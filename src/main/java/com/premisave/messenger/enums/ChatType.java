@@ -1,5 +1,5 @@
 package com.premisave.messenger.enums;
 
-public class ChatType {
-
+public enum ChatType {
+    PRIVATE, GROUP
 }

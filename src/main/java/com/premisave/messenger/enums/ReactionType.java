@@ -1,5 +1,5 @@
 package com.premisave.messenger.enums;
 
-public class ReactionType {
-
+public enum ReactionType {
+    LIKE, LOVE, LAUGH, SAD, ANGRY, WOW
 }

@@ -1,5 +1,5 @@
 package com.premisave.messenger.enums;
 
-public class MessageStatus {
-
+public enum MessageStatus {
+    SENDING, SENT, DELIVERED, READ, FAILED
 }

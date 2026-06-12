@@ -1,5 +1,5 @@
 package com.premisave.messenger.enums;
 
-public class MessageType {
-
+public enum MessageType {
+    TEXT, IMAGE, VIDEO, DOCUMENT, VOICE, LOCATION, STICKER, REACTION
 }
