@@ -1,5 +1,7 @@
 package com.premisave.messenger.exception;
 
-public class UserBlockedException {
-
+public class UserBlockedException extends RuntimeException {
+    public UserBlockedException(String message) {
+        super(message);
+    }
 }
