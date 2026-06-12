@@ -1,0 +1,52 @@
+spring:
+  application:
+    name: premisave-messenger-service
+
+  # MongoDB
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/premisave-messenger
+
+  # Redis
+  redis:
+    host: localhost
+    port: 6379
+
+  # WebSocket / STOMP
+  websocket:
+    stomp:
+      broker:
+        heartbeat: 10000
+
+server:
+  port: 8081
+
+# Auth Service Integration
+auth:
+  service:
+    url: http://localhost:8080
+
+# JWT (Should match Auth Service secret)
+jwt:
+  secret: eW91ci12ZXJ5LXNlY3VyZS1qd3Qtc2VjcmV0LWtleS0zMi1ieXRlcyE=
+
+# Cloudinary (Same as Auth Service)
+cloudinary:
+  cloud-name: thepeacemakersllc
+  api-key: 929659223288334
+  api-secret: nAsBdgfXx86u7-Y8X2VnLa-2FbQ
+
+# Logging
+logging:
+  level:
+    com.premisave.messenger: DEBUG
+    org.springframework.web.socket: DEBUG
+    org.springframework.data.mongodb: INFO
+
+# Profile Views / Other common settings (optional)
+profile-views:
+  max-history-size: 20
+
+# Rate Limiting (if you want to add later)
+rate-limit:
+  requests-per-minute: 60
