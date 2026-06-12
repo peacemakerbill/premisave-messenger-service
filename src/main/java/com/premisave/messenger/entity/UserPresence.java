@@ -1,0 +1,5 @@
+package com.premisave.messenger.entity;
+
+public class UserPresence {
+
+}
