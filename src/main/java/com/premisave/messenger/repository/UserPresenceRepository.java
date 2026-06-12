@@ -1,5 +1,7 @@
 package com.premisave.messenger.repository;
 
-public class UserPresenceRepository {
+import com.premisave.messenger.entity.UserPresence;
+import org.springframework.data.mongodb.repository.MongoRepository;
 
+public interface UserPresenceRepository extends MongoRepository<UserPresence, String> {
 }

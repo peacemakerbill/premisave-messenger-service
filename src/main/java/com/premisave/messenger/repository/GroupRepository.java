@@ -1,5 +1,11 @@
 package com.premisave.messenger.repository;
 
-public class GroupRepository {
+import com.premisave.messenger.entity.Group;
+import org.springframework.data.mongodb.repository.MongoRepository;
 
+import java.util.Optional;
+
+public interface GroupRepository extends MongoRepository<Group, String> {
+
+    Optional<Group> findByName(String name);
 }
