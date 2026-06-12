@@ -27,7 +27,7 @@ jwt:
 
 cloudinary:
   cloud-name: thepeacemakersllc
-  api-key: 929659223288334
+  api-key: "929659223288334"
   api-secret: nAsBdgfXx86u7-Y8X2VnLa-2FbQ
 
 logging:
@@ -35,6 +35,7 @@ logging:
     com.premisave.messenger: DEBUG
     org.springframework.web.socket: DEBUG
     org.springframework.data.mongodb: INFO
+    org.springframework.security: TRACE
 
 profile-views:
   max-history-size: 20
