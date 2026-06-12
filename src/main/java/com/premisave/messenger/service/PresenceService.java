@@ -7,6 +7,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 
 @Service
@@ -25,9 +26,11 @@ public class PresenceService {
         presence.setLastSeen(LocalDateTime.now());
         presenceRepository.save(presence);
 
-        // Broadcast to friends or subscribed users
-        messagingTemplate.convertAndSend("/topic/presence", 
-            Map.of("userId", userId, "status", "ONLINE"));
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("userId", userId);
+        payload.put("status", "ONLINE");
+
+        messagingTemplate.convertAndSend("/topic/presence", (Object) payload);
     }
 
     public void userOffline(String userId) {
@@ -37,8 +40,11 @@ public class PresenceService {
             presence.setLastSeen(LocalDateTime.now());
             presenceRepository.save(presence);
 
-            messagingTemplate.convertAndSend("/topic/presence", 
-                Map.of("userId", userId, "status", "OFFLINE"));
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("userId", userId);
+            payload.put("status", "OFFLINE");
+
+            messagingTemplate.convertAndSend("/topic/presence", (Object) payload);
         }
     }
 
