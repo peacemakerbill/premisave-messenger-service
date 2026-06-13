@@ -1,9 +1,6 @@
 package com.premisave.messenger.service;
 
-import com.premisave.messenger.client.AuthServiceClient;
-import com.premisave.messenger.dto.request.SendMessageRequest;
 import com.premisave.messenger.dto.response.MessageResponse;
-import com.premisave.messenger.dto.response.UserSummaryResponse;
 import com.premisave.messenger.dto.websocket.ChatMessage;
 import com.premisave.messenger.entity.Message;
 import com.premisave.messenger.enums.MessageStatus;
@@ -28,7 +25,6 @@ public class MessageService {
 
     private final MessageRepository messageRepository;
     private final ChatService chatService;
-    private final AuthServiceClient authServiceClient;
     private final SimpMessagingTemplate messagingTemplate;
 
     /**

@@ -1,10 +1,8 @@
 package com.premisave.messenger.service;
 
-import com.premisave.messenger.client.AuthServiceClient;
 import com.premisave.messenger.dto.response.ChatResponse;
 import com.premisave.messenger.dto.response.MessageResponse;
 import com.premisave.messenger.entity.Chat;
-import com.premisave.messenger.entity.Message;
 import com.premisave.messenger.enums.ChatType;
 import com.premisave.messenger.repository.ChatRepository;
 import com.premisave.messenger.repository.MessageRepository;
@@ -23,8 +21,6 @@ public class ChatService {
 
     private final ChatRepository chatRepository;
     private final MessageRepository messageRepository;
-    private final AuthServiceClient authServiceClient;
-
     /**
      * Get or create private chat between two users
      */

@@ -2,41 +2,51 @@ spring:
   application:
     name: premisave-messenger-service
 
+  # ==================== MongoDB ====================
   data:
     mongodb:
       uri: mongodb://localhost:27017/premisave-messenger
+      database: premisave-messenger   # Explicitly force correct database name
 
+  # ==================== Redis ====================
   redis:
     host: localhost
     port: 6379
 
+  # ==================== WebSocket ====================
   websocket:
     stomp:
       broker:
         heartbeat: 10000
 
+# ==================== Server ====================
 server:
   port: 8081
 
+# ==================== Auth Service Integration ====================
 auth:
   service:
     url: http://localhost:8080
 
+# ==================== JWT ====================
 jwt:
   secret: eW91ci12ZXJ5LXNlY3VyZS1qd3Qtc2VjcmV0LWtleS0zMi1ieXRlcyE=
 
+# ==================== Cloudinary ====================
 cloudinary:
   cloud-name: thepeacemakersllc
   api-key: "929659223288334"
   api-secret: nAsBdgfXx86u7-Y8X2VnLa-2FbQ
 
+# ==================== Logging ====================
 logging:
   level:
     com.premisave.messenger: DEBUG
     org.springframework.web.socket: DEBUG
-    org.springframework.data.mongodb: INFO
-    org.springframework.security: TRACE
+    org.springframework.data.mongodb: DEBUG
+    org.springframework.security: DEBUG
 
+# ==================== Other Settings ====================
 profile-views:
   max-history-size: 20
 
