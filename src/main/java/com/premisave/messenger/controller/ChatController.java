@@ -21,7 +21,7 @@ public class ChatController {
     private final ChatService chatService;
     private final JwtService jwtService;
 
-    // ==================== TEST ENDPOINT (Temporary) ====================
+    // ==================== TEMPORARY TEST ENDPOINT ====================
     @GetMapping("/test-token")
     public ResponseEntity<?> testToken(@RequestHeader("Authorization") String authHeader) {
         try {
@@ -36,30 +36,29 @@ public class ChatController {
             ));
         } catch (Exception e) {
             log.error("Token test failed", e);
-            return ResponseEntity.badRequest().body(Map.of(
-                "error", e.getMessage(),
-                "status", "failed"
-            ));
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
     /**
-     * Create or get private chat between current user and another user
+     * Create or Get Private Chat
+     * POST /api/chats/private
      */
     @PostMapping("/private")
     public ResponseEntity<ChatResponse> createPrivateChat(
             @RequestBody CreateChatRequest request,
             @RequestHeader("Authorization") String authHeader) {
 
-        String currentUserId = extractUserIdFromToken(authHeader);
+        String currentUserId = extractUserId(authHeader);
+        
         String chatId = chatService.getOrCreatePrivateChat(currentUserId, request.getOtherUserId());
 
-        // You can enhance this to return full chat details
         ChatResponse response = new ChatResponse();
         response.setId(chatId);
         response.setChatType(com.premisave.messenger.enums.ChatType.PRIVATE);
         response.setParticipantIds(List.of(currentUserId, request.getOtherUserId()));
 
+        log.info("Private chat created/retrieved between {} and {}", currentUserId, request.getOtherUserId());
         return ResponseEntity.ok(response);
     }
 
@@ -67,29 +66,29 @@ public class ChatController {
      * Get all chats for current user
      */
     @GetMapping
-    public ResponseEntity<List<ChatResponse>> getUserChats(@RequestHeader("Authorization") String authHeader) {
-        String currentUserId = extractUserIdFromToken(authHeader);
+    public ResponseEntity<List<ChatResponse>> getMyChats(@RequestHeader("Authorization") String authHeader) {
+        String currentUserId = extractUserId(authHeader);
         List<ChatResponse> chats = chatService.getUserChats(currentUserId);
         return ResponseEntity.ok(chats);
     }
 
     /**
-     * Delete / Archive chat
+     * Delete/Archive chat
      */
     @DeleteMapping("/{chatId}")
     public ResponseEntity<Void> deleteChat(
             @PathVariable String chatId,
             @RequestHeader("Authorization") String authHeader) {
 
-        String currentUserId = extractUserIdFromToken(authHeader);
+        String currentUserId = extractUserId(authHeader);
         chatService.deleteChat(chatId, currentUserId);
         return ResponseEntity.noContent().build();
     }
 
-    // Helper method to extract user ID from token
-    private String extractUserIdFromToken(String authHeader) {
+    // ==================== Helper Method ====================
+    private String extractUserId(String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            throw new RuntimeException("Invalid authorization header");
+            throw new RuntimeException("Missing or invalid Authorization header");
         }
         String token = authHeader.substring(7);
         String userId = jwtService.extractUsername(token);
