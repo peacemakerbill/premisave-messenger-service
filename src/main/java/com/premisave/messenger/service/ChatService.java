@@ -4,6 +4,7 @@ import com.premisave.messenger.dto.response.ChatResponse;
 import com.premisave.messenger.dto.response.MessageResponse;
 import com.premisave.messenger.entity.Chat;
 import com.premisave.messenger.enums.ChatType;
+import com.premisave.messenger.exception.ChatNotFoundException;
 import com.premisave.messenger.repository.ChatRepository;
 import com.premisave.messenger.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
@@ -89,14 +90,16 @@ public class ChatService {
 
     public void deleteChat(String chatId, String userId) {
         Chat chat = chatRepository.findById(chatId)
-                .orElseThrow(() -> new RuntimeException("Chat not found"));
+                .orElseThrow(() -> new ChatNotFoundException("Chat not found with id: " + chatId));
 
         if (!chat.getParticipantIds().contains(userId)) {
-            throw new RuntimeException("You are not part of this chat");
+            throw new RuntimeException("You are not a participant of this chat");
         }
 
         chat.setActive(false);
+        chat.setUpdatedAt(LocalDateTime.now());   // Make sure this field exists in entity
         chatRepository.save(chat);
-        log.info("Chat {} marked as deleted by user {}", chatId, userId);
+
+        log.info("Chat {} marked as inactive by user {}", chatId, userId);
     }
 }

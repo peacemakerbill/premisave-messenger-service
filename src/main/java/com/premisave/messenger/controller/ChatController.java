@@ -7,6 +7,7 @@ import com.premisave.messenger.service.ChatService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -78,13 +79,19 @@ public class ChatController {
     @DeleteMapping("/{chatId}")
     public ResponseEntity<Void> deleteChat(
             @PathVariable String chatId,
-            @RequestHeader("Authorization") String authHeader) {
+            Authentication authentication) {
 
-        String currentUserId = extractUserId(authHeader);
+        if (authentication == null || authentication.getName() == null) {
+            throw new RuntimeException("User not authenticated");
+        }
+
+        String currentUserId = authentication.getName();
         chatService.deleteChat(chatId, currentUserId);
+        
+        log.info("Chat {} deleted by user {}", chatId, currentUserId);
         return ResponseEntity.noContent().build();
     }
-
+    
     // ==================== Helper Method ====================
     private String extractUserId(String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
