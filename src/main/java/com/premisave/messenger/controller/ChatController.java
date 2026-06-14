@@ -79,7 +79,7 @@ public class ChatController {
     @DeleteMapping("/{chatId}")
     public ResponseEntity<Void> deleteChat(
             @PathVariable String chatId,
-            Authentication authentication) {
+            Authentication authentication) {          // Changed to use Security Context
 
         if (authentication == null || authentication.getName() == null) {
             throw new RuntimeException("User not authenticated");
@@ -91,8 +91,8 @@ public class ChatController {
         log.info("Chat {} deleted by user {}", chatId, currentUserId);
         return ResponseEntity.noContent().build();
     }
-    
-    // ==================== Helper Method ====================
+
+    // ==================== Helper Method (still used by other endpoints) ====================
     private String extractUserId(String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             throw new RuntimeException("Missing or invalid Authorization header");

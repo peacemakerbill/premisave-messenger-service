@@ -22,6 +22,7 @@ public class ChatService {
 
     private final ChatRepository chatRepository;
     private final MessageRepository messageRepository;
+
     /**
      * Get or create private chat between two users
      */
@@ -36,6 +37,7 @@ public class ChatService {
         newChat.getParticipantIds().add(userId1);
         newChat.getParticipantIds().add(userId2);
         newChat.setCreatedAt(LocalDateTime.now());
+        newChat.setActive(true);
 
         Chat saved = chatRepository.save(newChat);
         log.info("New private chat created between {} and {}", userId1, userId2);
@@ -44,7 +46,7 @@ public class ChatService {
 
     public void updateLastMessage(String chatId, String messageId) {
         Chat chat = chatRepository.findById(chatId)
-                .orElseThrow(() -> new RuntimeException("Chat not found"));
+                .orElseThrow(() -> new ChatNotFoundException("Chat not found: " + chatId));
         
         chat.setLastMessageId(messageId);
         chat.setLastMessageAt(LocalDateTime.now());
@@ -52,10 +54,11 @@ public class ChatService {
     }
 
     /**
-     * Get all chats for current user
+     * Get all ACTIVE chats for current user
      */
     public List<ChatResponse> getUserChats(String userId) {
-        List<Chat> chats = chatRepository.findByParticipantIdsContaining(userId);
+        // Using the optimized query that filters active chats only
+        List<Chat> chats = chatRepository.findByParticipantIdsContainingAndIsActiveTrue(userId);
         
         return chats.stream()
                 .map(chat -> convertToChatResponse(chat, userId))
@@ -68,6 +71,7 @@ public class ChatService {
         response.setChatType(chat.getChatType());
         response.setParticipantIds(chat.getParticipantIds());
         response.setLastMessageAt(chat.getLastMessageAt());
+        response.setGroupId(chat.getGroupId());
 
         // Get last message
         if (chat.getLastMessageId() != null) {
@@ -88,8 +92,11 @@ public class ChatService {
         return response;
     }
 
+    /**
+     * Soft delete / Archive chat
+     */
     public void deleteChat(String chatId, String userId) {
-        Chat chat = chatRepository.findById(chatId)
+        Chat chat = chatRepository.findByIdAndIsActiveTrue(chatId)
                 .orElseThrow(() -> new ChatNotFoundException("Chat not found with id: " + chatId));
 
         if (!chat.getParticipantIds().contains(userId)) {
@@ -97,9 +104,9 @@ public class ChatService {
         }
 
         chat.setActive(false);
-        chat.setUpdatedAt(LocalDateTime.now());   // Make sure this field exists in entity
+        chat.setUpdatedAt(LocalDateTime.now());
         chatRepository.save(chat);
 
-        log.info("Chat {} marked as inactive by user {}", chatId, userId);
+        log.info("Chat {} marked as inactive/deleted by user {}", chatId, userId);
     }
 }
