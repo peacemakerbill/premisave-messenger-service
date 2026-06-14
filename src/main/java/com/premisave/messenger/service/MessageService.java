@@ -28,7 +28,7 @@ public class MessageService {
     private final SimpMessagingTemplate messagingTemplate;
 
     /**
-     * Send a new message (mainly called from WebSocket)
+     * Send a new message (used by both WebSocket and REST)
      */
     public ChatMessage sendMessage(ChatMessage chatMessage) {
         try {
@@ -41,16 +41,16 @@ public class MessageService {
             message.setMediaUrl(chatMessage.getMediaUrl());
             message.setStatus(MessageStatus.SENT);
             message.setCreatedAt(LocalDateTime.now());
-            message.setActive(true);                    // New active flag
+            message.setActive(true);
 
             Message savedMessage = messageRepository.save(message);
 
-            // Update last message in chat
+            // Update chat's last message
             chatService.updateLastMessage(savedMessage.getChatId(), savedMessage.getId());
 
             ChatMessage response = convertToChatMessage(savedMessage);
 
-            // Real-time delivery
+            // Real-time notifications
             if (chatMessage.getReceiverId() != null) {
                 messagingTemplate.convertAndSendToUser(chatMessage.getReceiverId(), "/queue/messages", response);
             }
@@ -68,7 +68,7 @@ public class MessageService {
     }
 
     /**
-     * Get paginated messages for a chat (only active ones)
+     * Get paginated messages
      */
     public List<MessageResponse> getChatMessages(String chatId, int page, int size) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
@@ -88,7 +88,7 @@ public class MessageService {
                 .orElseThrow(() -> new MessageNotFoundException("Message not found: " + messageId));
 
         if (!message.isActive()) {
-            throw new RuntimeException("Message is no longer active");
+            throw new RuntimeException("Message is no longer available");
         }
 
         if (!message.getReadBy().contains(userId)) {
@@ -98,7 +98,6 @@ public class MessageService {
             }
             messageRepository.save(message);
 
-            // Notify sender about read receipt
             messagingTemplate.convertAndSendToUser(
                     message.getSenderId(),
                     "/queue/read-receipts",
@@ -108,7 +107,7 @@ public class MessageService {
     }
 
     /**
-     * Delete message for everyone (soft delete)
+     * Delete message for everyone
      */
     public void deleteMessageForEveryone(String messageId, String userId) {
         Message message = messageRepository.findById(messageId)
@@ -121,10 +120,9 @@ public class MessageService {
         message.setDeletedForEveryone(true);
         message.setContent("This message was deleted");
         message.setEditedAt(LocalDateTime.now());
-        message.setActive(false);                    // Mark as inactive
+        message.setActive(false);
         messageRepository.save(message);
 
-        // Notify both parties
         ChatMessage deletedMsg = convertToChatMessage(message);
         messagingTemplate.convertAndSendToUser(message.getSenderId(), "/queue/messages", deletedMsg);
         
@@ -147,6 +145,22 @@ public class MessageService {
         cm.setTimestamp(message.getCreatedAt());
         cm.setStatus(message.getStatus().name());
         return cm;
+    }
+
+    /**
+     * Convert ChatMessage (from sendMessage) to MessageResponse for REST
+     */
+    public MessageResponse convertToMessageResponse(ChatMessage chatMessage) {
+        MessageResponse response = new MessageResponse();
+        response.setId(chatMessage.getId());
+        response.setChatId(chatMessage.getChatId());
+        response.setSenderId(chatMessage.getSenderId());
+        response.setContent(chatMessage.getContent());
+        response.setMessageType(chatMessage.getMessageType());
+        response.setMediaUrl(chatMessage.getMediaUrl());
+        response.setCreatedAt(chatMessage.getTimestamp());
+        response.setStatus(MessageStatus.valueOf(chatMessage.getStatus()));
+        return response;
     }
 
     private MessageResponse convertToMessageResponse(Message message) {
