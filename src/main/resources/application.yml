@@ -2,11 +2,19 @@ spring:
   application:
     name: premisave-messenger-service
 
+  # ==================== File Upload Configuration ====================
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB      # Maximum size per file
+      max-request-size: 50MB   # Maximum size for entire request (important for multipart)
+      file-size-threshold: 2KB # Files larger than this are written to disk
+
   # ==================== MongoDB ====================
   data:
     mongodb:
       uri: mongodb://localhost:27017/premisave-messenger
-      database: premisave-messenger   # Explicitly force correct database name
+      database: premisave-messenger
 
   # ==================== Redis ====================
   redis:
@@ -45,6 +53,7 @@ logging:
     org.springframework.web.socket: DEBUG
     org.springframework.data.mongodb: DEBUG
     org.springframework.security: DEBUG
+    org.springframework.web.multipart: DEBUG   # Added for upload debugging
 
 # ==================== Other Settings ====================
 profile-views:
