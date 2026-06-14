@@ -18,6 +18,9 @@ public class SendMessageRequest {
     private String fileName;
     private Long fileSize;
 
+    // For replying to a specific message
+    private String replyToMessageId;
+
     // For location sharing
     private Double latitude;
     private Double longitude;

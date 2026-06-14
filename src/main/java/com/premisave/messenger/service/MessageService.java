@@ -28,7 +28,7 @@ public class MessageService {
     private final SimpMessagingTemplate messagingTemplate;
 
     /**
-     * Send a new message (used by both WebSocket and REST)
+     * Send a new message (supports replies)
      */
     public ChatMessage sendMessage(ChatMessage chatMessage) {
         try {
@@ -42,22 +42,19 @@ public class MessageService {
             message.setStatus(MessageStatus.SENT);
             message.setCreatedAt(LocalDateTime.now());
             message.setActive(true);
+            message.setReplyToMessageId(chatMessage.getReplyToMessageId());
 
             Message savedMessage = messageRepository.save(message);
 
-            // Update chat's last message
             chatService.updateLastMessage(savedMessage.getChatId(), savedMessage.getId());
 
             ChatMessage response = convertToChatMessage(savedMessage);
 
-            // Real-time notifications
+            // Real-time delivery
             if (chatMessage.getReceiverId() != null) {
                 messagingTemplate.convertAndSendToUser(chatMessage.getReceiverId(), "/queue/messages", response);
             }
             messagingTemplate.convertAndSendToUser(chatMessage.getSenderId(), "/queue/messages", response);
-
-            log.info("Message sent from {} to {} in chat {}", 
-                    savedMessage.getSenderId(), savedMessage.getReceiverId(), savedMessage.getChatId());
 
             return response;
 
@@ -80,16 +77,9 @@ public class MessageService {
                 .toList();
     }
 
-    /**
-     * Mark message as read
-     */
     public void markMessageAsRead(String messageId, String userId) {
         Message message = messageRepository.findById(messageId)
                 .orElseThrow(() -> new MessageNotFoundException("Message not found: " + messageId));
-
-        if (!message.isActive()) {
-            throw new RuntimeException("Message is no longer available");
-        }
 
         if (!message.getReadBy().contains(userId)) {
             message.getReadBy().add(userId);
@@ -101,20 +91,17 @@ public class MessageService {
             messagingTemplate.convertAndSendToUser(
                     message.getSenderId(),
                     "/queue/read-receipts",
-                    Map.of("messageId", messageId, "status", "READ", "by", userId)
+                    Map.of("messageId", messageId, "status", "READ")
             );
         }
     }
 
-    /**
-     * Delete message for everyone
-     */
     public void deleteMessageForEveryone(String messageId, String userId) {
         Message message = messageRepository.findById(messageId)
                 .orElseThrow(() -> new MessageNotFoundException("Message not found: " + messageId));
 
         if (!message.getSenderId().equals(userId)) {
-            throw new RuntimeException("You can only delete your own messages");
+            throw new RuntimeException("Only sender can delete for everyone");
         }
 
         message.setDeletedForEveryone(true);
@@ -123,9 +110,23 @@ public class MessageService {
         message.setActive(false);
         messageRepository.save(message);
 
+        broadcastDeletedMessage(message);
+    }
+
+    public void deleteMessageForMe(String messageId, String userId) {
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new MessageNotFoundException("Message not found: " + messageId));
+
+        if (!message.getDeletedForUsers().contains(userId)) {
+            message.getDeletedForUsers().add(userId);
+            messageRepository.save(message);
+            log.info("Message {} deleted for user {}", messageId, userId);
+        }
+    }
+
+    private void broadcastDeletedMessage(Message message) {
         ChatMessage deletedMsg = convertToChatMessage(message);
         messagingTemplate.convertAndSendToUser(message.getSenderId(), "/queue/messages", deletedMsg);
-        
         if (message.getReceiverId() != null) {
             messagingTemplate.convertAndSendToUser(message.getReceiverId(), "/queue/messages", deletedMsg);
         }
@@ -144,12 +145,10 @@ public class MessageService {
         cm.setMediaUrl(message.getMediaUrl());
         cm.setTimestamp(message.getCreatedAt());
         cm.setStatus(message.getStatus().name());
+        cm.setReplyToMessageId(message.getReplyToMessageId());
         return cm;
     }
 
-    /**
-     * Convert ChatMessage (from sendMessage) to MessageResponse for REST
-     */
     public MessageResponse convertToMessageResponse(ChatMessage chatMessage) {
         MessageResponse response = new MessageResponse();
         response.setId(chatMessage.getId());
@@ -160,6 +159,7 @@ public class MessageService {
         response.setMediaUrl(chatMessage.getMediaUrl());
         response.setCreatedAt(chatMessage.getTimestamp());
         response.setStatus(MessageStatus.valueOf(chatMessage.getStatus()));
+        response.setReplyToMessageId(chatMessage.getReplyToMessageId());
         return response;
     }
 
@@ -176,6 +176,37 @@ public class MessageService {
         response.setCreatedAt(message.getCreatedAt());
         response.setEditedAt(message.getEditedAt());
         response.setDeleted(message.isDeletedForEveryone());
+        response.setReplyToMessageId(message.getReplyToMessageId());
+
+        // Build reply preview if this message is a reply
+        if (message.getReplyToMessageId() != null) {
+            response.setReplyPreview(buildReplyPreview(message.getReplyToMessageId()));
+        }
+
         return response;
+    }
+
+    /**
+     * Build reply preview
+     */
+    private MessageResponse.ReplyPreview buildReplyPreview(String originalMessageId) {
+        if (originalMessageId == null) return null;
+
+        return messageRepository.findById(originalMessageId)
+                .map(original -> {
+                    MessageResponse.ReplyPreview preview = new MessageResponse.ReplyPreview();
+                    preview.setMessageId(original.getId());
+                    preview.setSenderId(original.getSenderId());
+                    preview.setContent(truncateForPreview(original.getContent()));
+                    preview.setMessageType(original.getMessageType());
+                    preview.setMediaUrl(original.getMediaUrl());
+                    return preview;
+                })
+                .orElse(null);
+    }
+
+    private String truncateForPreview(String content) {
+        if (content == null) return "";
+        return content.length() > 80 ? content.substring(0, 77) + "..." : content;
     }
 }

@@ -26,24 +26,29 @@ public class Message {
 
     private String chatId;
     private String senderId;
-    private String receiverId; // For private chats
+    private String receiverId;
 
     private MessageType messageType = MessageType.TEXT;
-    private String content;           // Text or media URL
-    private String mediaUrl;          // For images, videos, etc.
+    private String content;
+    private String mediaUrl;
     private String fileName;
     private Long fileSize;
 
     private MessageStatus status = MessageStatus.SENT;
 
-    private List<String> readBy = new ArrayList<>(); // List of userIds who read it
+    private List<String> readBy = new ArrayList<>();
 
     @CreatedDate
     private LocalDateTime createdAt;
-
     private LocalDateTime editedAt;
+
     private boolean isDeleted = false;
     private boolean isDeletedForEveryone = false;
-    
-    private boolean isActive = true;   // For soft delete / visibility control
+    private boolean isActive = true;
+
+    // Reply support
+    private String replyToMessageId;
+
+    // Delete for Me support (per-user deletion)
+    private List<String> deletedForUsers = new ArrayList<>();
 }
