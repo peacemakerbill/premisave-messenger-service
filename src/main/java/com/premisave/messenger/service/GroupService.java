@@ -164,6 +164,65 @@ public class GroupService {
         group.setUpdatedAt(LocalDateTime.now());
         return groupRepository.save(group);
     }
+    
+    /**
+     * Promote member to Admin (WhatsApp style - multiple admins allowed)
+     */
+    public void addAdminToGroup(String groupId, String userId, String requestedBy) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new RuntimeException("Group not found"));
+
+        if (!group.getAdminId().equals(requestedBy)) {
+            throw new RuntimeException("Only group admin can promote others");
+        }
+
+        if (!group.getMemberIds().contains(userId)) {
+            throw new RuntimeException("User must be a member first");
+        }
+
+        if (!group.getModerators().contains(userId)) {
+            group.getModerators().add(userId);
+            groupRepository.save(group);
+        }
+
+        // Update role in GroupMember
+        groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
+                .ifPresent(member -> {
+                    member.setRole("ADMIN");
+                    groupMemberRepository.save(member);
+                });
+
+        log.info("User {} promoted to ADMIN in group {}", userId, groupId);
+    }
+
+    /**
+     * Remove Admin (Demote from Admin)
+     */
+    public void removeAdminFromGroup(String groupId, String userId, String requestedBy) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new RuntimeException("Group not found"));
+
+        if (!group.getAdminId().equals(requestedBy)) {
+            throw new RuntimeException("Only group admin can demote others");
+        }
+
+        if (group.getAdminId().equals(userId)) {
+            throw new RuntimeException("Cannot remove the main group creator from admin");
+        }
+
+        group.getModerators().remove(userId);
+        groupRepository.save(group);
+
+        // Update role in GroupMember
+        groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
+                .ifPresent(member -> {
+                    member.setRole("MEMBER");
+                    groupMemberRepository.save(member);
+                });
+
+        log.info("User {} demoted from ADMIN in group {}", userId, groupId);
+    }
+    
 
     public List<Group> getUserGroups(String userId) {
         return groupRepository.findByMemberIdsContaining(userId);

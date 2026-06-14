@@ -115,6 +115,34 @@ public class GroupController {
         Group updatedGroup = groupService.transferAdmin(groupId, newAdminId, currentAdmin);
         return ResponseEntity.ok(updatedGroup);
     }
+    
+    /**
+     * Promote Member to Admin (Multiple Admins Support)
+     */
+    @PostMapping("/{groupId}/admins")
+    public ResponseEntity<String> addAdmin(
+            @PathVariable String groupId,
+            @RequestParam String userId,
+            Authentication authentication) {
+
+        String currentAdmin = authentication.getName();
+        groupService.addAdminToGroup(groupId, userId, currentAdmin);
+        return ResponseEntity.ok("User promoted to admin successfully");
+    }
+
+    /**
+     * Remove Admin (Demote from Admin)
+     */
+    @DeleteMapping("/{groupId}/admins/{userId}")
+    public ResponseEntity<String> removeAdmin(
+            @PathVariable String groupId,
+            @PathVariable String userId,
+            Authentication authentication) {
+
+        String currentAdmin = authentication.getName();
+        groupService.removeAdminFromGroup(groupId, userId, currentAdmin);
+        return ResponseEntity.ok("User demoted from admin successfully");
+    }
 
     /**
      * Get My Groups
