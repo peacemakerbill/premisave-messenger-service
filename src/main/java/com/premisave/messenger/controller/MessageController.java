@@ -3,20 +3,29 @@ package com.premisave.messenger.controller;
 import com.premisave.messenger.dto.request.SendMessageRequest;
 import com.premisave.messenger.dto.response.MessageResponse;
 import com.premisave.messenger.dto.websocket.ChatMessage;
+import com.premisave.messenger.enums.MessageType;
+import com.premisave.messenger.service.MediaService;
 import com.premisave.messenger.service.MessageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
 /**
- * REST Controller for handling all message-related operations.
+ * MessageController - Handles all messaging operations including text, media, and replies.
  * 
- * Supports both direct messaging and reply functionality.
- * All endpoints require valid JWT authentication.
+ * Key Features:
+ * - Send text messages
+ * - Send media files (images, videos, documents, voice) with automatic upload to Cloudinary
+ * - Reply to messages (with or without media)
+ * - Message retrieval, read receipts, and deletion (for everyone / for me)
+ * 
+ * @author Bill Graham Peacemaker
+ * @version 1.1
  */
 @Slf4j
 @RestController
@@ -25,38 +34,41 @@ import java.util.List;
 public class MessageController {
 
     private final MessageService messageService;
+    private final MediaService mediaService;
 
     /**
-     * Send a new message in a chat.
+     * Send a new message - Supports both text-only and file attachments.
      * 
-     * @param request message details (chatId, content, etc.)
-     * @param authentication current authenticated user
-     * @return created message with full details
+     * Accepts multipart/form-data to support file uploads.
+     * 
+     * Example Usage:
+     * - Text only: content + chatId
+     * - With file: content + chatId + file (image/video/document/voice)
+     * 
+     * @param request Combined request containing message data and optional file
+     * @param authentication Current authenticated user (from JWT)
      */
-    @PostMapping
+    @PostMapping(consumes = {"multipart/form-data"})
     public ResponseEntity<MessageResponse> sendMessage(
-            @RequestBody SendMessageRequest request,
+            @ModelAttribute SendMessageRequest request,
             Authentication authentication) {
 
         return sendMessageInternal(request, authentication, false);
     }
 
     /**
-     * Dedicated endpoint to reply to a specific message.
+     * Reply to an existing message.
      * 
-     * This is the recommended way to create replies as it clearly indicates intent.
-     * 
-     * Example: POST /api/messages/{originalMessageId}/reply
+     * This endpoint makes reply intent explicit and supports file attachments in replies.
      * 
      * @param messageId ID of the message being replied to
-     * @param request reply content
-     * @param authentication current authenticated user
-     * @return created reply message
+     * @param request Message content + optional file
+     * @param authentication Current user
      */
-    @PostMapping("/{messageId}/reply")
+    @PostMapping(value = "/{messageId}/reply", consumes = {"multipart/form-data"})
     public ResponseEntity<MessageResponse> replyToMessage(
             @PathVariable String messageId,
-            @RequestBody SendMessageRequest request,
+            @ModelAttribute SendMessageRequest request,
             Authentication authentication) {
 
         request.setReplyToMessageId(messageId);
@@ -64,8 +76,18 @@ public class MessageController {
     }
 
     /**
-     * Internal helper method to handle both normal messages and replies.
-     * Reduces code duplication while maintaining clarity.
+     * Internal helper method to reduce duplication between sendMessage and replyToMessage.
+     * 
+     * Handles:
+     * 1. Authentication check
+     * 2. File upload to Cloudinary (if present)
+     * 3. Auto-detection of message type based on file
+     * 4. Message processing via MessageService
+     * 
+     * @param request The message request (may contain file)
+     * @param authentication Current authenticated user
+     * @param isReply Whether this is a reply operation
+     * @return Created message response
      */
     private ResponseEntity<MessageResponse> sendMessageInternal(
             SendMessageRequest request,
@@ -73,12 +95,40 @@ public class MessageController {
             boolean isReply) {
 
         if (authentication == null || authentication.getName() == null) {
-            log.warn("Unauthorized attempt to send message");
+            log.warn("Unauthorized message attempt");
             return ResponseEntity.status(401).build();
         }
 
         String senderId = authentication.getName();
 
+        // ====================== FILE UPLOAD HANDLING ======================
+        if (request.getFile() != null && !request.getFile().isEmpty()) {
+            try {
+                // Determine appropriate Cloudinary folder and message type
+                String folder = determineMediaFolder(request.getFile());
+                String uploadedUrl = mediaService.uploadMedia(request.getFile(), folder);
+
+                // Populate media fields
+                request.setMediaUrl(uploadedUrl);
+                request.setFileName(request.getFile().getOriginalFilename());
+                request.setFileSize(request.getFile().getSize());
+
+                // Auto-detect message type if not explicitly provided
+                if (request.getMessageType() == MessageType.TEXT || request.getMessageType() == null) {
+                    request.setMessageType(detectMessageType(request.getFile()));
+                }
+
+                log.info("File uploaded successfully: {} | Type: {} | URL: {}", 
+                        request.getFileName(), request.getMessageType(), uploadedUrl);
+
+            } catch (Exception e) {
+                log.error("Media upload failed for chat: {}", request.getChatId(), e);
+                return ResponseEntity.internalServerError()
+                        .body(null); // Consider custom error response in production
+            }
+        }
+
+        // ====================== PREPARE AND SEND MESSAGE ======================
         ChatMessage chatMessage = new ChatMessage();
         chatMessage.setChatId(request.getChatId());
         chatMessage.setSenderId(senderId);
@@ -87,9 +137,11 @@ public class MessageController {
         chatMessage.setMediaUrl(request.getMediaUrl());
         chatMessage.setReplyToMessageId(request.getReplyToMessageId());
 
+        // Delegate business logic to service layer
         ChatMessage savedMessage = messageService.sendMessage(chatMessage);
         MessageResponse response = messageService.convertToMessageResponse(savedMessage);
 
+        // Logging for observability
         if (isReply) {
             log.info("Reply sent by {} to message {} in chat {}", 
                     senderId, request.getReplyToMessageId(), request.getChatId());
@@ -101,8 +153,37 @@ public class MessageController {
     }
 
     /**
-     * Retrieve paginated messages from a specific chat.
-     * Messages are returned in descending order (newest first).
+     * Determines the appropriate Cloudinary folder based on file MIME type.
+     */
+    private String determineMediaFolder(MultipartFile file) {
+        String contentType = file.getContentType();
+        if (contentType != null) {
+            if (contentType.startsWith("image/")) return "images";
+            if (contentType.startsWith("video/")) return "videos";
+            if (contentType.startsWith("audio/")) return "voice";
+        }
+        return "documents";
+    }
+
+    /**
+     * Automatically detects MessageType from file content type.
+     * Falls back to DOCUMENT for unknown types.
+     */
+    private MessageType detectMessageType(MultipartFile file) {
+        String contentType = file.getContentType();
+        if (contentType == null) return MessageType.DOCUMENT;
+
+        if (contentType.startsWith("image/")) return MessageType.IMAGE;
+        if (contentType.startsWith("video/")) return MessageType.VIDEO;
+        if (contentType.startsWith("audio/")) return MessageType.VOICE;
+
+        return MessageType.DOCUMENT;
+    }
+
+    // ====================== OTHER MESSAGE OPERATIONS ======================
+
+    /**
+     * Retrieve paginated messages from a chat (newest first).
      */
     @GetMapping("/chat/{chatId}")
     public ResponseEntity<List<MessageResponse>> getMessages(
@@ -120,8 +201,7 @@ public class MessageController {
     }
 
     /**
-     * Mark a message as read by the current user.
-     * Sends real-time read receipt to the sender.
+     * Mark a message as read and notify sender via WebSocket.
      */
     @PostMapping("/read/{messageId}")
     public ResponseEntity<Void> markAsRead(
@@ -137,8 +217,7 @@ public class MessageController {
     }
 
     /**
-     * Delete message for everyone (visible to all participants).
-     * Only the original sender can perform this action.
+     * Delete message for all participants (only sender can do this).
      */
     @DeleteMapping("/{messageId}")
     public ResponseEntity<Void> deleteForEveryone(
@@ -154,8 +233,7 @@ public class MessageController {
     }
 
     /**
-     * Delete message only for the current user (soft delete).
-     * Other participants can still see the message.
+     * Soft delete message only for current user.
      */
     @DeleteMapping("/{messageId}/me")
     public ResponseEntity<Void> deleteForMe(
