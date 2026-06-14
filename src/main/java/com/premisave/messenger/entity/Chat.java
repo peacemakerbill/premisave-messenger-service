@@ -36,4 +36,8 @@ public class Chat {
     private LocalDateTime updatedAt;
 
     private boolean isActive = true;
+
+    // Group-specific metadata cached in chat
+    private String groupName;
+    private String groupPhotoUrl;
 }

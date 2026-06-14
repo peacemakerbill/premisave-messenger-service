@@ -19,5 +19,13 @@ public class ChatResponse {
     private LocalDateTime lastMessageAt;
 
     private int unreadCount;
-    private boolean isOnline; // For the other participant in private chat
+    private boolean isOnline;
+
+    // Group specific
+    private String groupName;
+    private String groupPhotoUrl;
+    private String adminId;
+    private int memberCount;
+
+    private LocalDateTime lastSeen;   // Last seen of the other user
 }

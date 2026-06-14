@@ -1,11 +1,15 @@
 package com.premisave.messenger.service;
 
 import com.premisave.messenger.dto.response.MessageResponse;
+import com.premisave.messenger.dto.response.UserSummaryResponse;
 import com.premisave.messenger.dto.websocket.ChatMessage;
+import com.premisave.messenger.entity.Chat;
 import com.premisave.messenger.entity.Message;
+import com.premisave.messenger.enums.ChatType;
 import com.premisave.messenger.enums.MessageStatus;
 import com.premisave.messenger.enums.MessageType;
 import com.premisave.messenger.exception.MessageNotFoundException;
+import com.premisave.messenger.repository.ChatRepository;
 import com.premisave.messenger.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,56 +28,61 @@ import java.util.Map;
 public class MessageService {
 
     private final MessageRepository messageRepository;
+    private final ChatRepository chatRepository;
     private final ChatService chatService;
+    private final UserService userService;
     private final SimpMessagingTemplate messagingTemplate;
 
-    /**
-     * Send a new message (supports replies)
-     */
-    public ChatMessage sendMessage(ChatMessage chatMessage) {
-        try {
-            Message message = new Message();
-            message.setChatId(chatMessage.getChatId());
-            message.setSenderId(chatMessage.getSenderId());
-            message.setReceiverId(chatMessage.getReceiverId());
-            message.setContent(chatMessage.getContent());
-            message.setMessageType(chatMessage.getMessageType() != null ? chatMessage.getMessageType() : MessageType.TEXT);
-            message.setMediaUrl(chatMessage.getMediaUrl());
-            message.setStatus(MessageStatus.SENT);
-            message.setCreatedAt(LocalDateTime.now());
-            message.setActive(true);
-            message.setReplyToMessageId(chatMessage.getReplyToMessageId());
+    public MessageResponse sendMessage(ChatMessage chatMessage, String authToken) {
+        Message message = new Message();
+        message.setChatId(chatMessage.getChatId());
+        message.setSenderId(chatMessage.getSenderId());
+        message.setContent(chatMessage.getContent());
+        message.setMessageType(chatMessage.getMessageType() != null ? chatMessage.getMessageType() : MessageType.TEXT);
+        message.setMediaUrl(chatMessage.getMediaUrl());
+        message.setStatus(MessageStatus.SENT);
+        message.setCreatedAt(LocalDateTime.now());
+        message.setActive(true);
+        message.setReplyToMessageId(chatMessage.getReplyToMessageId());
 
-            Message savedMessage = messageRepository.save(message);
+        Message savedMessage = messageRepository.save(message);
+        chatService.updateLastMessage(savedMessage.getChatId(), savedMessage.getId());
 
-            chatService.updateLastMessage(savedMessage.getChatId(), savedMessage.getId());
+        MessageResponse response = convertToMessageResponse(savedMessage, authToken);
+        broadcastMessage(savedMessage, response);
 
-            ChatMessage response = convertToChatMessage(savedMessage);
+        return response;
+    }
 
-            // Real-time delivery
-            if (chatMessage.getReceiverId() != null) {
-                messagingTemplate.convertAndSendToUser(chatMessage.getReceiverId(), "/queue/messages", response);
-            }
-            messagingTemplate.convertAndSendToUser(chatMessage.getSenderId(), "/queue/messages", response);
+    private void broadcastMessage(Message message, MessageResponse response) {
+        Chat chat = chatRepository.findById(message.getChatId()).orElse(null);
+        if (chat == null) {
+            messagingTemplate.convertAndSendToUser(message.getSenderId(), "/queue/messages", response);
+            return;
+        }
 
-            return response;
-
-        } catch (Exception e) {
-            log.error("Failed to send message", e);
-            throw new RuntimeException("Failed to send message", e);
+        if (chat.getChatType() == ChatType.PRIVATE) {
+            chat.getParticipantIds().stream()
+                .filter(id -> !id.equals(message.getSenderId()))
+                .findFirst()
+                .ifPresent(receiver -> messagingTemplate.convertAndSendToUser(receiver, "/queue/messages", response));
+            
+            messagingTemplate.convertAndSendToUser(message.getSenderId(), "/queue/messages", response);
+        } else {
+            // Group chat
+            chat.getParticipantIds().forEach(memberId ->
+                messagingTemplate.convertAndSendToUser(memberId, "/queue/messages", response)
+            );
         }
     }
 
-    /**
-     * Get paginated messages
-     */
-    public List<MessageResponse> getChatMessages(String chatId, int page, int size) {
+    public List<MessageResponse> getChatMessages(String chatId, int page, int size, String authToken) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         List<Message> messages = messageRepository.findByChatIdOrderByCreatedAtDesc(chatId, pageable);
 
         return messages.stream()
                 .filter(Message::isActive)
-                .map(this::convertToMessageResponse)
+                .map(msg -> convertToMessageResponse(msg, authToken))
                 .toList();
     }
 
@@ -110,7 +119,8 @@ public class MessageService {
         message.setActive(false);
         messageRepository.save(message);
 
-        broadcastDeletedMessage(message);
+        MessageResponse deletedResponse = convertToMessageResponse(message, "Bearer " + userId);
+        broadcastMessage(message, deletedResponse);
     }
 
     public void deleteMessageForMe(String messageId, String userId) {
@@ -120,50 +130,10 @@ public class MessageService {
         if (!message.getDeletedForUsers().contains(userId)) {
             message.getDeletedForUsers().add(userId);
             messageRepository.save(message);
-            log.info("Message {} deleted for user {}", messageId, userId);
         }
     }
 
-    private void broadcastDeletedMessage(Message message) {
-        ChatMessage deletedMsg = convertToChatMessage(message);
-        messagingTemplate.convertAndSendToUser(message.getSenderId(), "/queue/messages", deletedMsg);
-        if (message.getReceiverId() != null) {
-            messagingTemplate.convertAndSendToUser(message.getReceiverId(), "/queue/messages", deletedMsg);
-        }
-    }
-
-    // ==================== Converters ====================
-
-    private ChatMessage convertToChatMessage(Message message) {
-        ChatMessage cm = new ChatMessage();
-        cm.setId(message.getId());
-        cm.setChatId(message.getChatId());
-        cm.setSenderId(message.getSenderId());
-        cm.setReceiverId(message.getReceiverId());
-        cm.setContent(message.isDeletedForEveryone() ? "This message was deleted" : message.getContent());
-        cm.setMessageType(message.getMessageType());
-        cm.setMediaUrl(message.getMediaUrl());
-        cm.setTimestamp(message.getCreatedAt());
-        cm.setStatus(message.getStatus().name());
-        cm.setReplyToMessageId(message.getReplyToMessageId());
-        return cm;
-    }
-
-    public MessageResponse convertToMessageResponse(ChatMessage chatMessage) {
-        MessageResponse response = new MessageResponse();
-        response.setId(chatMessage.getId());
-        response.setChatId(chatMessage.getChatId());
-        response.setSenderId(chatMessage.getSenderId());
-        response.setContent(chatMessage.getContent());
-        response.setMessageType(chatMessage.getMessageType());
-        response.setMediaUrl(chatMessage.getMediaUrl());
-        response.setCreatedAt(chatMessage.getTimestamp());
-        response.setStatus(MessageStatus.valueOf(chatMessage.getStatus()));
-        response.setReplyToMessageId(chatMessage.getReplyToMessageId());
-        return response;
-    }
-
-    private MessageResponse convertToMessageResponse(Message message) {
+    private MessageResponse convertToMessageResponse(Message message, String authToken) {
         MessageResponse response = new MessageResponse();
         response.setId(message.getId());
         response.setChatId(message.getChatId());
@@ -178,20 +148,22 @@ public class MessageService {
         response.setDeleted(message.isDeletedForEveryone());
         response.setReplyToMessageId(message.getReplyToMessageId());
 
-        // Build reply preview if this message is a reply
+        try {
+            UserSummaryResponse sender = userService.getUserSummary(message.getSenderId(), authToken);
+            response.setSenderName(sender.getDisplayName() != null ? sender.getDisplayName() : sender.getUsername());
+            response.setSenderProfilePic(sender.getProfilePictureUrl());
+        } catch (Exception e) {
+            response.setSenderName("Unknown User");
+        }
+
         if (message.getReplyToMessageId() != null) {
-            response.setReplyPreview(buildReplyPreview(message.getReplyToMessageId()));
+            response.setReplyPreview(buildReplyPreview(message.getReplyToMessageId(), authToken));
         }
 
         return response;
     }
 
-    /**
-     * Build reply preview
-     */
-    private MessageResponse.ReplyPreview buildReplyPreview(String originalMessageId) {
-        if (originalMessageId == null) return null;
-
+    private MessageResponse.ReplyPreview buildReplyPreview(String originalMessageId, String authToken) {
         return messageRepository.findById(originalMessageId)
                 .map(original -> {
                     MessageResponse.ReplyPreview preview = new MessageResponse.ReplyPreview();
@@ -200,6 +172,12 @@ public class MessageService {
                     preview.setContent(truncateForPreview(original.getContent()));
                     preview.setMessageType(original.getMessageType());
                     preview.setMediaUrl(original.getMediaUrl());
+
+                    try {
+                        UserSummaryResponse sender = userService.getUserSummary(original.getSenderId(), authToken);
+                        preview.setSenderName(sender.getDisplayName() != null ? sender.getDisplayName() : sender.getUsername());
+                    } catch (Exception ignored) {}
+
                     return preview;
                 })
                 .orElse(null);
