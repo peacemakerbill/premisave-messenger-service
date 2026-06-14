@@ -44,4 +44,6 @@ public class Message {
     private LocalDateTime editedAt;
     private boolean isDeleted = false;
     private boolean isDeletedForEveryone = false;
+    
+    private boolean isActive = true;   // For soft delete / visibility control
 }

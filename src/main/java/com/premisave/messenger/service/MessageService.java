@@ -5,6 +5,7 @@ import com.premisave.messenger.dto.websocket.ChatMessage;
 import com.premisave.messenger.entity.Message;
 import com.premisave.messenger.enums.MessageStatus;
 import com.premisave.messenger.enums.MessageType;
+import com.premisave.messenger.exception.MessageNotFoundException;
 import com.premisave.messenger.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +17,6 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -28,7 +28,7 @@ public class MessageService {
     private final SimpMessagingTemplate messagingTemplate;
 
     /**
-     * Send a new message (called from WebSocket)
+     * Send a new message (mainly called from WebSocket)
      */
     public ChatMessage sendMessage(ChatMessage chatMessage) {
         try {
@@ -41,30 +41,20 @@ public class MessageService {
             message.setMediaUrl(chatMessage.getMediaUrl());
             message.setStatus(MessageStatus.SENT);
             message.setCreatedAt(LocalDateTime.now());
+            message.setActive(true);                    // New active flag
 
             Message savedMessage = messageRepository.save(message);
 
             // Update last message in chat
             chatService.updateLastMessage(savedMessage.getChatId(), savedMessage.getId());
 
-            // Convert to WebSocket response
             ChatMessage response = convertToChatMessage(savedMessage);
 
-            // Notify receiver in real-time
+            // Real-time delivery
             if (chatMessage.getReceiverId() != null) {
-                messagingTemplate.convertAndSendToUser(
-                        chatMessage.getReceiverId(),
-                        "/queue/messages",
-                        response
-                );
+                messagingTemplate.convertAndSendToUser(chatMessage.getReceiverId(), "/queue/messages", response);
             }
-
-            // Notify sender (delivery confirmation)
-            messagingTemplate.convertAndSendToUser(
-                    chatMessage.getSenderId(),
-                    "/queue/messages",
-                    response
-            );
+            messagingTemplate.convertAndSendToUser(chatMessage.getSenderId(), "/queue/messages", response);
 
             log.info("Message sent from {} to {} in chat {}", 
                     savedMessage.getSenderId(), savedMessage.getReceiverId(), savedMessage.getChatId());
@@ -78,15 +68,16 @@ public class MessageService {
     }
 
     /**
-     * Get paginated messages for a chat
+     * Get paginated messages for a chat (only active ones)
      */
     public List<MessageResponse> getChatMessages(String chatId, int page, int size) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         List<Message> messages = messageRepository.findByChatIdOrderByCreatedAtDesc(chatId, pageable);
 
         return messages.stream()
+                .filter(Message::isActive)
                 .map(this::convertToMessageResponse)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     /**
@@ -94,7 +85,11 @@ public class MessageService {
      */
     public void markMessageAsRead(String messageId, String userId) {
         Message message = messageRepository.findById(messageId)
-                .orElseThrow(() -> new RuntimeException("Message not found"));
+                .orElseThrow(() -> new MessageNotFoundException("Message not found: " + messageId));
+
+        if (!message.isActive()) {
+            throw new RuntimeException("Message is no longer active");
+        }
 
         if (!message.getReadBy().contains(userId)) {
             message.getReadBy().add(userId);
@@ -103,21 +98,21 @@ public class MessageService {
             }
             messageRepository.save(message);
 
-            // Notify sender that message was read
+            // Notify sender about read receipt
             messagingTemplate.convertAndSendToUser(
                     message.getSenderId(),
                     "/queue/read-receipts",
-                    Map.of("messageId", messageId, "status", "READ", "readBy", userId)
+                    Map.of("messageId", messageId, "status", "READ", "by", userId)
             );
         }
     }
 
     /**
-     * Delete message for everyone
+     * Delete message for everyone (soft delete)
      */
     public void deleteMessageForEveryone(String messageId, String userId) {
         Message message = messageRepository.findById(messageId)
-                .orElseThrow(() -> new RuntimeException("Message not found"));
+                .orElseThrow(() -> new MessageNotFoundException("Message not found: " + messageId));
 
         if (!message.getSenderId().equals(userId)) {
             throw new RuntimeException("You can only delete your own messages");
@@ -125,14 +120,20 @@ public class MessageService {
 
         message.setDeletedForEveryone(true);
         message.setContent("This message was deleted");
+        message.setEditedAt(LocalDateTime.now());
+        message.setActive(false);                    // Mark as inactive
         messageRepository.save(message);
 
-        // Notify both users
-        messagingTemplate.convertAndSendToUser(message.getSenderId(), "/queue/messages", convertToChatMessage(message));
+        // Notify both parties
+        ChatMessage deletedMsg = convertToChatMessage(message);
+        messagingTemplate.convertAndSendToUser(message.getSenderId(), "/queue/messages", deletedMsg);
+        
         if (message.getReceiverId() != null) {
-            messagingTemplate.convertAndSendToUser(message.getReceiverId(), "/queue/messages", convertToChatMessage(message));
+            messagingTemplate.convertAndSendToUser(message.getReceiverId(), "/queue/messages", deletedMsg);
         }
     }
+
+    // ==================== Converters ====================
 
     private ChatMessage convertToChatMessage(Message message) {
         ChatMessage cm = new ChatMessage();
@@ -159,6 +160,7 @@ public class MessageService {
         response.setStatus(message.getStatus());
         response.setReadBy(message.getReadBy());
         response.setCreatedAt(message.getCreatedAt());
+        response.setEditedAt(message.getEditedAt());
         response.setDeleted(message.isDeletedForEveryone());
         return response;
     }
