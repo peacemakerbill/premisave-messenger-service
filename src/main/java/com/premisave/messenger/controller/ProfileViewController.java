@@ -13,13 +13,23 @@ import java.util.List;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/profile/views")
+@RequestMapping("/api/profile")
 @RequiredArgsConstructor
 public class ProfileViewController {
 
     private final AuthServiceClient authServiceClient;
 
-    @PostMapping("/{targetId}")
+    @GetMapping("/me")
+    public ResponseEntity<UserSummaryResponse> getMyProfile(
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+
+        String token = httpRequest.getHeader("Authorization");
+        log.info("GET_MY_PROFILE - User: {}", authentication.getName());
+        return ResponseEntity.ok(authServiceClient.getCurrentUser(token));
+    }
+
+    @PostMapping("/views/{targetId}")
     public ResponseEntity<ProfileViewResponse> recordView(
             @PathVariable String targetId,
             Authentication authentication,
@@ -30,7 +40,7 @@ public class ProfileViewController {
         return ResponseEntity.ok(authServiceClient.recordProfileView(targetId, token));
     }
 
-    @GetMapping("/who-viewed-me")
+    @GetMapping("/views/who-viewed-me")
     public ResponseEntity<List<ProfileViewResponse>> getWhoViewedMe(
             Authentication authentication,
             HttpServletRequest httpRequest) {
@@ -40,7 +50,7 @@ public class ProfileViewController {
         return ResponseEntity.ok(authServiceClient.getWhoViewedMe(token));
     }
 
-    @GetMapping("/who-i-viewed")
+    @GetMapping("/views/who-i-viewed")
     public ResponseEntity<List<WhoIViewedResponse>> getWhoIViewed(
             Authentication authentication,
             HttpServletRequest httpRequest) {
@@ -50,7 +60,7 @@ public class ProfileViewController {
         return ResponseEntity.ok(authServiceClient.getWhoIViewed(token));
     }
 
-    @GetMapping("/my-stats")
+    @GetMapping("/views/my-stats")
     public ResponseEntity<ProfileViewStats> getMyStats(
             Authentication authentication,
             HttpServletRequest httpRequest) {
@@ -60,7 +70,7 @@ public class ProfileViewController {
         return ResponseEntity.ok(authServiceClient.getMyProfileViewStats(token));
     }
 
-    @GetMapping("/stats")
+    @GetMapping("/views/stats")
     public ResponseEntity<?> getStats(
             @RequestParam(required = false) String userId,
             Authentication authentication,
@@ -71,7 +81,7 @@ public class ProfileViewController {
         return ResponseEntity.ok(authServiceClient.getProfileViewStats(userId, token));
     }
 
-    @GetMapping("/stats/{userId}")
+    @GetMapping("/views/stats/{userId}")
     public ResponseEntity<PublicProfileViewStats> getUserStats(
             @PathVariable String userId,
             Authentication authentication,

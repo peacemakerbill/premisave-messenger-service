@@ -18,7 +18,8 @@ public interface AuthServiceClient {
             @RequestHeader("Authorization") String token);
 
     @GetMapping("/profile/me")
-    UserSummaryResponse getCurrentUser(@RequestHeader("Authorization") String token);
+    UserSummaryResponse getCurrentUser(
+            @RequestHeader("Authorization") String token);
 
     @GetMapping("/profile/search")
     List<UserSummaryResponse> searchUsers(
@@ -79,10 +80,12 @@ public interface AuthServiceClient {
             @RequestHeader("Authorization") String token);
 
     @GetMapping("/social/my-likes")
-    List<UserSummaryResponse> getMyLikes(@RequestHeader("Authorization") String token);
+    List<UserSummaryResponse> getMyLikes(
+            @RequestHeader("Authorization") String token);
 
     @GetMapping("/social/my-following")
-    List<UserSummaryResponse> getMyFollowing(@RequestHeader("Authorization") String token);
+    List<UserSummaryResponse> getMyFollowing(
+            @RequestHeader("Authorization") String token);
 
     // ── Profile Views ────────────────────────────────────────────────
 
@@ -92,13 +95,16 @@ public interface AuthServiceClient {
             @RequestHeader("Authorization") String token);
 
     @GetMapping("/profile/views/who-viewed-me")
-    List<ProfileViewResponse> getWhoViewedMe(@RequestHeader("Authorization") String token);
+    List<ProfileViewResponse> getWhoViewedMe(
+            @RequestHeader("Authorization") String token);
 
     @GetMapping("/profile/views/who-i-viewed")
-    List<WhoIViewedResponse> getWhoIViewed(@RequestHeader("Authorization") String token);
+    List<WhoIViewedResponse> getWhoIViewed(
+            @RequestHeader("Authorization") String token);
 
     @GetMapping("/profile/views/my-stats")
-    ProfileViewStats getMyProfileViewStats(@RequestHeader("Authorization") String token);
+    ProfileViewStats getMyProfileViewStats(
+            @RequestHeader("Authorization") String token);
 
     @GetMapping("/profile/views/stats")
     Object getProfileViewStats(

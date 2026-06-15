@@ -1,15 +1,30 @@
 package com.premisave.messenger.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
 public class WhoIViewedResponse {
-    private String id;
-    private String fullName;
-    private String profilePictureUrl;
-    private String username;
+
+    @JsonProperty("targetId")
+    private String targetId;
+
+    @JsonProperty("targetName")
+    private String targetName;
+
+    @JsonProperty("targetProfilePicture")
+    private String targetProfilePicture;
+
+    @JsonProperty("targetUsername")
+    private String targetUsername;
+
+    @JsonProperty("viewedAt")
     private LocalDateTime viewedAt;
+
+    @JsonProperty("deviceType")
     private String deviceType;
+
+    @JsonProperty("source")
     private String source;
 }
