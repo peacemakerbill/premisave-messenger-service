@@ -26,7 +26,7 @@ public class GroupService {
     private final MediaService mediaService;
 
     /**
-     * Create a new group (WhatsApp style)
+     * Create a new group and its associated chat
      */
     public Group createGroup(String name, String description, String adminId) {
         Group group = new Group();
@@ -38,7 +38,6 @@ public class GroupService {
 
         Group savedGroup = groupRepository.save(group);
 
-        // Create associated Chat
         Chat groupChat = new Chat();
         groupChat.setChatType(ChatType.GROUP);
         groupChat.setGroupId(savedGroup.getId());
@@ -48,7 +47,6 @@ public class GroupService {
 
         chatRepository.save(groupChat);
 
-        // Add admin as first member
         GroupMember adminMember = new GroupMember();
         adminMember.setGroupId(savedGroup.getId());
         adminMember.setUserId(adminId);
@@ -61,7 +59,122 @@ public class GroupService {
     }
 
     /**
-     * Update Group Description (Admin Only)
+     * Add multiple members to group
+     */
+    public void addMembersToGroup(String groupId, List<String> userIds, String addedBy) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new RuntimeException("Group not found"));
+
+        if (!group.getAdminId().equals(addedBy)) {
+            throw new RuntimeException("Only group admin can add members");
+        }
+
+        for (String userId : userIds) {
+            if (!group.getMemberIds().contains(userId)) {
+                group.getMemberIds().add(userId);
+
+                GroupMember member = new GroupMember();
+                member.setGroupId(groupId);
+                member.setUserId(userId);
+                member.setRole("MEMBER");
+                member.setJoinedAt(LocalDateTime.now());
+                groupMemberRepository.save(member);
+            }
+        }
+
+        groupRepository.save(group);
+        log.info("Added {} members to group {}", userIds.size(), groupId);
+    }
+
+    /**
+     * Remove multiple members from group
+     */
+    public void removeMembersFromGroup(String groupId, List<String> userIds, String removedBy) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new RuntimeException("Group not found"));
+
+        boolean isAdmin = group.getAdminId().equals(removedBy);
+
+        for (String userId : userIds) {
+            if (!isAdmin && !userId.equals(removedBy)) {
+                throw new RuntimeException("Only admin or self can remove members");
+            }
+
+            group.getMemberIds().remove(userId);
+            groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
+                    .ifPresent(groupMemberRepository::delete);
+        }
+
+        groupRepository.save(group);
+        log.info("Removed {} members from group {}", userIds.size(), groupId);
+    }
+
+    /**
+     * Promote multiple users to admin
+     */
+    public void addAdminsToGroup(String groupId, List<String> userIds, String requestedBy) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new RuntimeException("Group not found"));
+
+        if (!group.getAdminId().equals(requestedBy)) {
+            throw new RuntimeException("Only group admin can promote others");
+        }
+
+        for (String userId : userIds) {
+            if (group.getMemberIds().contains(userId) && !group.getModerators().contains(userId)) {
+                group.getModerators().add(userId);
+
+                groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
+                        .ifPresent(member -> {
+                            member.setRole("ADMIN");
+                            groupMemberRepository.save(member);
+                        });
+            }
+        }
+
+        groupRepository.save(group);
+        log.info("Promoted {} users to admin in group {}", userIds.size(), groupId);
+    }
+
+    /**
+     * Demote multiple admins
+     */
+    public void removeAdminsFromGroup(String groupId, List<String> userIds, String requestedBy) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new RuntimeException("Group not found"));
+
+        if (!group.getAdminId().equals(requestedBy)) {
+            throw new RuntimeException("Only group admin can demote others");
+        }
+
+        for (String userId : userIds) {
+            if (group.getAdminId().equals(userId)) {
+                throw new RuntimeException("Cannot remove the main group creator from admin");
+            }
+
+            group.getModerators().remove(userId);
+
+            groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
+                    .ifPresent(member -> {
+                        member.setRole("MEMBER");
+                        groupMemberRepository.save(member);
+                    });
+        }
+
+        groupRepository.save(group);
+        log.info("Demoted {} admins in group {}", userIds.size(), groupId);
+    }
+
+    /**
+     * Check if user is member of group
+     */
+    public boolean isUserMemberOfGroup(String groupId, String userId) {
+        if (groupId == null || userId == null) return false;
+        return groupMemberRepository.findByGroupIdAndUserId(groupId, userId).isPresent();
+    }
+
+    /**
+     * Update group description
      */
     public Group updateGroupDescription(String groupId, String newDescription, String updatedBy) {
         Group group = groupRepository.findById(groupId)
@@ -80,7 +193,7 @@ public class GroupService {
     }
 
     /**
-     * Add member to group (Admin only)
+     * Add single member to group
      */
     public void addMemberToGroup(String groupId, String userId, String addedBy) {
         Group group = groupRepository.findById(groupId)
@@ -108,7 +221,7 @@ public class GroupService {
     }
 
     /**
-     * Remove member from group
+     * Remove single member from group
      */
     public void removeMemberFromGroup(String groupId, String userId, String removedBy) {
         Group group = groupRepository.findById(groupId)
@@ -128,7 +241,7 @@ public class GroupService {
     }
 
     /**
-     * Update Group Photo
+     * Update group photo
      */
     public Group updateGroupPhoto(String groupId, MultipartFile file, String updatedBy) {
         Group group = groupRepository.findById(groupId)
@@ -146,7 +259,7 @@ public class GroupService {
     }
 
     /**
-     * Transfer Admin Rights
+     * Transfer admin rights
      */
     public Group transferAdmin(String groupId, String newAdminId, String currentAdminId) {
         Group group = groupRepository.findById(groupId)
@@ -164,9 +277,9 @@ public class GroupService {
         group.setUpdatedAt(LocalDateTime.now());
         return groupRepository.save(group);
     }
-    
+
     /**
-     * Promote member to Admin (WhatsApp style - multiple admins allowed)
+     * Promote single user to admin
      */
     public void addAdminToGroup(String groupId, String userId, String requestedBy) {
         Group group = groupRepository.findById(groupId)
@@ -185,7 +298,6 @@ public class GroupService {
             groupRepository.save(group);
         }
 
-        // Update role in GroupMember
         groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
                 .ifPresent(member -> {
                     member.setRole("ADMIN");
@@ -196,7 +308,7 @@ public class GroupService {
     }
 
     /**
-     * Remove Admin (Demote from Admin)
+     * Demote single admin
      */
     public void removeAdminFromGroup(String groupId, String userId, String requestedBy) {
         Group group = groupRepository.findById(groupId)
@@ -213,7 +325,6 @@ public class GroupService {
         group.getModerators().remove(userId);
         groupRepository.save(group);
 
-        // Update role in GroupMember
         groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
                 .ifPresent(member -> {
                     member.setRole("MEMBER");
@@ -222,7 +333,6 @@ public class GroupService {
 
         log.info("User {} demoted from ADMIN in group {}", userId, groupId);
     }
-    
 
     public List<Group> getUserGroups(String userId) {
         return groupRepository.findByMemberIdsContaining(userId);

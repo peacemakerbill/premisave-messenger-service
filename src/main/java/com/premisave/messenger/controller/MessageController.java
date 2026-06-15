@@ -4,6 +4,7 @@ import com.premisave.messenger.dto.request.SendMessageRequest;
 import com.premisave.messenger.dto.response.MessageResponse;
 import com.premisave.messenger.dto.websocket.ChatMessage;
 import com.premisave.messenger.enums.MessageType;
+import com.premisave.messenger.service.ChatService;
 import com.premisave.messenger.service.MediaService;
 import com.premisave.messenger.service.MessageService;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +24,8 @@ public class MessageController {
 
     private final MessageService messageService;
     private final MediaService mediaService;
-
+    private final ChatService chatService;
+    
     @PostMapping(consumes = {"multipart/form-data"})
     public ResponseEntity<MessageResponse> sendMessage(
             @ModelAttribute SendMessageRequest request,
@@ -53,7 +55,14 @@ public class MessageController {
         }
 
         String senderId = authentication.getName();
-        String token = "Bearer " + senderId;
+
+        // Security: Check if user can access the chat (private or group)
+        if (request.getChatId() != null) {
+            if (!chatService.canAccessChat(request.getChatId(), senderId)) {
+                log.warn("User {} tried to send message to unauthorized chat {}", senderId, request.getChatId());
+                return ResponseEntity.status(403).build();
+            }
+        }
 
         if (request.getFile() != null && !request.getFile().isEmpty()) {
             try {
@@ -81,7 +90,7 @@ public class MessageController {
         chatMessage.setMediaUrl(request.getMediaUrl());
         chatMessage.setReplyToMessageId(request.getReplyToMessageId());
 
-        MessageResponse response = messageService.sendMessage(chatMessage, token);
+        MessageResponse response = messageService.sendMessage(chatMessage, "Bearer " + senderId);
 
         log.info("{} sent successfully in chat {}", isReply ? "Reply" : "Message", request.getChatId());
         return ResponseEntity.ok(response);
@@ -98,7 +107,15 @@ public class MessageController {
             return ResponseEntity.status(401).build();
         }
 
-        String token = "Bearer " + authentication.getName();
+        String userId = authentication.getName();
+
+        // Security: Check chat access
+        if (!chatService.canAccessChat(chatId, userId)) {
+            log.warn("User {} tried to access unauthorized chat {}", userId, chatId);
+            return ResponseEntity.status(403).build();
+        }
+
+        String token = "Bearer " + userId;
         List<MessageResponse> messages = messageService.getChatMessages(chatId, page, size, token);
         return ResponseEntity.ok(messages);
     }

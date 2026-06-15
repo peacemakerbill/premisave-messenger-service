@@ -4,7 +4,6 @@ import com.premisave.messenger.dto.response.ChatResponse;
 import com.premisave.messenger.dto.response.MessageResponse;
 import com.premisave.messenger.dto.response.UserSummaryResponse;
 import com.premisave.messenger.entity.Chat;
-import com.premisave.messenger.entity.Group;
 import com.premisave.messenger.enums.ChatType;
 import com.premisave.messenger.exception.ChatNotFoundException;
 import com.premisave.messenger.repository.ChatRepository;
@@ -26,8 +25,9 @@ public class ChatService {
     private final ChatRepository chatRepository;
     private final MessageRepository messageRepository;
     private final GroupRepository groupRepository;
+    private final GroupService groupService;
     private final PresenceService presenceService;
-    private final UserService userService;   // Added for profile enrichment
+    private final UserService userService;
 
     /**
      * Get or create private chat between two users
@@ -51,7 +51,7 @@ public class ChatService {
     }
 
     /**
-     * Get all chats for current user (Private + Groups) - Full WhatsApp style
+     * Get all chats for current user (Private + Groups)
      */
     public List<ChatResponse> getUserChats(String userId) {
         List<Chat> chats = chatRepository.findByParticipantIdsContainingAndIsActiveTrue(userId);
@@ -62,7 +62,7 @@ public class ChatService {
     }
 
     /**
-     * Fully enhanced conversion with all optional sections completed
+     * Convert Chat entity to ChatResponse with proper group details
      */
     private ChatResponse convertToChatResponse(Chat chat, String currentUserId) {
         ChatResponse response = new ChatResponse();
@@ -84,7 +84,6 @@ public class ChatService {
                         lastMsg.setMessageType(msg.getMessageType());
                         lastMsg.setMediaUrl(msg.getMediaUrl());
 
-                        // Enrich sender profile for last message
                         try {
                             UserSummaryResponse sender = userService.getUserSummary(msg.getSenderId(), "Bearer " + currentUserId);
                             lastMsg.setSenderName(sender.getDisplayName() != null ? sender.getDisplayName() : sender.getUsername());
@@ -101,7 +100,7 @@ public class ChatService {
         long unread = messageRepository.countByChatIdAndReadByNotContaining(chat.getId(), currentUserId);
         response.setUnreadCount((int) unread);
 
-        // ==================== PRIVATE CHAT ====================
+        // Private Chat
         if (chat.getChatType() == ChatType.PRIVATE) {
             String otherUserId = chat.getParticipantIds().stream()
                     .filter(id -> !id.equals(currentUserId))
@@ -111,29 +110,43 @@ public class ChatService {
             if (otherUserId != null) {
                 var presence = presenceService.getPresence(otherUserId);
                 response.setOnline(presence.isOnline());
-                
-                // Fixed: Added Last Seen support
                 if (presence.getLastSeen() != null) {
                     response.setLastSeen(presence.getLastSeen());
                 }
             }
         } 
-        // ==================== GROUP CHAT (Fully Enhanced) ====================
+        // Group Chat - Improved handling
         else if (chat.getChatType() == ChatType.GROUP && chat.getGroupId() != null) {
-            try {
-                Group group = groupRepository.findById(chat.getGroupId()).orElse(null);
-                if (group != null) {
-                    response.setGroupName(group.getName());
-                    response.setGroupPhotoUrl(group.getGroupPhotoUrl());
-                    response.setAdminId(group.getAdminId());
-                }
-                response.setMemberCount(chat.getParticipantIds().size());
-            } catch (Exception e) {
-                log.warn("Could not load full group details for chat {}", chat.getId());
-            }
+            groupRepository.findById(chat.getGroupId()).ifPresent(group -> {
+                response.setGroupName(group.getName());
+                response.setGroupPhotoUrl(group.getGroupPhotoUrl());
+                response.setAdminId(group.getAdminId());
+                response.setMemberCount(group.getMemberIds().size());
+            });
         }
 
         return response;
+    }
+
+    /**
+     * Check if user can access this chat (used for security validation)
+     */
+    public boolean canAccessChat(String chatId, String userId) {
+        if (chatId == null || userId == null) return false;
+
+        Optional<Chat> chatOpt = chatRepository.findById(chatId);
+        if (chatOpt.isEmpty()) return false;
+
+        Chat chat = chatOpt.get();
+        if (!chat.isActive()) return false;
+
+        if (chat.getChatType() == ChatType.PRIVATE) {
+            return chat.getParticipantIds().contains(userId);
+        } else if (chat.getChatType() == ChatType.GROUP && chat.getGroupId() != null) {
+            return groupService.isUserMemberOfGroup(chat.getGroupId(), userId);
+        }
+
+        return false;
     }
 
     /**

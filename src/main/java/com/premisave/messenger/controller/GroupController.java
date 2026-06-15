@@ -34,7 +34,63 @@ public class GroupController {
     }
 
     /**
-     * Add Member to Group
+     * Add multiple members to group
+     */
+    @PostMapping("/{groupId}/members/bulk")
+    public ResponseEntity<String> addMembersBulk(
+            @PathVariable String groupId,
+            @RequestBody List<String> userIds,
+            Authentication authentication) {
+
+        String adminId = authentication.getName();
+        groupService.addMembersToGroup(groupId, userIds, adminId);
+        return ResponseEntity.ok("Members added successfully");
+    }
+
+    /**
+     * Remove multiple members from group
+     */
+    @DeleteMapping("/{groupId}/members/bulk")
+    public ResponseEntity<String> removeMembersBulk(
+            @PathVariable String groupId,
+            @RequestBody List<String> userIds,
+            Authentication authentication) {
+
+        String removedBy = authentication.getName();
+        groupService.removeMembersFromGroup(groupId, userIds, removedBy);
+        return ResponseEntity.ok("Members removed successfully");
+    }
+
+    /**
+     * Promote multiple users to admin
+     */
+    @PostMapping("/{groupId}/admins/bulk")
+    public ResponseEntity<String> addAdminsBulk(
+            @PathVariable String groupId,
+            @RequestBody List<String> userIds,
+            Authentication authentication) {
+
+        String currentAdmin = authentication.getName();
+        groupService.addAdminsToGroup(groupId, userIds, currentAdmin);
+        return ResponseEntity.ok("Users promoted to admin successfully");
+    }
+
+    /**
+     * Demote multiple admins
+     */
+    @DeleteMapping("/{groupId}/admins/bulk")
+    public ResponseEntity<String> removeAdminsBulk(
+            @PathVariable String groupId,
+            @RequestBody List<String> userIds,
+            Authentication authentication) {
+
+        String currentAdmin = authentication.getName();
+        groupService.removeAdminsFromGroup(groupId, userIds, currentAdmin);
+        return ResponseEntity.ok("Admins demoted successfully");
+    }
+
+    /**
+     * Add single member to group
      */
     @PostMapping("/{groupId}/members")
     public ResponseEntity<String> addMember(
@@ -48,7 +104,7 @@ public class GroupController {
     }
 
     /**
-     * Remove Member from Group
+     * Remove single member from group
      */
     @DeleteMapping("/{groupId}/members/{userId}")
     public ResponseEntity<String> removeMember(
@@ -62,7 +118,7 @@ public class GroupController {
     }
 
     /**
-     * Leave Group (Current User)
+     * Leave group
      */
     @PostMapping("/{groupId}/leave")
     public ResponseEntity<String> leaveGroup(
@@ -75,7 +131,7 @@ public class GroupController {
     }
 
     /**
-     * Update Group Description (Admin Only)
+     * Update group description
      */
     @PutMapping("/{groupId}/description")
     public ResponseEntity<Group> updateGroupDescription(
@@ -89,7 +145,7 @@ public class GroupController {
     }
 
     /**
-     * Update Group Photo
+     * Update group photo
      */
     @PostMapping("/{groupId}/photo")
     public ResponseEntity<Group> uploadGroupPhoto(
@@ -103,7 +159,7 @@ public class GroupController {
     }
 
     /**
-     * Transfer Admin Rights
+     * Transfer admin rights
      */
     @PostMapping("/{groupId}/transfer-admin")
     public ResponseEntity<Group> transferAdmin(
@@ -115,9 +171,9 @@ public class GroupController {
         Group updatedGroup = groupService.transferAdmin(groupId, newAdminId, currentAdmin);
         return ResponseEntity.ok(updatedGroup);
     }
-    
+
     /**
-     * Promote Member to Admin (Multiple Admins Support)
+     * Promote single user to admin
      */
     @PostMapping("/{groupId}/admins")
     public ResponseEntity<String> addAdmin(
@@ -131,7 +187,7 @@ public class GroupController {
     }
 
     /**
-     * Remove Admin (Demote from Admin)
+     * Demote single admin
      */
     @DeleteMapping("/{groupId}/admins/{userId}")
     public ResponseEntity<String> removeAdmin(
@@ -145,7 +201,7 @@ public class GroupController {
     }
 
     /**
-     * Get My Groups
+     * Get my groups
      */
     @GetMapping("/my-groups")
     public ResponseEntity<List<Group>> getMyGroups(Authentication authentication) {
@@ -155,7 +211,7 @@ public class GroupController {
     }
 
     /**
-     * Get Group Members
+     * Get group members
      */
     @GetMapping("/{groupId}/members")
     public ResponseEntity<List<String>> getGroupMembers(@PathVariable String groupId) {

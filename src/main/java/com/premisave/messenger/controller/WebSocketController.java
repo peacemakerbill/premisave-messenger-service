@@ -1,6 +1,7 @@
 package com.premisave.messenger.controller;
 
 import com.premisave.messenger.dto.websocket.ChatMessage;
+import com.premisave.messenger.service.ChatService;
 import com.premisave.messenger.service.MessageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +18,7 @@ import java.security.Principal;
 public class WebSocketController {
 
     private final MessageService messageService;
+    private final ChatService chatService;
     private final SimpMessagingTemplate messagingTemplate;
 
     @MessageMapping("/chat.sendMessage")
@@ -29,7 +31,14 @@ public class WebSocketController {
         String senderId = principal.getName();
         chatMessage.setSenderId(senderId);
 
-        // Token is now handled by WebSocketAuthInterceptor
+        // Security: Validate chat access for group messages
+        if (chatMessage.getChatId() != null) {
+            if (!chatService.canAccessChat(chatMessage.getChatId(), senderId)) {
+                log.warn("WebSocket: User {} attempted unauthorized access to chat {}", senderId, chatMessage.getChatId());
+                return;
+            }
+        }
+
         String token = "Bearer " + senderId;
 
         try {
