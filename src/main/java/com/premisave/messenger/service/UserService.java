@@ -19,25 +19,35 @@ public class UserService {
     private final AuthServiceClient authServiceClient;
 
     /**
-     * Get single user summary
+     * Get single user summary - Fixed token handling
      */
     public UserSummaryResponse getUserSummary(String userId, String token) {
         try {
+            // Ensure token is properly formatted
+            if (token == null || !token.startsWith("Bearer ")) {
+                token = "Bearer " + token; // fallback if only userId was passed
+            }
+            
+            log.debug("Fetching user {} with token length: {}", userId, token.length());
             return authServiceClient.getUserSummary(userId, token);
         } catch (Exception e) {
-            log.warn("Failed to fetch user profile for {}: {}", userId, e.getMessage());
+            log.error("Failed to fetch user profile for {} | Token: {}", userId, token, e);
             return createFallbackUser(userId);
         }
     }
 
     /**
-     * Search users by name, username or email
+     * Search users
      */
     public List<UserSummaryResponse> searchUsers(String query, String token) {
         try {
+            if (token == null || !token.startsWith("Bearer ")) {
+                token = "Bearer " + token;
+            }
+            log.debug("Searching users with query: '{}' | Token length: {}", query, token.length());
             return authServiceClient.searchUsers(query, token);
         } catch (Exception e) {
-            log.warn("User search failed for query '{}': {}", query, e.getMessage());
+            log.error("User search failed for query '{}'", query, e);
             return List.of();
         }
     }
@@ -47,15 +57,19 @@ public class UserService {
      */
     public List<UserSummaryResponse> getAllUsers(int page, int size, String token) {
         try {
+            if (token == null || !token.startsWith("Bearer ")) {
+                token = "Bearer " + token;
+            }
+            log.debug("Fetching all users (page={}, size={}) | Token length: {}", page, size, token.length());
             return authServiceClient.getAllUsers(page, size, token);
         } catch (Exception e) {
-            log.warn("Failed to fetch all users: {}", e.getMessage());
+            log.error("Failed to fetch all users", e);
             return List.of();
         }
     }
 
     /**
-     * Bulk fetch user summaries
+     * Bulk fetch
      */
     public Map<String, UserSummaryResponse> getUsersSummary(Set<String> userIds, String token) {
         return userIds.stream()

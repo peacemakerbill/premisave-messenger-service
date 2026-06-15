@@ -31,6 +31,8 @@ public class UserController {
         }
 
         String token = "Bearer " + authentication.getName();
+        log.info("SEARCH REQUEST - User: {} | Query: {}", authentication.getName(), query);
+
         List<UserSummaryResponse> users = userService.searchUsers(query, token);
         return ResponseEntity.ok(users);
     }
@@ -49,6 +51,8 @@ public class UserController {
         }
 
         String token = "Bearer " + authentication.getName();
+        log.info("ALL USERS REQUEST - User: {} | Page: {} Size: {}", authentication.getName(), page, size);
+
         List<UserSummaryResponse> users = userService.getAllUsers(page, size, token);
         return ResponseEntity.ok(users);
     }
@@ -66,6 +70,8 @@ public class UserController {
         }
 
         String token = "Bearer " + authentication.getName();
+        log.info("PROFILE REQUEST - User: {} | Target: {}", authentication.getName(), userId);
+
         UserSummaryResponse user = userService.getUserSummary(userId, token);
         return ResponseEntity.ok(user);
     }
