@@ -1,0 +1,84 @@
+package com.premisave.messenger.controller;
+
+import com.premisave.messenger.client.AuthServiceClient;
+import com.premisave.messenger.dto.response.*;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@Slf4j
+@RestController
+@RequestMapping("/api/profile/views")
+@RequiredArgsConstructor
+public class ProfileViewController {
+
+    private final AuthServiceClient authServiceClient;
+
+    @PostMapping("/{targetId}")
+    public ResponseEntity<ProfileViewResponse> recordView(
+            @PathVariable String targetId,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+
+        String token = httpRequest.getHeader("Authorization");
+        log.info("RECORD_VIEW - User: {} | Target: {}", authentication.getName(), targetId);
+        return ResponseEntity.ok(authServiceClient.recordProfileView(targetId, token));
+    }
+
+    @GetMapping("/who-viewed-me")
+    public ResponseEntity<List<ProfileViewResponse>> getWhoViewedMe(
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+
+        String token = httpRequest.getHeader("Authorization");
+        log.info("WHO_VIEWED_ME - User: {}", authentication.getName());
+        return ResponseEntity.ok(authServiceClient.getWhoViewedMe(token));
+    }
+
+    @GetMapping("/who-i-viewed")
+    public ResponseEntity<List<WhoIViewedResponse>> getWhoIViewed(
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+
+        String token = httpRequest.getHeader("Authorization");
+        log.info("WHO_I_VIEWED - User: {}", authentication.getName());
+        return ResponseEntity.ok(authServiceClient.getWhoIViewed(token));
+    }
+
+    @GetMapping("/my-stats")
+    public ResponseEntity<ProfileViewStats> getMyStats(
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+
+        String token = httpRequest.getHeader("Authorization");
+        log.info("MY_VIEW_STATS - User: {}", authentication.getName());
+        return ResponseEntity.ok(authServiceClient.getMyProfileViewStats(token));
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<?> getStats(
+            @RequestParam(required = false) String userId,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+
+        String token = httpRequest.getHeader("Authorization");
+        log.info("VIEW_STATS - User: {} | UserId param: {}", authentication.getName(), userId);
+        return ResponseEntity.ok(authServiceClient.getProfileViewStats(userId, token));
+    }
+
+    @GetMapping("/stats/{userId}")
+    public ResponseEntity<PublicProfileViewStats> getUserStats(
+            @PathVariable String userId,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+
+        String token = httpRequest.getHeader("Authorization");
+        log.info("USER_VIEW_STATS - User: {} | Target: {}", authentication.getName(), userId);
+        return ResponseEntity.ok(authServiceClient.getUserProfileViewStats(userId, token));
+    }
+}
