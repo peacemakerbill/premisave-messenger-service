@@ -6,26 +6,25 @@ spring:
   servlet:
     multipart:
       enabled: true
-      max-file-size: 50MB      # Maximum size per file
-      max-request-size: 50MB   # Maximum size for entire request (important for multipart)
-      file-size-threshold: 2KB # Files larger than this are written to disk
+      max-file-size: 50MB
+      max-request-size: 50MB
+      file-size-threshold: 2KB
 
-  # ==================== MongoDB ====================
+  # ==================== Data ====================
   data:
-    mongodb:
-      uri: mongodb://localhost:27017/premisave-messenger
-      database: premisave-messenger
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
 
-  # ==================== Redis ====================
-  redis:
-    host: localhost
-    port: 6379
+
 
   # ==================== WebSocket ====================
   websocket:
     stomp:
       broker:
         heartbeat: 10000
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://localhost:27017/premisave-messenger}
+    database: ${MONGODB_DATABASE:premisave-messenger}
 
 # ==================== Server ====================
 server:
@@ -53,7 +52,7 @@ logging:
     org.springframework.web.socket: DEBUG
     org.springframework.data.mongodb: DEBUG
     org.springframework.security: DEBUG
-    org.springframework.web.multipart: DEBUG   # Added for upload debugging
+    org.springframework.web.multipart: DEBUG
 
 # ==================== Other Settings ====================
 profile-views:

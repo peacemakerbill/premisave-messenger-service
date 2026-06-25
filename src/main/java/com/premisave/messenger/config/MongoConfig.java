@@ -10,16 +10,14 @@ import org.springframework.data.mongodb.core.SimpleMongoClientDatabaseFactory;
 @Configuration
 public class MongoConfig {
 
-    @Value("${spring.data.mongodb.uri}")
+    @Value("${spring.mongodb.uri}")
     private String mongoUri;
 
-    @Value("${spring.data.mongodb.database}")
+    @Value("${spring.mongodb.database}")
     private String databaseName;
 
     @Bean
     public MongoDatabaseFactory mongoDatabaseFactory() {
-        // Forces the connection to use the explicitly configured database name,
-        // regardless of what's in the URI path.
         return new SimpleMongoClientDatabaseFactory(mongoUri.replaceAll("/[^/]*$", "/" + databaseName));
     }
 

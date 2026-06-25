@@ -8,7 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.security.Key;
+import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.function.Function;
 
@@ -35,22 +35,25 @@ public class JwtService {
 
     private Claims extractAllClaims(String token) {
         try {
-            return Jwts.parserBuilder()
-                    .setSigningKey(getSignInKey())
+            return Jwts.parser()
+                    .verifyWith(getSignInKey())
                     .build()
-                    .parseClaimsJws(token)
-                    .getBody();
+                    .parseSignedClaims(token)
+                    .getPayload();
         } catch (Exception e) {
             log.error("JWT parsing failed: {}", e.getMessage());
             throw e;
         }
     }
 
-    private Key getSignInKey() {
+    /**
+     * Mirrors auth-service key derivation exactly:
+     * truncate/pad to 32 bytes so tokens are cross-verifiable.
+     */
+    private SecretKey getSignInKey() {
         try {
             byte[] keyBytes = Decoders.BASE64.decode(secret);
-            
-            // Ensure key is exactly 32 bytes (common fix for signature mismatch)
+
             if (keyBytes.length < 32) {
                 byte[] padded = new byte[32];
                 System.arraycopy(keyBytes, 0, padded, 0, keyBytes.length);
@@ -67,7 +70,7 @@ public class JwtService {
             return Keys.hmacShaKeyFor(keyBytes);
         } catch (Exception e) {
             log.error("Failed to create signing key", e);
-            return Keys.hmacShaKeyFor(secret.getBytes()); // fallback
+            return Keys.hmacShaKeyFor(secret.getBytes());
         }
     }
 
