@@ -16,7 +16,8 @@ public class MediaService {
 
     private final Cloudinary cloudinary;
 
-    public String uploadMedia(MultipartFile file, String folder) {
+    @SuppressWarnings("rawtypes")
+	public String uploadMedia(MultipartFile file, String folder) {
         try {
             Map uploadResult = cloudinary.uploader().upload(file.getBytes(),
                     ObjectUtils.asMap(

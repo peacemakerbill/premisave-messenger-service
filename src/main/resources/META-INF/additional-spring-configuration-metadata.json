@@ -1,5 +1,98 @@
-{"properties": [{
-  "name": "cloudinary.cloud-name",
-  "type": "java.lang.String",
-  "description": "A description for 'cloudinary.cloud-name'"
-}]}
+{
+  "properties": [
+    {
+      "name": "cloudinary.cloud-name",
+      "type": "java.lang.String",
+      "description": "Cloudinary account cloud name."
+    },
+    {
+      "name": "cloudinary.api-key",
+      "type": "java.lang.String",
+      "description": "Cloudinary API key."
+    },
+    {
+      "name": "cloudinary.api-secret",
+      "type": "java.lang.String",
+      "description": "Cloudinary API secret."
+    },
+    {
+      "name": "auth.service.url",
+      "type": "java.lang.String",
+      "description": "Base URL of the authentication service."
+    },
+    {
+      "name": "jwt.secret",
+      "type": "java.lang.String",
+      "description": "Base64-encoded secret key used to sign and verify JWT tokens. Must match across all services."
+    },
+    {
+      "name": "profile-views.max-history-size",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of profile view history entries to retain per user.",
+      "defaultValue": 20
+    },
+    {
+      "name": "rate-limit.requests-per-minute",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of requests allowed per minute per client before rate limiting kicks in.",
+      "defaultValue": 60
+    },
+    {
+      "name": "spring.websocket.stomp.broker.heartbeat",
+      "type": "java.lang.Long",
+      "description": "Interval in milliseconds for STOMP broker heartbeat. Controls how often the server sends heartbeat frames to connected WebSocket clients.",
+      "defaultValue": 10000
+    }
+  ],
+  "hints": [
+    {
+      "name": "logging.level.values",
+      "values": [
+        {"value": "TRACE"},
+        {"value": "DEBUG"},
+        {"value": "INFO"},
+        {"value": "WARN"},
+        {"value": "ERROR"},
+        {"value": "FATAL"},
+        {"value": "OFF"}
+      ]
+    },
+    {
+      "name": "logging.level.keys",
+      "values": [
+        {
+          "value": "root",
+          "description": "Root logger level."
+        },
+        {
+          "value": "com.premisave.messenger",
+          "description": "All Premisave messenger application classes."
+        },
+        {
+          "value": "org.springframework.web.socket",
+          "description": "WebSocket layer."
+        },
+        {
+          "value": "org.springframework.data.mongodb",
+          "description": "MongoDB data layer."
+        },
+        {
+          "value": "org.springframework.security",
+          "description": "Spring Security."
+        },
+        {
+          "value": "org.springframework.web.multipart",
+          "description": "Multipart file upload handling."
+        },
+        {
+          "value": "org.springframework.data.repository.config.RepositoryConfigurationExtensionSupport",
+          "description": "Suppresses Redis/MongoDB repository conflict warnings."
+        },
+        {
+          "value": "org.springframework.cloud.commons.util.InetUtils",
+          "description": "Suppresses hostname resolution warnings from Spring Cloud."
+        }
+      ]
+    }
+  ]
+}

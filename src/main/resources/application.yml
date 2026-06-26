@@ -11,20 +11,24 @@ spring:
       file-size-threshold: 2KB
 
   # ==================== Data ====================
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://localhost:27017/premisave-messenger}
+
   data:
     redis:
       url: ${REDIS_URL:redis://localhost:6379}
-
-
+      repositories:
+        enabled: false  # Prevents Redis from claiming MongoDB repositories
 
   # ==================== WebSocket ====================
   websocket:
     stomp:
       broker:
         heartbeat: 10000
-  mongodb:
-    uri: ${MONGODB_URI:mongodb://localhost:27017/premisave-messenger}
-    database: ${MONGODB_DATABASE:premisave-messenger}
+
+  cloud:
+    discovery:
+      enabled: false
 
 # ==================== Server ====================
 server:
@@ -33,26 +37,28 @@ server:
 # ==================== Auth Service Integration ====================
 auth:
   service:
-    url: http://localhost:8080
+    url: ${AUTH_SERVICE_URL:http://localhost:8080}
 
 # ==================== JWT ====================
 jwt:
-  secret: eW91ci12ZXJ5LXNlY3VyZS1qd3Qtc2VjcmV0LWtleS0zMi1ieXRlcyE=
+  secret: ${JWT_SECRET:eW91ci12ZXJ5LXNlY3VyZS1qd3Qtc2VjcmV0LWtleS0zMi1ieXRlcyE=}
 
 # ==================== Cloudinary ====================
 cloudinary:
-  cloud-name: thepeacemakersllc
-  api-key: "929659223288334"
-  api-secret: nAsBdgfXx86u7-Y8X2VnLa-2FbQ
+  cloud-name: ${CLOUDINARY_CLOUD_NAME:thepeacemakersllc}
+  api-key: ${CLOUDINARY_API_KEY:929659223288334}
+  api-secret: ${CLOUDINARY_API_SECRET:nAsBdgfXx86u7-Y8X2VnLa-2FbQ}
 
 # ==================== Logging ====================
 logging:
   level:
-    com.premisave.messenger: DEBUG
-    org.springframework.web.socket: DEBUG
-    org.springframework.data.mongodb: DEBUG
-    org.springframework.security: DEBUG
-    org.springframework.web.multipart: DEBUG
+    "[com.premisave.messenger]": DEBUG
+    "[org.springframework.web.socket]": DEBUG
+    "[org.springframework.data.mongodb]": DEBUG
+    "[org.springframework.security]": DEBUG
+    "[org.springframework.web.multipart]": DEBUG
+    "[org.springframework.data.repository.config.RepositoryConfigurationExtensionSupport]": ERROR
+    "[org.springframework.cloud.commons.util.InetUtils]": ERROR
 
 # ==================== Other Settings ====================
 profile-views:
