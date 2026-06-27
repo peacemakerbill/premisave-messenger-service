@@ -13,12 +13,9 @@ public class MongoConfig {
     @Value("${spring.mongodb.uri}")
     private String mongoUri;
 
-    @Value("${spring.mongodb.database}")
-    private String databaseName;
-
     @Bean
     public MongoDatabaseFactory mongoDatabaseFactory() {
-        return new SimpleMongoClientDatabaseFactory(mongoUri.replaceAll("/[^/]*$", "/" + databaseName));
+        return new SimpleMongoClientDatabaseFactory(mongoUri);
     }
 
     @Bean

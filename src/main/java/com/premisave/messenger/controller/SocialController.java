@@ -144,4 +144,92 @@ public class SocialController {
         log.info("MY_FOLLOWING - User: {}", authentication.getName());
         return ResponseEntity.ok(authServiceClient.getMyFollowing(token));
     }
+
+    // ── Inbound: who liked / follows / reviewed me ────────────────────────────
+
+    @GetMapping("/my-likers")
+    public ResponseEntity<List<UserSummaryResponse>> getMyLikers(
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+
+        String token = httpRequest.getHeader("Authorization");
+        log.info("MY_LIKERS - User: {}", authentication.getName());
+        return ResponseEntity.ok(authServiceClient.getMyLikers(token));
+    }
+
+    @GetMapping("/my-followers")
+    public ResponseEntity<List<UserSummaryResponse>> getMyFollowers(
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+
+        String token = httpRequest.getHeader("Authorization");
+        log.info("MY_FOLLOWERS - User: {}", authentication.getName());
+        return ResponseEntity.ok(authServiceClient.getMyFollowers(token));
+    }
+
+    @GetMapping("/my-reviews")
+    public ResponseEntity<List<ReviewResponse>> getMyReviews(
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+
+        String token = httpRequest.getHeader("Authorization");
+        log.info("MY_REVIEWS - User: {}", authentication.getName());
+        return ResponseEntity.ok(authServiceClient.getMyReviews(token));
+    }
+
+    @GetMapping("/my-written-reviews")
+    public ResponseEntity<List<ReviewResponse>> getMyWrittenReviews(
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+
+        String token = httpRequest.getHeader("Authorization");
+        log.info("MY_WRITTEN_REVIEWS - User: {}", authentication.getName());
+        return ResponseEntity.ok(authServiceClient.getMyWrittenReviews(token));
+    }
+
+    // ── Relationship status checks ────────────────────────────────────────────
+
+    @GetMapping("/like/status/{targetId}")
+    public ResponseEntity<SocialStatusResponse> getLikeStatus(
+            @PathVariable String targetId,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+
+        String token = httpRequest.getHeader("Authorization");
+        log.info("LIKE_STATUS - User: {} | Target: {}", authentication.getName(), targetId);
+        return ResponseEntity.ok(authServiceClient.getLikeStatus(targetId, token));
+    }
+
+    @GetMapping("/follow/status/{targetId}")
+    public ResponseEntity<SocialStatusResponse> getFollowStatus(
+            @PathVariable String targetId,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+
+        String token = httpRequest.getHeader("Authorization");
+        log.info("FOLLOW_STATUS - User: {} | Target: {}", authentication.getName(), targetId);
+        return ResponseEntity.ok(authServiceClient.getFollowStatus(targetId, token));
+    }
+
+    @GetMapping("/review/status/{targetId}")
+    public ResponseEntity<SocialStatusResponse> getReviewStatus(
+            @PathVariable String targetId,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+
+        String token = httpRequest.getHeader("Authorization");
+        log.info("REVIEW_STATUS - User: {} | Target: {}", authentication.getName(), targetId);
+        return ResponseEntity.ok(authServiceClient.getReviewStatus(targetId, token));
+    }
+
+    @GetMapping("/follow/mutual/{targetId}")
+    public ResponseEntity<SocialStatusResponse> getMutualFollowStatus(
+            @PathVariable String targetId,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+
+        String token = httpRequest.getHeader("Authorization");
+        log.info("MUTUAL_FOLLOW - User: {} | Target: {}", authentication.getName(), targetId);
+        return ResponseEntity.ok(authServiceClient.getMutualFollowStatus(targetId, token));
+    }
 }

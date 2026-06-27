@@ -87,6 +87,46 @@ public interface AuthServiceClient {
     List<UserSummaryResponse> getMyFollowing(
             @RequestHeader("Authorization") String token);
 
+    // ── Inbound: who liked / follows / reviewed me ────────────────────────────
+
+    @GetMapping("/social/my-likers")
+    List<UserSummaryResponse> getMyLikers(
+            @RequestHeader("Authorization") String token);
+
+    @GetMapping("/social/my-followers")
+    List<UserSummaryResponse> getMyFollowers(
+            @RequestHeader("Authorization") String token);
+
+    @GetMapping("/social/my-reviews")
+    List<ReviewResponse> getMyReviews(
+            @RequestHeader("Authorization") String token);
+
+    @GetMapping("/social/my-written-reviews")
+    List<ReviewResponse> getMyWrittenReviews(
+            @RequestHeader("Authorization") String token);
+
+    // ── Relationship status checks ────────────────────────────────────────────
+
+    @GetMapping("/social/like/status/{targetId}")
+    SocialStatusResponse getLikeStatus(
+            @PathVariable String targetId,
+            @RequestHeader("Authorization") String token);
+
+    @GetMapping("/social/follow/status/{targetId}")
+    SocialStatusResponse getFollowStatus(
+            @PathVariable String targetId,
+            @RequestHeader("Authorization") String token);
+
+    @GetMapping("/social/review/status/{targetId}")
+    SocialStatusResponse getReviewStatus(
+            @PathVariable String targetId,
+            @RequestHeader("Authorization") String token);
+
+    @GetMapping("/social/follow/mutual/{targetId}")
+    SocialStatusResponse getMutualFollowStatus(
+            @PathVariable String targetId,
+            @RequestHeader("Authorization") String token);
+
     // ── Profile Views ────────────────────────────────────────────────
 
     @PostMapping("/profile/views/{targetId}")
