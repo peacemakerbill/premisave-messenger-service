@@ -164,13 +164,32 @@ public class GlobalExceptionHandler {
     // ===== DOWNSTREAM SERVICE EXCEPTIONS (Feign) =====
 
     /**
-     * Auth-service (or any other Feign-backed downstream service) is
-     * unreachable, timed out, or returned an error status.
-     *
-     * Deliberately logs a single concise line instead of the full stack
-     * trace - a downstream service being down is an expected operational
-     * condition, not a bug in this service, and doesn't need to flood the
-     * logs with 100+ lines of connection internals.
+     * Preferred path: controller/service code explicitly wraps a Feign
+     * call and throws this with the service name known up front (e.g.
+     * "auth-service"), giving a clean, structured response instead of
+     * parsing a service name out of a URL or exception message.
+     */
+    @ExceptionHandler(DownstreamServiceException.class)
+    public ResponseEntity<ErrorResponse> handleDownstreamServiceException(
+            DownstreamServiceException ex,
+            HttpServletRequest request) {
+        log.warn("Downstream service '{}' unavailable during {} {}: {}",
+                ex.getServiceName(), request.getMethod(), request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.of(
+                "DOWNSTREAM_SERVICE_UNAVAILABLE",
+                ex.getServiceName() + " is currently unavailable. Please try again shortly.",
+                HttpStatus.SERVICE_UNAVAILABLE.value()
+        );
+        error.setDetails(Map.of("service", ex.getServiceName()));
+
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error);
+    }
+
+    /**
+     * Fallback: catches raw Feign failures that weren't wrapped in a
+     * DownstreamServiceException by the caller. Service name isn't
+     * known here, so it's omitted rather than guessed.
      */
     @ExceptionHandler(feign.FeignException.class)
     public ResponseEntity<ErrorResponse> handleFeignException(

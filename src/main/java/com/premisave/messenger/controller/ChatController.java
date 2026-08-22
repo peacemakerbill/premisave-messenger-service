@@ -4,6 +4,7 @@ import com.premisave.messenger.client.AuthServiceClient;
 import com.premisave.messenger.dto.request.CreateChatRequest;
 import com.premisave.messenger.dto.response.ChatResponse;
 import com.premisave.messenger.dto.response.UserSummaryResponse;
+import com.premisave.messenger.exception.DownstreamServiceException;
 import com.premisave.messenger.security.JwtService;
 import com.premisave.messenger.service.ChatService;
 import lombok.RequiredArgsConstructor;
@@ -110,7 +111,12 @@ public class ChatController {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             throw new RuntimeException("Missing or invalid Authorization header");
         }
-        UserSummaryResponse user = authServiceClient.getCurrentUser(authHeader);
+        UserSummaryResponse user;
+        try {
+            user = authServiceClient.getCurrentUser(authHeader);
+        } catch (feign.FeignException e) {
+            throw new DownstreamServiceException("auth-service", "Failed to resolve current user", e);
+        }
         if (user == null || user.getId() == null) {
             throw new RuntimeException("Unable to resolve current user from token");
         }
@@ -121,11 +127,19 @@ public class ChatController {
      * Resolves the email for a given real userId, used when we already
      * have the ID (e.g. otherUserId from the request body) and just need
      * the email to store alongside it.
+     *
+     * Only escalates on connection-level failures (auth-service actually
+     * unreachable). An ordinary 4xx from auth-service (e.g. userId not
+     * found) is not the same as "service unavailable" and is handled
+     * leniently here - the chat can still be created with a null email,
+     * to be healed later.
      */
     private String resolveEmail(String userId, String authHeader) {
         try {
             UserSummaryResponse summary = authServiceClient.getUserSummary(userId, authHeader);
             return summary != null ? summary.getEmail() : null;
+        } catch (feign.RetryableException e) {
+            throw new DownstreamServiceException("auth-service", "Failed to resolve user email", e);
         } catch (Exception e) {
             log.warn("Could not resolve email for userId {}: {}", userId, e.getMessage());
             return null;
