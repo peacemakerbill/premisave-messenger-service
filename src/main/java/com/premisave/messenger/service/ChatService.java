@@ -30,24 +30,75 @@ public class ChatService {
     private final UserService userService;
 
     /**
-     * Get or create private chat between two users
+     * Get or create private chat between two users.
+     * Always stores the real userId in participantIds, and keeps a
+     * userId -> email lookup in participantEmails.
+     *
+     * If an existing chat is found but is missing email data (e.g. was
+     * created before this fix, or previously stored an email instead of
+     * an ID), this heals it in place rather than leaving stale data.
      */
-    public String getOrCreatePrivateChat(String userId1, String userId2) {
+    public String getOrCreatePrivateChat(String userId1, String email1, String userId2, String email2) {
         Optional<Chat> existing = chatRepository.findPrivateChatBetween(userId1, userId2);
+
         if (existing.isPresent()) {
-            return existing.get().getId();
+            Chat chat = existing.get();
+            boolean needsHealing = healParticipants(chat, userId1, email1, userId2, email2);
+            if (needsHealing) {
+                chatRepository.save(chat);
+                log.info("Healed participant data for existing chat {}", chat.getId());
+            }
+            return chat.getId();
         }
 
         Chat newChat = new Chat();
         newChat.setChatType(ChatType.PRIVATE);
         newChat.getParticipantIds().add(userId1);
         newChat.getParticipantIds().add(userId2);
+        newChat.getParticipantEmails().put(userId1, email1);
+        newChat.getParticipantEmails().put(userId2, email2);
         newChat.setCreatedAt(LocalDateTime.now());
         newChat.setActive(true);
 
         Chat saved = chatRepository.save(newChat);
-        log.info("New private chat created between {} and {}", userId1, userId2);
+        log.info("New private chat created between {} ({}) and {} ({})", userId1, email1, userId2, email2);
         return saved.getId();
+    }
+
+    /**
+     * Ensures participantIds contains real IDs (not emails) and that
+     * participantEmails is fully populated. Returns true if the chat
+     * document was modified and needs saving.
+     */
+    private boolean healParticipants(Chat chat, String userId1, String email1, String userId2, String email2) {
+        boolean modified = false;
+
+        // Replace any participant entry that looks like an email (contains "@")
+        // with the correct real userId.
+        List<String> ids = chat.getParticipantIds();
+        for (int i = 0; i < ids.size(); i++) {
+            String current = ids.get(i);
+            if (current.contains("@")) {
+                if (current.equalsIgnoreCase(email1)) {
+                    ids.set(i, userId1);
+                    modified = true;
+                } else if (current.equalsIgnoreCase(email2)) {
+                    ids.set(i, userId2);
+                    modified = true;
+                }
+            }
+        }
+
+        if (!chat.getParticipantEmails().containsKey(userId1) || chat.getParticipantEmails().get(userId1) == null) {
+            chat.getParticipantEmails().put(userId1, email1);
+            modified = true;
+        }
+        if (!chat.getParticipantEmails().containsKey(userId2) || chat.getParticipantEmails().get(userId2) == null) {
+            chat.getParticipantEmails().put(userId2, email2);
+            modified = true;
+        }
+
+        return modified;
     }
 
     /**
@@ -55,7 +106,7 @@ public class ChatService {
      */
     public List<ChatResponse> getUserChats(String userId) {
         List<Chat> chats = chatRepository.findByParticipantIdsContainingAndIsActiveTrue(userId);
-        
+
         return chats.stream()
                 .map(chat -> convertToChatResponse(chat, userId))
                 .toList();
