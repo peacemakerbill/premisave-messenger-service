@@ -76,8 +76,8 @@ public class ChatController {
      */
     @GetMapping
     public ResponseEntity<List<ChatResponse>> getMyChats(@RequestHeader("Authorization") String authHeader) {
-        String currentUserId = resolveCurrentUser(authHeader).getId();
-        List<ChatResponse> chats = chatService.getUserChats(currentUserId, authHeader);
+        UserSummaryResponse currentUser = resolveCurrentUser(authHeader);
+        List<ChatResponse> chats = chatService.getUserChats(currentUser.getId(), authHeader, currentUser);
         return ResponseEntity.ok(chats);
     }
 

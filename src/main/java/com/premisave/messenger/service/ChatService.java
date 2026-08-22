@@ -104,30 +104,39 @@ public class ChatService {
     /**
      * Get all chats for current user (Private + Groups)
      *
-     * @param userId    the current user's real ID (for filtering/ownership)
-     * @param authToken the caller's raw "Bearer &lt;jwt&gt;" header, forwarded
-     *                  to auth-service for enrichment (sender names, other
-     *                  participant's full profile). Must be the real token -
-     *                  NOT the userId - since it's used for actual Feign auth.
+     * @param userId      the current user's real ID (for filtering/ownership)
+     * @param authToken   the caller's raw "Bearer &lt;jwt&gt;" header, forwarded
+     *                    to auth-service for enrichment (sender names, other
+     *                    participant's full profile). Must be the real token -
+     *                    NOT the userId - since it's used for actual Feign auth.
+     * @param currentUser the already-resolved profile of the logged-in user
+     *                    (fetched once by the controller via /profile/me),
+     *                    passed through here to avoid re-fetching it per chat.
      */
-    public List<ChatResponse> getUserChats(String userId, String authToken) {
+    public List<ChatResponse> getUserChats(String userId, String authToken, UserSummaryResponse currentUser) {
         List<Chat> chats = chatRepository.findByParticipantIdsContainingAndIsActiveTrue(userId);
 
+        // Enrich currentUser with their own presence once, reused across all chats.
+        var selfPresence = presenceService.getPresence(userId);
+        currentUser.setOnline(selfPresence.isOnline());
+        currentUser.setLastSeen(selfPresence.getLastSeen());
+
         return chats.stream()
-                .map(chat -> convertToChatResponse(chat, userId, authToken))
+                .map(chat -> convertToChatResponse(chat, userId, authToken, currentUser))
                 .toList();
     }
 
     /**
      * Convert Chat entity to ChatResponse with proper group details
      */
-    private ChatResponse convertToChatResponse(Chat chat, String currentUserId, String authToken) {
+    private ChatResponse convertToChatResponse(Chat chat, String currentUserId, String authToken, UserSummaryResponse currentUser) {
         ChatResponse response = new ChatResponse();
         response.setId(chat.getId());
         response.setChatType(chat.getChatType());
         response.setParticipantIds(chat.getParticipantIds());
         response.setGroupId(chat.getGroupId());
         response.setLastMessageAt(chat.getLastMessageAt());
+        response.setCurrentUser(currentUser);
 
         // Last Message Preview
         if (chat.getLastMessageId() != null) {

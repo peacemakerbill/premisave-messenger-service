@@ -30,6 +30,13 @@ public class ChatResponse {
     private LocalDateTime lastSeen;   // Last seen of the other user (PRIVATE chats)
 
     /**
+     * Full profile of the logged-in user making the request - same shape
+     * as otherUser, so the client doesn't need a separate /profile/me
+     * call just to render "me" in the chat UI (own avatar, name, etc).
+     */
+    private UserSummaryResponse currentUser;
+
+    /**
      * Full profile of the other participant, populated for PRIVATE chats
      * only: id, username, email, name, profile picture, online status,
      * and last seen - everything a chat list UI needs to render a row
