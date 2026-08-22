@@ -47,6 +47,12 @@ public class ChatController {
     /**
      * Create or Get Private Chat
      * POST /api/chats/private
+     *
+     * Returns 201 Created with a "Chat created successfully." message
+     * when a new chat is created, or 200 OK with an
+     * "already exists" message when the chat was found and reused -
+     * so the client can distinguish the two cases instead of both
+     * silently looking identical.
      */
     @PostMapping("/private")
     public ResponseEntity<ChatResponse> createPrivateChat(
@@ -60,15 +66,24 @@ public class ChatController {
         String otherUserId = request.getOtherUserId();
         String otherUserEmail = resolveEmail(otherUserId, authHeader);
 
-        String chatId = chatService.getOrCreatePrivateChat(currentUserId, currentUserEmail, otherUserId, otherUserEmail);
+        ChatService.PrivateChatResult result =
+                chatService.getOrCreatePrivateChat(currentUserId, currentUserEmail, otherUserId, otherUserEmail);
 
         ChatResponse response = new ChatResponse();
-        response.setId(chatId);
+        response.setId(result.chatId());
         response.setChatType(com.premisave.messenger.enums.ChatType.PRIVATE);
         response.setParticipantIds(List.of(currentUserId, otherUserId));
+        response.setNewlyCreated(result.created());
+        response.setMessage(result.created()
+                ? "Chat created successfully."
+                : "Chat already exists between these users.");
 
-        log.info("Private chat created/retrieved between {} and {}", currentUserId, otherUserId);
-        return ResponseEntity.ok(response);
+        log.info("Private chat {} between {} and {} (newly created: {})",
+                result.chatId(), currentUserId, otherUserId, result.created());
+
+        return result.created()
+                ? ResponseEntity.status(org.springframework.http.HttpStatus.CREATED).body(response)
+                : ResponseEntity.ok(response);
     }
 
     /**

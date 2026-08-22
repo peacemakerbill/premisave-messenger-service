@@ -38,7 +38,22 @@ public class ChatService {
      * created before this fix, or previously stored an email instead of
      * an ID), this heals it in place rather than leaving stale data.
      */
-    public String getOrCreatePrivateChat(String userId1, String email1, String userId2, String email2) {
+    /**
+     * Result of getOrCreatePrivateChat: the chat's ID, plus whether it
+     * was just created by this call (false = it already existed).
+     */
+    public record PrivateChatResult(String chatId, boolean created) {}
+
+    /**
+     * Get or create private chat between two users.
+     * Always stores the real userId in participantIds, and keeps a
+     * userId -> email lookup in participantEmails.
+     *
+     * If an existing chat is found but is missing email data (e.g. was
+     * created before this fix, or previously stored an email instead of
+     * an ID), this heals it in place rather than leaving stale data.
+     */
+    public PrivateChatResult getOrCreatePrivateChat(String userId1, String email1, String userId2, String email2) {
         Optional<Chat> existing = chatRepository.findPrivateChatBetween(userId1, userId2);
 
         if (existing.isPresent()) {
@@ -48,7 +63,9 @@ public class ChatService {
                 chatRepository.save(chat);
                 log.info("Healed participant data for existing chat {}", chat.getId());
             }
-            return chat.getId();
+            log.info("Private chat already exists between {} and {} - returning existing chat {}",
+                    userId1, userId2, chat.getId());
+            return new PrivateChatResult(chat.getId(), false);
         }
 
         Chat newChat = new Chat();
@@ -62,7 +79,7 @@ public class ChatService {
 
         Chat saved = chatRepository.save(newChat);
         log.info("New private chat created between {} ({}) and {} ({})", userId1, email1, userId2, email2);
-        return saved.getId();
+        return new PrivateChatResult(saved.getId(), true);
     }
 
     /**
