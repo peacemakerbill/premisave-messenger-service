@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
@@ -22,7 +23,7 @@ public class WebSocketController {
     private final SimpMessagingTemplate messagingTemplate;
 
     @MessageMapping("/chat.sendMessage")
-    public void sendMessage(@Payload ChatMessage chatMessage, Principal principal) {
+    public void sendMessage(@Payload ChatMessage chatMessage, Principal principal, SimpMessageHeaderAccessor headerAccessor) {
         if (principal == null || principal.getName() == null) {
             log.warn("Unauthenticated WebSocket message attempt");
             return;
@@ -39,7 +40,11 @@ public class WebSocketController {
             }
         }
 
-        String token = "Bearer " + senderId;
+        // Use the REAL JWT stashed by WebSocketAuthInterceptor during CONNECT,
+        // not a fabricated "Bearer " + senderId string (senderId is a Mongo
+        // ObjectId, not a valid JWT - the old code silently broke every
+        // downstream auth-service enrichment call in MessageService).
+        String token = resolveRealToken(headerAccessor, senderId);
 
         try {
             messageService.sendMessage(chatMessage, token);
@@ -73,5 +78,24 @@ public class WebSocketController {
         if (readMessage.getId() != null) {
             messageService.markMessageAsRead(readMessage.getId(), userId);
         }
+    }
+
+    /**
+     * Retrieves the real "Bearer <jwt>" token stashed in the STOMP session
+     * during CONNECT (see WebSocketAuthInterceptor). Falls back to a
+     * clearly-fake token only if it's genuinely missing, so downstream
+     * enrichment calls fail gracefully (they already catch exceptions and
+     * fall back to "Unknown User") rather than throwing here and dropping
+     * the message entirely.
+     */
+    private String resolveRealToken(SimpMessageHeaderAccessor headerAccessor, String senderId) {
+        if (headerAccessor != null && headerAccessor.getSessionAttributes() != null) {
+            Object stored = headerAccessor.getSessionAttributes().get("jwt");
+            if (stored instanceof String jwt && !jwt.isBlank()) {
+                return jwt;
+            }
+        }
+        log.warn("No real JWT found in session for user {} - sender enrichment will fall back to defaults", senderId);
+        return "Bearer " + senderId;
     }
 }
