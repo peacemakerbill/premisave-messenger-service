@@ -27,5 +27,16 @@ public class ChatResponse {
     private String adminId;
     private int memberCount;
 
-    private LocalDateTime lastSeen;   // Last seen of the other user
+    private LocalDateTime lastSeen;   // Last seen of the other user (PRIVATE chats)
+
+    /**
+     * Full profile of the other participant, populated for PRIVATE chats
+     * only: id, username, email, name, profile picture, online status,
+     * and last seen - everything a chat list UI needs to render a row
+     * without a separate lookup, similar to WhatsApp/Telegram chat lists.
+     *
+     * Null for GROUP chats (use groupName/groupPhotoUrl/adminId/memberCount
+     * instead).
+     */
+    private UserSummaryResponse otherUser;
 }

@@ -103,19 +103,25 @@ public class ChatService {
 
     /**
      * Get all chats for current user (Private + Groups)
+     *
+     * @param userId    the current user's real ID (for filtering/ownership)
+     * @param authToken the caller's raw "Bearer &lt;jwt&gt;" header, forwarded
+     *                  to auth-service for enrichment (sender names, other
+     *                  participant's full profile). Must be the real token -
+     *                  NOT the userId - since it's used for actual Feign auth.
      */
-    public List<ChatResponse> getUserChats(String userId) {
+    public List<ChatResponse> getUserChats(String userId, String authToken) {
         List<Chat> chats = chatRepository.findByParticipantIdsContainingAndIsActiveTrue(userId);
 
         return chats.stream()
-                .map(chat -> convertToChatResponse(chat, userId))
+                .map(chat -> convertToChatResponse(chat, userId, authToken))
                 .toList();
     }
 
     /**
      * Convert Chat entity to ChatResponse with proper group details
      */
-    private ChatResponse convertToChatResponse(Chat chat, String currentUserId) {
+    private ChatResponse convertToChatResponse(Chat chat, String currentUserId, String authToken) {
         ChatResponse response = new ChatResponse();
         response.setId(chat.getId());
         response.setChatType(chat.getChatType());
@@ -136,7 +142,7 @@ public class ChatService {
                         lastMsg.setMediaUrl(msg.getMediaUrl());
 
                         try {
-                            UserSummaryResponse sender = userService.getUserSummary(msg.getSenderId(), "Bearer " + currentUserId);
+                            UserSummaryResponse sender = userService.getUserSummary(msg.getSenderId(), authToken);
                             lastMsg.setSenderName(sender.getDisplayName() != null ? sender.getDisplayName() : sender.getUsername());
                             lastMsg.setSenderProfilePic(sender.getProfilePictureUrl());
                         } catch (Exception e) {
@@ -163,6 +169,16 @@ public class ChatService {
                 response.setOnline(presence.isOnline());
                 if (presence.getLastSeen() != null) {
                     response.setLastSeen(presence.getLastSeen());
+                }
+
+                try {
+                    UserSummaryResponse otherUser = userService.getUserSummary(otherUserId, authToken);
+                    otherUser.setOnline(presence.isOnline());
+                    otherUser.setLastSeen(presence.getLastSeen());
+                    response.setOtherUser(otherUser);
+                } catch (Exception e) {
+                    log.warn("Could not enrich other participant {} for chat {}: {}",
+                            otherUserId, chat.getId(), e.getMessage());
                 }
             }
         } 
