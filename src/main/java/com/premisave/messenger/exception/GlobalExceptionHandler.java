@@ -1,6 +1,5 @@
 package com.premisave.messenger.exception;
 
-import com.premisave.messenger.security.JwtService;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -11,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -19,9 +19,6 @@ import java.util.stream.Collectors;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-
-    public GlobalExceptionHandler(JwtService jwtService) {
-    }
 
     // ===== CUSTOM EXCEPTIONS =====
 
@@ -160,6 +157,52 @@ public class GlobalExceptionHandler {
                 "FORBIDDEN",
                 ex.getMessage(),
                 HttpStatus.FORBIDDEN.value(),
+                LocalDateTime.now()
+            ));
+    }
+
+    // ===== DOWNSTREAM SERVICE EXCEPTIONS (Feign) =====
+
+    /**
+     * Auth-service (or any other Feign-backed downstream service) is
+     * unreachable, timed out, or returned an error status.
+     *
+     * Deliberately logs a single concise line instead of the full stack
+     * trace - a downstream service being down is an expected operational
+     * condition, not a bug in this service, and doesn't need to flood the
+     * logs with 100+ lines of connection internals.
+     */
+    @ExceptionHandler(feign.FeignException.class)
+    public ResponseEntity<ErrorResponse> handleFeignException(
+            feign.FeignException ex,
+            HttpServletRequest request) {
+        log.warn("Downstream service call failed: {} {} -> {}",
+                request.getMethod(), request.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+            .body(new ErrorResponse(
+                "DOWNSTREAM_SERVICE_UNAVAILABLE",
+                "A required service is currently unavailable. Please try again shortly.",
+                HttpStatus.SERVICE_UNAVAILABLE.value(),
+                LocalDateTime.now()
+            ));
+    }
+
+    /**
+     * Catches raw connection failures that occur outside Feign's own
+     * wrapping (e.g. a direct socket/HTTP client call elsewhere).
+     * Same rationale as above: concise log, no stack trace spam.
+     */
+    @ExceptionHandler(java.net.ConnectException.class)
+    public ResponseEntity<ErrorResponse> handleConnectException(
+            java.net.ConnectException ex,
+            HttpServletRequest request) {
+        log.warn("Connection refused: {} {} -> {}",
+                request.getMethod(), request.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+            .body(new ErrorResponse(
+                "DOWNSTREAM_SERVICE_UNAVAILABLE",
+                "A required service is currently unavailable. Please try again shortly.",
+                HttpStatus.SERVICE_UNAVAILABLE.value(),
                 LocalDateTime.now()
             ));
     }
