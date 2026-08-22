@@ -1,9 +1,8 @@
 package com.premisave.messenger.controller;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.HealthEndpoint;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -14,11 +13,16 @@ import java.util.Map;
 
 @Slf4j
 @RestController
-@RequiredArgsConstructor
 public class HealthController {
 
-    private final HealthEndpoint healthEndpoint;
+    private final MongoTemplate mongoTemplate;
+    private final RedisTemplate<String, Object> redisTemplate;
     private static final LocalDateTime START_TIME = LocalDateTime.now();
+
+    public HealthController(MongoTemplate mongoTemplate, RedisTemplate<String, Object> redisTemplate) {
+        this.mongoTemplate = mongoTemplate;
+        this.redisTemplate = redisTemplate;
+    }
 
     /**
      * Full health check with component details
@@ -26,15 +30,21 @@ public class HealthController {
     @GetMapping("/health")
     public ResponseEntity<Map<String, Object>> health() {
         try {
-            Health health = healthEndpoint.health();
+            boolean mongoOk = checkMongoDB();
+            boolean redisOk = checkRedis();
+            boolean allOk = mongoOk && redisOk;
             
             Map<String, Object> response = new HashMap<>();
-            response.put("status", health.getStatus().toString());
-            response.put("components", health.getComponents());
+            response.put("status", allOk ? "UP" : "PARTIAL");
             response.put("timestamp", System.currentTimeMillis());
             response.put("uptime", calculateUptime());
             
-            return ResponseEntity.ok(response);
+            Map<String, Object> components = new HashMap<>();
+            components.put("mongodb", mongoOk ? "UP" : "DOWN");
+            components.put("redis", redisOk ? "UP" : "DOWN");
+            response.put("components", components);
+            
+            return allOk ? ResponseEntity.ok(response) : ResponseEntity.status(503).body(response);
         } catch (Exception e) {
             log.error("Error getting health status", e);
             return ResponseEntity.internalServerError().body(Map.of(
@@ -51,10 +61,9 @@ public class HealthController {
     @GetMapping("/health/ready")
     public ResponseEntity<Map<String, Object>> readiness() {
         try {
-            Health health = healthEndpoint.health();
-            
-            // Service is ready if all components are UP
-            boolean isReady = health.getStatus().toString().equals("UP");
+            boolean mongoOk = checkMongoDB();
+            boolean redisOk = checkRedis();
+            boolean isReady = mongoOk && redisOk;
             
             Map<String, Object> response = new HashMap<>();
             response.put("status", isReady ? "READY" : "NOT_READY");
@@ -95,8 +104,9 @@ public class HealthController {
     @GetMapping("/health/startup")
     public ResponseEntity<Map<String, Object>> startup() {
         try {
-            Health health = healthEndpoint.health();
-            boolean isStarted = health.getStatus().toString().equals("UP");
+            boolean mongoOk = checkMongoDB();
+            boolean redisOk = checkRedis();
+            boolean isStarted = mongoOk && redisOk;
             
             Map<String, Object> response = new HashMap<>();
             response.put("status", isStarted ? "STARTED" : "STARTING");
@@ -128,6 +138,28 @@ public class HealthController {
     }
 
     // ===== HELPER METHODS =====
+
+    private boolean checkMongoDB() {
+        try {
+            mongoTemplate.executeCommand("{ ping: 1 }");
+            return true;
+        } catch (Exception e) {
+            log.warn("MongoDB health check failed: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    private boolean checkRedis() {
+        try {
+            var conn = redisTemplate.getConnectionFactory().getConnection();
+            conn.ping();
+            conn.close();
+            return true;
+        } catch (Exception e) {
+            log.warn("Redis health check failed: {}", e.getMessage());
+            return false;
+        }
+    }
 
     private long calculateUptime() {
         return java.time.temporal.ChronoUnit.SECONDS.between(START_TIME, LocalDateTime.now());

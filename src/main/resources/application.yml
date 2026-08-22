@@ -3,39 +3,29 @@ spring:
     name: premisave-messenger-service
     version: 1.0.0
 
-  # ==================== Servlet Configuration ====================
-  servlet:
-    multipart:
-      enabled: true
-      max-file-size: 50MB
-      max-request-size: 50MB
-      file-size-threshold: 2KB
-
-  # ==================== Database Configuration ====================
-  mongodb:
-    uri: ${MONGODB_URI:mongodb://localhost:27017/premisave-messenger}
-    auto-index-creation: true
-    connection-string: ${MONGODB_URI:mongodb://localhost:27017/premisave-messenger}
-
-  # ==================== Redis Configuration ====================
   data:
+    mongodb:
+      connection-string: ${MONGODB_URI:mongodb://localhost:27017/premisave-messenger}
+      auto-index-creation: true
     redis:
       url: ${REDIS_URL:redis://localhost:6379}
-      timeout: 2000
-      jedis:
+      timeout: 2000ms
+      connect-timeout: 2000ms
+      lettuce:
         pool:
           max-active: 20
           max-idle: 10
           min-idle: 5
-          max-wait: -1ms
-      repositories:
-        enabled: false
 
-  # ==================== Cache Configuration ====================
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
   cache:
     type: redis
     redis:
-      time-to-live: 300000
+      time-to-live: 5m
     cache-names:
       - users
       - chat-access
@@ -43,15 +33,18 @@ spring:
       - chat-details
       - message-reactions
 
-  # ==================== JPA Configuration ====================
-  jpa:
-    properties:
-      hibernate:
-        jdbc:
-          batch_size: 20
-          fetch_size: 50
+  security:
+    user:
+      name: ${ACTUATOR_USER:actuator}
+      password: ${ACTUATOR_PASSWORD:actuator123}
 
-  # ==================== Task Execution ====================
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+
   task:
     execution:
       pool:
@@ -59,26 +52,15 @@ spring:
         max-size: 50
         queue-capacity: 100
         thread-name-prefix: messenger-async-
+        allow-core-thread-timeout: true
+        wait-for-tasks-to-complete-on-shutdown: true
+        await-termination-period: 60s
 
-  # ==================== Jackson (JSON) ====================
-  jackson:
-    serialization:
-      write-dates-as-timestamps: false
-    deserialization:
-      fail-on-unknown-properties: false
-
-  # ==================== Security ====================
-  security:
-    user:
-      name: actuator
-      password: ${ACTUATOR_PASSWORD:actuator123}
-
-# ==================== Server Configuration ====================
 server:
   port: 8081
+  shutdown: graceful
   servlet:
     context-path: /
-  shutdown: graceful
   compression:
     enabled: true
     min-response-size: 1024
@@ -88,61 +70,66 @@ server:
       min-spare: 10
     accept-count: 100
     max-connections: 10000
-    max-http-post-size: 52428800
+    max-http-form-post-size: 52428800
+    connection-timeout: 20000ms
 
-# ==================== Auth Service Configuration ====================
-auth:
-  service:
-    url: ${AUTH_SERVICE_URL:http://localhost:8080}
-    connect-timeout: 5000
-    read-timeout: 10000
-    max-retries: 3
-
-# ==================== JWT Configuration ====================
 jwt:
   secret: ${JWT_SECRET:eW91ci12ZXJ5LXNlY3VyZS1qd3Qtc2VjcmV0LWtleS0zMi1ieXRlcyE=}
   expiration: 86400000
   refresh-expiration: 604800000
 
-# ==================== Cloudinary Configuration ====================
+auth:
+  service:
+    url: ${AUTH_SERVICE_URL:http://localhost:8080}
+
 cloudinary:
   cloud-name: ${CLOUDINARY_CLOUD_NAME:your-cloud-name}
   api-key: ${CLOUDINARY_API_KEY:your-api-key}
   api-secret: ${CLOUDINARY_API_SECRET:your-api-secret}
 
-# ==================== Logging Configuration ====================
+feign:
+  client:
+    config:
+      default:
+        connect-timeout: 5000
+        read-timeout: 10000
+  compression:
+    request:
+      enabled: true
+      min-request-size: 2048
+
 logging:
   level:
     root: INFO
-    com.premisave.messenger: DEBUG
-    org.springframework.web: DEBUG
-    org.springframework.security: DEBUG
-    org.springframework.data.mongodb: INFO
-    org.springframework.data.redis: INFO
+    '[com.premisave.messenger]': DEBUG
+    '[org.springframework.web]': WARN
+    '[org.springframework.security]': WARN
+    '[org.springframework.data.mongodb]': INFO
+    '[org.springframework.data.redis]': INFO
   pattern:
     console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
-    file: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
   file:
     name: logs/messenger-service.log
     max-size: 10MB
     max-history: 10
-  logback:
-    rollingpolicy:
-      max-file-size: 10MB
-      max-history: 10
-      total-size-cap: 100MB
+    total-size-cap: 100MB
 
-# ==================== Actuator Configuration ====================
 management:
+  server:
+    port: 8081
   endpoints:
     web:
       exposure:
-        include: health,metrics,prometheus,info,env
+        include: health,metrics,prometheus,info
       base-path: /actuator
   endpoint:
     health:
       show-details: when-authorized
       probes:
+        enabled: true
+      livenessState:
+        enabled: true
+      readinessState:
         enabled: true
     metrics:
       enabled: true
@@ -152,38 +139,9 @@ management:
         enabled: true
     distribution:
       percentiles-histogram:
-        messenger.message.send.latency: true
+        '[messenger.message.send.latency]': true
     tags:
       application: premisave-messenger
-  health:
-    livenessState:
-      enabled: true
-    readinessState:
-      enabled: true
-
-# ==================== Feign Configuration ====================
-feign:
-  client:
-    config:
-      default:
-        loggerLevel: FULL
-        connectTimeout: 5000
-        readTimeout: 10000
-        retryer: default
-  compression:
-    request:
-      enabled: true
-      min-request-size: 2048
-    response:
-      enabled: true
-
-# ==================== Application-Specific Configuration ====================
-rate-limit:
-  requests-per-minute: 60
-  websocket-messages-per-minute: 100
-
-profile-views:
-  max-history-size: 20
 
 message:
   delivery:
@@ -191,13 +149,16 @@ message:
     retry-delay-ms: 1000
   idempotency-timeout-hours: 24
 
+rate-limit:
+  requests-per-minute: 60
+  websocket-messages-per-minute: 100
+
 websocket:
   stomp:
     heartbeat:
-      client-outbound: 10000
-      server-inbound: 10000
+      client: 10000
+      server: 10000
 
-# ==================== Profiles ====================
 ---
 spring:
   config:
@@ -206,8 +167,12 @@ spring:
 
 logging:
   level:
-    com.premisave.messenger: DEBUG
-    org.springframework: DEBUG
+    '[com.premisave.messenger]': DEBUG
+    '[org.springframework]': DEBUG
+
+server:
+  compression:
+    enabled: false
 
 ---
 spring:
@@ -217,8 +182,8 @@ spring:
 
 logging:
   level:
-    com.premisave.messenger: INFO
-    org.springframework: WARN
+    '[com.premisave.messenger]': INFO
+    '[org.springframework]': WARN
 
 server:
   compression:
@@ -229,14 +194,12 @@ spring:
   config:
     activate:
       on-profile: test
-
-spring:
-  mongodb:
-    uri: mongodb://localhost:27017/premisave-messenger-test
   data:
+    mongodb:
+      connection-string: mongodb://localhost:27017/premisave-messenger-test
     redis:
       url: redis://localhost:6379/1
 
 logging:
   level:
-    com.premisave.messenger: DEBUG
+    '[com.premisave.messenger]': DEBUG

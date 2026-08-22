@@ -13,7 +13,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 @RequiredArgsConstructor
 public class MessengerMetrics {
 
-    private final MeterRegistry meterRegistry;
     private final Counter messagesCreated;
     private final Counter messagesDeleted;
     private final Counter chatsCreated;
@@ -23,8 +22,6 @@ public class MessengerMetrics {
     private final Counter partialDeliveries;
 
     public MessengerMetrics(MeterRegistry meterRegistry) {
-        this.meterRegistry = meterRegistry;
-
         this.messagesCreated = Counter.builder("messenger.messages.created.total")
             .description("Total messages created")
             .register(meterRegistry);

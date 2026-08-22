@@ -3,27 +3,57 @@
     {
       "name": "cloudinary.cloud-name",
       "type": "java.lang.String",
-      "description": "Cloudinary account cloud name."
+      "description": "Cloudinary account cloud name for media storage."
     },
     {
       "name": "cloudinary.api-key",
       "type": "java.lang.String",
-      "description": "Cloudinary API key."
+      "description": "Cloudinary API key for authentication."
     },
     {
       "name": "cloudinary.api-secret",
       "type": "java.lang.String",
-      "description": "Cloudinary API secret."
+      "description": "Cloudinary API secret for authentication."
     },
     {
       "name": "auth.service.url",
       "type": "java.lang.String",
-      "description": "Base URL of the authentication service."
+      "description": "Base URL of the authentication service (used for JWT validation and inter-service communication)."
     },
     {
       "name": "jwt.secret",
       "type": "java.lang.String",
-      "description": "Base64-encoded secret key used to sign and verify JWT tokens. Must match across all services."
+      "description": "Base64-encoded secret key used to sign and verify JWT tokens. Must match across all microservices."
+    },
+    {
+      "name": "jwt.expiration",
+      "type": "java.lang.Long",
+      "description": "JWT access token expiration time in milliseconds.",
+      "defaultValue": 86400000
+    },
+    {
+      "name": "jwt.refresh-expiration",
+      "type": "java.lang.Long",
+      "description": "JWT refresh token expiration time in milliseconds.",
+      "defaultValue": 604800000
+    },
+    {
+      "name": "message.delivery.retry-attempts",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of retry attempts for failed message delivery to users.",
+      "defaultValue": 3
+    },
+    {
+      "name": "message.delivery.retry-delay-ms",
+      "type": "java.lang.Long",
+      "description": "Delay in milliseconds between message delivery retry attempts with exponential backoff.",
+      "defaultValue": 1000
+    },
+    {
+      "name": "message.idempotency-timeout-hours",
+      "type": "java.lang.Integer",
+      "description": "Duration in hours to keep idempotency keys for preventing duplicate message sends.",
+      "defaultValue": 24
     },
     {
       "name": "profile-views.max-history-size",
@@ -34,27 +64,385 @@
     {
       "name": "rate-limit.requests-per-minute",
       "type": "java.lang.Integer",
-      "description": "Maximum number of requests allowed per minute per client before rate limiting kicks in.",
+      "description": "Maximum number of HTTP requests allowed per minute per client IP address.",
       "defaultValue": 60
     },
     {
-      "name": "spring.websocket.stomp.broker.heartbeat",
+      "name": "rate-limit.websocket-messages-per-minute",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of WebSocket STOMP messages allowed per minute per connected client.",
+      "defaultValue": 100
+    },
+    {
+      "name": "websocket.stomp.heartbeat.client",
       "type": "java.lang.Long",
-      "description": "Interval in milliseconds for STOMP broker heartbeat. Controls how often the server sends heartbeat frames to connected WebSocket clients.",
+      "description": "STOMP heartbeat interval in milliseconds that clients send to the server.",
       "defaultValue": 10000
+    },
+    {
+      "name": "websocket.stomp.heartbeat.server",
+      "type": "java.lang.Long",
+      "description": "STOMP heartbeat interval in milliseconds that the server sends to connected clients.",
+      "defaultValue": 10000
+    },
+    {
+      "name": "spring.task.execution.pool.thread-name-prefix",
+      "type": "java.lang.String",
+      "description": "Prefix for async task executor thread names for easier debugging in logs.",
+      "defaultValue": "messenger-async-"
+    },
+    {
+      "name": "spring.task.execution.pool.core-size",
+      "type": "java.lang.Integer",
+      "description": "Core number of threads in the async task executor thread pool.",
+      "defaultValue": 10
+    },
+    {
+      "name": "spring.task.execution.pool.max-size",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of threads in the async task executor thread pool.",
+      "defaultValue": 50
+    },
+    {
+      "name": "spring.task.execution.pool.queue-capacity",
+      "type": "java.lang.Integer",
+      "description": "Queue capacity for async tasks waiting to be executed.",
+      "defaultValue": 100
+    },
+    {
+      "name": "spring.task.execution.pool.wait-for-tasks-to-complete-on-shutdown",
+      "type": "java.lang.Boolean",
+      "description": "Whether to wait for remaining async tasks to complete on application shutdown.",
+      "defaultValue": true
+    },
+    {
+      "name": "spring.task.execution.pool.await-termination-period",
+      "type": "java.lang.String",
+      "description": "Maximum time to wait for async tasks to complete on shutdown.",
+      "defaultValue": "60s"
+    },
+    {
+      "name": "feign.client.config.default.connect-timeout",
+      "type": "java.lang.Integer",
+      "description": "Feign HTTP client connection timeout in milliseconds for inter-service calls.",
+      "defaultValue": 5000
+    },
+    {
+      "name": "feign.client.config.default.read-timeout",
+      "type": "java.lang.Integer",
+      "description": "Feign HTTP client read timeout in milliseconds for inter-service calls.",
+      "defaultValue": 10000
+    },
+    {
+      "name": "feign.compression.request.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Enable GZIP compression for Feign HTTP requests.",
+      "defaultValue": true
+    },
+    {
+      "name": "feign.compression.request.min-request-size",
+      "type": "java.lang.Integer",
+      "description": "Minimum request size in bytes before Feign applies compression.",
+      "defaultValue": 2048
+    },
+    {
+      "name": "server.tomcat.max-http-form-post-size",
+      "type": "java.lang.Long",
+      "description": "Maximum size in bytes for HTTP form POST requests.",
+      "defaultValue": 52428800
+    },
+    {
+      "name": "server.tomcat.connection-timeout",
+      "type": "java.lang.String",
+      "description": "Tomcat connection timeout for establishing HTTP connections.",
+      "defaultValue": "20000ms"
+    },
+    {
+      "name": "server.tomcat.threads.max",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of request processing threads in Tomcat.",
+      "defaultValue": 200
+    },
+    {
+      "name": "server.tomcat.threads.min-spare",
+      "type": "java.lang.Integer",
+      "description": "Minimum number of spare request processing threads in Tomcat.",
+      "defaultValue": 10
+    },
+    {
+      "name": "server.tomcat.max-connections",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of connections Tomcat will accept.",
+      "defaultValue": 10000
+    },
+    {
+      "name": "server.compression.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Enable response compression (gzip) for responses larger than min-response-size.",
+      "defaultValue": true
+    },
+    {
+      "name": "server.compression.min-response-size",
+      "type": "java.lang.Integer",
+      "description": "Minimum response size in bytes before compression is applied.",
+      "defaultValue": 1024
+    },
+    {
+      "name": "server.port",
+      "type": "java.lang.Integer",
+      "description": "Server HTTP port.",
+      "defaultValue": 8081
+    },
+    {
+      "name": "server.shutdown",
+      "type": "java.lang.String",
+      "description": "Server shutdown strategy (immediate, graceful).",
+      "defaultValue": "graceful"
+    },
+    {
+      "name": "server.servlet.context-path",
+      "type": "java.lang.String",
+      "description": "Context path of the web application.",
+      "defaultValue": "/"
+    },
+    {
+      "name": "spring.data.mongodb.connection-string",
+      "type": "java.lang.String",
+      "description": "MongoDB connection string URI (replaces deprecated uri property)."
+    },
+    {
+      "name": "spring.data.mongodb.auto-index-creation",
+      "type": "java.lang.Boolean",
+      "description": "Enable automatic MongoDB index creation from @Indexed annotations.",
+      "defaultValue": true
+    },
+    {
+      "name": "spring.data.redis.url",
+      "type": "java.lang.String",
+      "description": "Redis server URL connection string.",
+      "defaultValue": "redis://localhost:6379"
+    },
+    {
+      "name": "spring.data.redis.timeout",
+      "type": "java.lang.String",
+      "description": "Redis connection timeout duration.",
+      "defaultValue": "2000ms"
+    },
+    {
+      "name": "spring.data.redis.connect-timeout",
+      "type": "java.lang.String",
+      "description": "Redis connection establish timeout duration.",
+      "defaultValue": "2000ms"
+    },
+    {
+      "name": "spring.data.redis.lettuce.pool.max-active",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of active connections in Redis Lettuce connection pool.",
+      "defaultValue": 20
+    },
+    {
+      "name": "spring.data.redis.lettuce.pool.max-idle",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of idle connections in Redis Lettuce connection pool.",
+      "defaultValue": 10
+    },
+    {
+      "name": "spring.data.redis.lettuce.pool.min-idle",
+      "type": "java.lang.Integer",
+      "description": "Minimum number of idle connections in Redis Lettuce connection pool.",
+      "defaultValue": 5
+    },
+    {
+      "name": "spring.cache.type",
+      "type": "java.lang.String",
+      "description": "Cache type to use (redis, caffeine, simple, none).",
+      "defaultValue": "redis"
+    },
+    {
+      "name": "spring.cache.redis.time-to-live",
+      "type": "java.lang.String",
+      "description": "Default cache TTL for all Redis caches.",
+      "defaultValue": "5m"
+    },
+    {
+      "name": "spring.cache.cache-names",
+      "type": "java.util.List",
+      "description": "List of cache names to initialize on startup."
+    },
+    {
+      "name": "spring.jackson.default-property-inclusion",
+      "type": "java.lang.String",
+      "description": "Inclusion strategy for serializing properties (non_null = exclude null values).",
+      "defaultValue": "non_null"
+    },
+    {
+      "name": "spring.jackson.serialization.write-dates-as-timestamps",
+      "type": "java.lang.Boolean",
+      "description": "Whether to write dates as timestamps (false = use ISO-8601 format).",
+      "defaultValue": false
+    },
+    {
+      "name": "spring.jackson.deserialization.fail-on-unknown-properties",
+      "type": "java.lang.Boolean",
+      "description": "Whether to fail if unknown properties are found during deserialization.",
+      "defaultValue": false
+    },
+    {
+      "name": "spring.servlet.multipart.max-file-size",
+      "type": "java.lang.String",
+      "description": "Maximum allowed file size per upload.",
+      "defaultValue": "50MB"
+    },
+    {
+      "name": "spring.servlet.multipart.max-request-size",
+      "type": "java.lang.String",
+      "description": "Maximum allowed request size for multipart uploads.",
+      "defaultValue": "50MB"
+    },
+    {
+      "name": "spring.security.user.name",
+      "type": "java.lang.String",
+      "description": "Default user name for basic authentication.",
+      "defaultValue": "actuator"
+    },
+    {
+      "name": "spring.security.user.password",
+      "type": "java.lang.String",
+      "description": "Default user password for basic authentication."
+    },
+    {
+      "name": "logging.level.root",
+      "type": "java.lang.String",
+      "description": "Root logger level.",
+      "defaultValue": "INFO"
+    },
+    {
+      "name": "logging.pattern.console",
+      "type": "java.lang.String",
+      "description": "Log pattern for console output."
+    },
+    {
+      "name": "logging.file.name",
+      "type": "java.lang.String",
+      "description": "Log file name and path."
+    },
+    {
+      "name": "logging.file.max-size",
+      "type": "java.lang.String",
+      "description": "Maximum size of log file before rotation.",
+      "defaultValue": "10MB"
+    },
+    {
+      "name": "logging.file.max-history",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of backup log files to keep.",
+      "defaultValue": 10
+    },
+    {
+      "name": "logging.file.total-size-cap",
+      "type": "java.lang.String",
+      "description": "Total size cap for all log files combined.",
+      "defaultValue": "100MB"
+    },
+    {
+      "name": "management.server.port",
+      "type": "java.lang.Integer",
+      "description": "Management endpoints server port.",
+      "defaultValue": 8081
+    },
+    {
+      "name": "management.endpoints.web.base-path",
+      "type": "java.lang.String",
+      "description": "Base path for management web endpoints.",
+      "defaultValue": "/actuator"
+    },
+    {
+      "name": "management.endpoints.web.exposure.include",
+      "type": "java.lang.String",
+      "description": "Comma-separated list of management endpoints to expose.",
+      "defaultValue": "health,metrics,prometheus,info"
+    },
+    {
+      "name": "management.endpoint.health.show-details",
+      "type": "java.lang.String",
+      "description": "When to show health details: never, when-authorized, always.",
+      "defaultValue": "when-authorized"
+    },
+    {
+      "name": "management.endpoint.health.probes.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Enable Kubernetes probe endpoints (/health/live, /health/ready, /health/startup).",
+      "defaultValue": true
+    },
+    {
+      "name": "management.endpoint.health.livenessState.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Enable the liveness state for Kubernetes liveness probes.",
+      "defaultValue": true
+    },
+    {
+      "name": "management.endpoint.health.readinessState.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Enable the readiness state for Kubernetes readiness probes.",
+      "defaultValue": true
+    },
+    {
+      "name": "management.endpoint.metrics.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Enable the metrics management endpoint.",
+      "defaultValue": true
+    },
+    {
+      "name": "management.metrics.export.prometheus.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Enable Prometheus metrics export at /actuator/prometheus endpoint.",
+      "defaultValue": true
+    },
+    {
+      "name": "management.metrics.distribution.percentiles-histogram.[messenger.message.send.latency]",
+      "type": "java.lang.Boolean",
+      "description": "Enable percentile histogram for message send latency metric.",
+      "defaultValue": true
+    },
+    {
+      "name": "management.metrics.tags.application",
+      "type": "java.lang.String",
+      "description": "Application name tag for metrics.",
+      "defaultValue": "premisave-messenger"
     }
   ],
   "hints": [
     {
       "name": "logging.level.values",
       "values": [
-        {"value": "TRACE"},
-        {"value": "DEBUG"},
-        {"value": "INFO"},
-        {"value": "WARN"},
-        {"value": "ERROR"},
-        {"value": "FATAL"},
-        {"value": "OFF"}
+        {
+          "value": "TRACE",
+          "description": "Trace level - most detailed, every method call and variable."
+        },
+        {
+          "value": "DEBUG",
+          "description": "Debug level - detailed diagnostic information for debugging."
+        },
+        {
+          "value": "INFO",
+          "description": "Info level - general informational messages about application flow."
+        },
+        {
+          "value": "WARN",
+          "description": "Warn level - warning messages for potential issues."
+        },
+        {
+          "value": "ERROR",
+          "description": "Error level - error messages only, no warnings."
+        },
+        {
+          "value": "FATAL",
+          "description": "Fatal level - only critical errors that cause shutdown."
+        },
+        {
+          "value": "OFF",
+          "description": "Off - disable logging for this logger completely."
+        }
       ]
     },
     {
@@ -62,35 +450,88 @@
       "values": [
         {
           "value": "root",
-          "description": "Root logger level."
+          "description": "Root logger level - applies to all loggers unless overridden."
         },
         {
-          "value": "com.premisave.messenger",
+          "value": "[com.premisave.messenger]",
           "description": "All Premisave messenger application classes."
         },
         {
-          "value": "org.springframework.web.socket",
-          "description": "WebSocket layer."
+          "value": "[com.premisave.messenger.service]",
+          "description": "Service layer: MessageService, ChatService, GroupService, UserService."
         },
         {
-          "value": "org.springframework.data.mongodb",
-          "description": "MongoDB data layer."
+          "value": "[com.premisave.messenger.controller]",
+          "description": "REST and WebSocket controller classes and request handling."
         },
         {
-          "value": "org.springframework.security",
-          "description": "Spring Security."
+          "value": "[com.premisave.messenger.repository]",
+          "description": "MongoDB repository layer and database queries."
         },
         {
-          "value": "org.springframework.web.multipart",
-          "description": "Multipart file upload handling."
+          "value": "[org.springframework.web]",
+          "description": "Spring Web framework and HTTP request handling."
         },
         {
-          "value": "org.springframework.data.repository.config.RepositoryConfigurationExtensionSupport",
+          "value": "[org.springframework.web.socket]",
+          "description": "WebSocket layer, STOMP protocol, and real-time messaging."
+        },
+        {
+          "value": "[org.springframework.data.mongodb]",
+          "description": "MongoDB Spring Data driver and query operations."
+        },
+        {
+          "value": "[org.springframework.data.redis]",
+          "description": "Redis Spring Data driver, caching, and Lettuce client."
+        },
+        {
+          "value": "[org.springframework.security]",
+          "description": "Spring Security core - authentication and authorization."
+        },
+        {
+          "value": "[org.springframework.security.web]",
+          "description": "Spring Security web layer - filters, authentication chains."
+        },
+        {
+          "value": "[org.springframework.web.multipart]",
+          "description": "Multipart request handling and file upload processing."
+        },
+        {
+          "value": "[org.springframework.data.repository.config.RepositoryConfigurationExtensionSupport]",
           "description": "Suppresses Redis/MongoDB repository conflict warnings."
         },
         {
-          "value": "org.springframework.cloud.commons.util.InetUtils",
+          "value": "[org.springframework.cloud.commons.util.InetUtils]",
           "description": "Suppresses hostname resolution warnings from Spring Cloud."
+        },
+        {
+          "value": "[org.springframework.messaging]",
+          "description": "Spring Messaging framework for WebSocket STOMP protocol."
+        },
+        {
+          "value": "[org.springframework.cache]",
+          "description": "Spring Cache abstraction and Redis cache operations."
+        },
+        {
+          "value": "[org.springframework.cloud.openfeign]",
+          "description": "Feign HTTP client for inter-service communication."
+        }
+      ]
+    },
+    {
+      "name": "spring.profiles.active",
+      "values": [
+        {
+          "value": "dev",
+          "description": "Development profile - DEBUG logging, no compression, local services."
+        },
+        {
+          "value": "prod",
+          "description": "Production profile - INFO logging, compression enabled, optimized performance."
+        },
+        {
+          "value": "test",
+          "description": "Test profile - local MongoDB/Redis, DEBUG logging for testing."
         }
       ]
     }

@@ -1,5 +1,6 @@
 package com.premisave.messenger.service;
 
+import com.premisave.messenger.config.MessengerMetrics;
 import com.premisave.messenger.dto.response.MessageResponse;
 import com.premisave.messenger.dto.response.UserSummaryResponse;
 import com.premisave.messenger.dto.websocket.ChatMessage;
@@ -22,7 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
