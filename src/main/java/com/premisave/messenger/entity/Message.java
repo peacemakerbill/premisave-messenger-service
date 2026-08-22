@@ -1,12 +1,18 @@
 package com.premisave.messenger.entity;
 
+import com.premisave.messenger.enums.MessageDeliveryState;
 import com.premisave.messenger.enums.MessageStatus;
 import com.premisave.messenger.enums.MessageType;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
@@ -14,6 +20,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 @Document(collection = "messages")
 @CompoundIndexes({
     @CompoundIndex(name = "chat_sender_idx", def = "{'chatId': 1, 'senderId': 1}"),
@@ -40,15 +48,46 @@ public class Message {
 
     @CreatedDate
     private LocalDateTime createdAt;
+    
+    @LastModifiedDate
+    private LocalDateTime updatedAt;
+    
     private LocalDateTime editedAt;
 
     private boolean isDeleted = false;
     private boolean isDeletedForEveryone = false;
     private boolean isActive = true;
 
+    // === IDEMPOTENCY & DELIVERY TRACKING ===
+    
+    @Indexed(unique = true, sparse = true)
+    private String idempotencyKey;
+    
+    @Version
+    private Long version;
+
+    private MessageDeliveryState deliveryState = MessageDeliveryState.PENDING;
+    private List<DeliveryReceipt> receipts = new ArrayList<>();
+    private LocalDateTime deliveredAt;
+    private LocalDateTime failedAt;
+    private String failureReason;
+    private int retryCount = 0;
+
     // Reply support
     private String replyToMessageId;
 
     // Delete for Me support (per-user deletion)
     private List<String> deletedForUsers = new ArrayList<>();
+
+    // ========================================
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class DeliveryReceipt {
+        private String recipientId;
+        private MessageDeliveryState state;
+        private LocalDateTime deliveredAt;
+        private String failureReason;
+    }
 }

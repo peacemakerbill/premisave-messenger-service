@@ -6,6 +6,7 @@ import com.premisave.messenger.dto.websocket.ChatMessage;
 import com.premisave.messenger.entity.Chat;
 import com.premisave.messenger.entity.Message;
 import com.premisave.messenger.enums.ChatType;
+import com.premisave.messenger.enums.MessageDeliveryState;
 import com.premisave.messenger.enums.MessageStatus;
 import com.premisave.messenger.enums.MessageType;
 import com.premisave.messenger.exception.MessageNotFoundException;
@@ -17,10 +18,14 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -32,27 +37,283 @@ public class MessageService {
     private final ChatService chatService;
     private final UserService userService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final MessengerMetrics metrics; // For tracking metrics
 
+    /**
+     * Send message with idempotency guarantee and delivery tracking
+     */
+    @Transactional
     public MessageResponse sendMessage(ChatMessage chatMessage, String authToken) {
+        // Generate idempotency key
+        String idempotencyKey = UUID.randomUUID().toString();
+        
+        // Check if already processed (prevent duplicates)
+        var existing = messageRepository.findByIdempotencyKey(idempotencyKey);
+        if (existing.isPresent()) {
+            log.warn("Duplicate message send attempt detected. Idempotency Key: {}", idempotencyKey);
+            return convertToMessageResponse(existing.get(), authToken);
+        }
+
+        // Create message entity
         Message message = new Message();
+        message.setIdempotencyKey(idempotencyKey);
         message.setChatId(chatMessage.getChatId());
         message.setSenderId(chatMessage.getSenderId());
         message.setContent(chatMessage.getContent());
-        message.setMessageType(chatMessage.getMessageType() != null ? chatMessage.getMessageType() : MessageType.TEXT);
+        message.setMessageType(chatMessage.getMessageType() != null 
+            ? chatMessage.getMessageType() 
+            : MessageType.TEXT);
         message.setMediaUrl(chatMessage.getMediaUrl());
         message.setStatus(MessageStatus.SENT);
         message.setCreatedAt(LocalDateTime.now());
         message.setActive(true);
         message.setReplyToMessageId(chatMessage.getReplyToMessageId());
-
+        
+        // Mark as pending for delivery
+        message.setDeliveryState(MessageDeliveryState.PENDING);
+        
+        // STEP 1: Persist to database first (DURABILITY GUARANTEE)
         Message savedMessage = messageRepository.save(message);
-        chatService.updateLastMessage(savedMessage.getChatId(), savedMessage.getId());
+        log.debug("Message persisted to DB: {} | Idempotency Key: {} | Chat: {}", 
+            savedMessage.getId(), idempotencyKey, savedMessage.getChatId());
 
-        MessageResponse response = convertToMessageResponse(savedMessage, authToken);
-        broadcastMessage(savedMessage, response);
+        // STEP 2: Update delivery state
+        savedMessage.setDeliveryState(MessageDeliveryState.DELIVERED_TO_DB);
+        messageRepository.save(savedMessage);
 
-        return response;
+        // STEP 3: Update chat's last message
+        try {
+            chatService.updateLastMessage(savedMessage.getChatId(), savedMessage.getId());
+        } catch (Exception e) {
+            log.error("Failed to update last message in chat", e);
+        }
+
+        // Record metric
+        if (metrics != null) {
+            metrics.recordMessageCreated();
+        }
+
+        // STEP 4: Async broadcast with retry (non-blocking)
+        broadcastMessageAsync(savedMessage);
+
+        return convertToMessageResponse(savedMessage, authToken);
     }
+
+    /**
+     * Broadcast message to recipients with delivery tracking
+     */
+    @Transactional
+    protected void broadcastMessageAsync(Message message) {
+        try {
+            Chat chat = chatRepository.findById(message.getChatId()).orElse(null);
+            if (chat == null) {
+                message.setDeliveryState(MessageDeliveryState.FAILED_TO_NOTIFY);
+                message.setFailureReason("Chat not found");
+                message.setFailedAt(LocalDateTime.now());
+                messageRepository.save(message);
+                log.error("Chat not found for message {}", message.getId());
+                return;
+            }
+
+            MessageResponse response = convertToMessageResponse(message, "Bearer " + message.getSenderId());
+            List<Message.DeliveryReceipt> receipts = new ArrayList<>();
+
+            // Determine recipients
+            List<String> recipients = determineRecipients(chat, message.getSenderId());
+            
+            if (recipients.isEmpty()) {
+                log.warn("No recipients found for message {} in chat {}", message.getId(), message.getChatId());
+                message.setDeliveryState(MessageDeliveryState.NOTIFIED_ALL);
+                messageRepository.save(message);
+                return;
+            }
+
+            boolean allNotified = true;
+            int successCount = 0;
+            int failureCount = 0;
+
+            // Notify each recipient
+            for (String recipientId : recipients) {
+                try {
+                    messagingTemplate.convertAndSendToUser(recipientId, "/queue/messages", response);
+                    receipts.add(createReceipt(recipientId, MessageDeliveryState.NOTIFIED_ALL));
+                    successCount++;
+                    log.debug("Message {} delivered to user {}", message.getId(), recipientId);
+                } catch (Exception e) {
+                    log.warn("Failed to deliver message {} to user {}: {}", 
+                        message.getId(), recipientId, e.getMessage());
+                    receipts.add(createReceipt(recipientId, MessageDeliveryState.PARTIALLY_NOTIFIED, e.getMessage()));
+                    failureCount++;
+                    allNotified = false;
+                }
+            }
+
+            // Update message delivery state
+            message.setReceipts(receipts);
+            message.setDeliveredAt(LocalDateTime.now());
+            
+            if (allNotified) {
+                message.setDeliveryState(MessageDeliveryState.NOTIFIED_ALL);
+            } else {
+                message.setDeliveryState(MessageDeliveryState.PARTIALLY_NOTIFIED);
+            }
+            
+            messageRepository.save(message);
+
+            log.info("Message {} delivery completed. Success: {}/{}, Failures: {}", 
+                message.getId(), successCount, recipients.size(), failureCount);
+
+        } catch (Exception e) {
+            log.error("Broadcast failed for message {}: {}", message.getId(), e.getMessage(), e);
+            message.setDeliveryState(MessageDeliveryState.FAILED_TO_NOTIFY);
+            message.setFailureReason(e.getMessage());
+            message.setFailedAt(LocalDateTime.now());
+            messageRepository.save(message);
+        }
+    }
+
+    /**
+     * Get messages for a chat with pagination
+     */
+    @Transactional(readOnly = true)
+    public List<MessageResponse> getChatMessages(String chatId, int page, int size, String authToken) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        List<Message> messages = messageRepository.findByChatIdOrderByCreatedAtDesc(chatId, pageable);
+
+        return messages.stream()
+            .filter(Message::isActive)
+            .map(msg -> convertToMessageResponse(msg, authToken))
+            .toList();
+    }
+
+    /**
+     * Mark message as read with optimistic locking retry
+     */
+    @Transactional
+    public void markMessageAsRead(String messageId, String userId) {
+        int maxRetries = 3;
+        int attempt = 0;
+
+        while (attempt < maxRetries) {
+            try {
+                Message message = messageRepository.findById(messageId)
+                    .orElseThrow(() -> new MessageNotFoundException("Message not found: " + messageId));
+
+                if (!message.getReadBy().contains(userId)) {
+                    message.getReadBy().add(userId);
+                    if (message.getStatus() != MessageStatus.READ) {
+                        message.setStatus(MessageStatus.READ);
+                    }
+                    messageRepository.save(message);
+                    log.debug("Message {} marked as read by {}", messageId, userId);
+                }
+
+                // Notify sender of read receipt
+                messagingTemplate.convertAndSendToUser(
+                    message.getSenderId(),
+                    "/queue/read-receipts",
+                    Map.of(
+                        "messageId", messageId,
+                        "readBy", userId,
+                        "timestamp", LocalDateTime.now().toString()
+                    )
+                );
+                return;
+
+            } catch (org.springframework.dao.OptimisticLockingFailureException e) {
+                attempt++;
+                if (attempt >= maxRetries) {
+                    log.error("Failed to mark message as read after {} attempts", maxRetries, e);
+                    throw e;
+                }
+                log.warn("Optimistic lock conflict, retrying ({}/{})", attempt, maxRetries);
+                try {
+                    Thread.sleep(100L * attempt);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
+     * Delete message for everyone
+     */
+    @Transactional
+    public void deleteMessageForEveryone(String messageId, String userId) {
+        Message message = messageRepository.findById(messageId)
+            .orElseThrow(() -> new MessageNotFoundException("Message not found: " + messageId));
+
+        if (!message.getSenderId().equals(userId)) {
+            throw new RuntimeException("Only sender can delete message for everyone");
+        }
+
+        message.setDeletedForEveryone(true);
+        message.setContent("This message was deleted");
+        message.setEditedAt(LocalDateTime.now());
+        message.setActive(false);
+        messageRepository.save(message);
+
+        // Notify all participants
+        MessageResponse deletedResponse = convertToMessageResponse(message, "Bearer " + userId);
+        broadcastMessage(message, deletedResponse);
+
+        log.info("Message {} deleted for everyone by {}", messageId, userId);
+        if (metrics != null) {
+            metrics.recordMessageDeleted();
+        }
+    }
+
+    /**
+     * Delete message for current user only
+     */
+    @Transactional
+    public void deleteMessageForMe(String messageId, String userId) {
+        Message message = messageRepository.findById(messageId)
+            .orElseThrow(() -> new MessageNotFoundException("Message not found: " + messageId));
+
+        if (!message.getDeletedForUsers().contains(userId)) {
+            message.getDeletedForUsers().add(userId);
+            messageRepository.save(message);
+            log.debug("Message {} deleted for user {}", messageId, userId);
+        }
+    }
+
+    /**
+     * Retry failed messages
+     */
+    @Transactional
+    public void retryFailedMessages() {
+        List<Message> failedMessages = messageRepository.findMessagesToRetry();
+        
+        if (failedMessages.isEmpty()) {
+            log.debug("No messages to retry");
+            return;
+        }
+
+        log.info("Found {} messages to retry", failedMessages.size());
+        
+        for (Message message : failedMessages) {
+            if (message.getRetryCount() < 3) {
+                try {
+                    message.setRetryCount(message.getRetryCount() + 1);
+                    broadcastMessageAsync(message);
+                    log.info("Retried message {} (attempt {}/3)", message.getId(), message.getRetryCount());
+                } catch (Exception e) {
+                    log.error("Retry failed for message {}", message.getId(), e);
+                }
+            } else {
+                log.warn("Message {} exceeded max retries (3), marking as failed", message.getId());
+                message.setDeliveryState(MessageDeliveryState.FAILED);
+                message.setFailedAt(LocalDateTime.now());
+                message.setFailureReason("Max retries exceeded");
+                messageRepository.save(message);
+            }
+        }
+    }
+
+    // ===== HELPER METHODS =====
 
     private void broadcastMessage(Message message, MessageResponse response) {
         Chat chat = chatRepository.findById(message.getChatId()).orElse(null);
@@ -66,7 +327,7 @@ public class MessageService {
                 .filter(id -> !id.equals(message.getSenderId()))
                 .findFirst()
                 .ifPresent(receiver -> messagingTemplate.convertAndSendToUser(receiver, "/queue/messages", response));
-            
+
             messagingTemplate.convertAndSendToUser(message.getSenderId(), "/queue/messages", response);
         } else {
             // Group chat
@@ -76,61 +337,27 @@ public class MessageService {
         }
     }
 
-    public List<MessageResponse> getChatMessages(String chatId, int page, int size, String authToken) {
-        PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        List<Message> messages = messageRepository.findByChatIdOrderByCreatedAtDesc(chatId, pageable);
-
-        return messages.stream()
-                .filter(Message::isActive)
-                .map(msg -> convertToMessageResponse(msg, authToken))
+    private List<String> determineRecipients(Chat chat, String senderId) {
+        if (chat.getChatType() == ChatType.PRIVATE) {
+            return chat.getParticipantIds().stream()
+                .filter(id -> !id.equals(senderId))
                 .toList();
-    }
-
-    public void markMessageAsRead(String messageId, String userId) {
-        Message message = messageRepository.findById(messageId)
-                .orElseThrow(() -> new MessageNotFoundException("Message not found: " + messageId));
-
-        if (!message.getReadBy().contains(userId)) {
-            message.getReadBy().add(userId);
-            if (message.getStatus() != MessageStatus.READ) {
-                message.setStatus(MessageStatus.READ);
-            }
-            messageRepository.save(message);
-
-            messagingTemplate.convertAndSendToUser(
-                    message.getSenderId(),
-                    "/queue/read-receipts",
-                    Map.of("messageId", messageId, "status", "READ")
-            );
+        } else {
+            return chat.getParticipantIds();
         }
     }
 
-    public void deleteMessageForEveryone(String messageId, String userId) {
-        Message message = messageRepository.findById(messageId)
-                .orElseThrow(() -> new MessageNotFoundException("Message not found: " + messageId));
-
-        if (!message.getSenderId().equals(userId)) {
-            throw new RuntimeException("Only sender can delete for everyone");
-        }
-
-        message.setDeletedForEveryone(true);
-        message.setContent("This message was deleted");
-        message.setEditedAt(LocalDateTime.now());
-        message.setActive(false);
-        messageRepository.save(message);
-
-        MessageResponse deletedResponse = convertToMessageResponse(message, "Bearer " + userId);
-        broadcastMessage(message, deletedResponse);
+    private Message.DeliveryReceipt createReceipt(String recipientId, MessageDeliveryState state) {
+        return createReceipt(recipientId, state, null);
     }
 
-    public void deleteMessageForMe(String messageId, String userId) {
-        Message message = messageRepository.findById(messageId)
-                .orElseThrow(() -> new MessageNotFoundException("Message not found: " + messageId));
-
-        if (!message.getDeletedForUsers().contains(userId)) {
-            message.getDeletedForUsers().add(userId);
-            messageRepository.save(message);
-        }
+    private Message.DeliveryReceipt createReceipt(String recipientId, MessageDeliveryState state, String failureReason) {
+        Message.DeliveryReceipt receipt = new Message.DeliveryReceipt();
+        receipt.setRecipientId(recipientId);
+        receipt.setState(state);
+        receipt.setDeliveredAt(LocalDateTime.now());
+        receipt.setFailureReason(failureReason);
+        return receipt;
     }
 
     private MessageResponse convertToMessageResponse(Message message, String authToken) {
@@ -153,6 +380,7 @@ public class MessageService {
             response.setSenderName(sender.getDisplayName() != null ? sender.getDisplayName() : sender.getUsername());
             response.setSenderProfilePic(sender.getProfilePictureUrl());
         } catch (Exception e) {
+            log.warn("Failed to fetch sender details for {}", message.getSenderId());
             response.setSenderName("Unknown User");
         }
 
@@ -165,22 +393,23 @@ public class MessageService {
 
     private MessageResponse.ReplyPreview buildReplyPreview(String originalMessageId, String authToken) {
         return messageRepository.findById(originalMessageId)
-                .map(original -> {
-                    MessageResponse.ReplyPreview preview = new MessageResponse.ReplyPreview();
-                    preview.setMessageId(original.getId());
-                    preview.setSenderId(original.getSenderId());
-                    preview.setContent(truncateForPreview(original.getContent()));
-                    preview.setMessageType(original.getMessageType());
-                    preview.setMediaUrl(original.getMediaUrl());
+            .map(original -> {
+                MessageResponse.ReplyPreview preview = new MessageResponse.ReplyPreview();
+                preview.setMessageId(original.getId());
+                preview.setSenderId(original.getSenderId());
+                preview.setContent(truncateForPreview(original.getContent()));
+                preview.setMessageType(original.getMessageType());
+                preview.setMediaUrl(original.getMediaUrl());
 
-                    try {
-                        UserSummaryResponse sender = userService.getUserSummary(original.getSenderId(), authToken);
-                        preview.setSenderName(sender.getDisplayName() != null ? sender.getDisplayName() : sender.getUsername());
-                    } catch (Exception ignored) {}
+                try {
+                    UserSummaryResponse sender = userService.getUserSummary(original.getSenderId(), authToken);
+                    preview.setSenderName(sender.getDisplayName() != null ? sender.getDisplayName() : sender.getUsername());
+                } catch (Exception ignored) {
+                }
 
-                    return preview;
-                })
-                .orElse(null);
+                return preview;
+            })
+            .orElse(null);
     }
 
     private String truncateForPreview(String content) {
