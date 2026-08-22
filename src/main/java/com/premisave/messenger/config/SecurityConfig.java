@@ -32,7 +32,8 @@ public class SecurityConfig {
                 .requestMatchers("/ws-messenger/**", 
                                "/error", 
                                "/actuator/**",
-                               "/health").permitAll()
+                               "/health/**",
+                               "/info").permitAll()
                 
                 // Auth-related (if needed)
                 .requestMatchers("/auth/**").permitAll()

@@ -3,10 +3,10 @@ spring:
     name: premisave-messenger-service
     version: 1.0.0
 
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://localhost:27017/premisave-messenger}
+
   data:
-    mongodb:
-      connection-string: ${MONGODB_URI:mongodb://localhost:27017/premisave-messenger}
-      auto-index-creation: true
     redis:
       url: ${REDIS_URL:redis://localhost:6379}
       timeout: 2000ms
@@ -35,12 +35,10 @@ spring:
 
   security:
     user:
-      name: ${ACTUATOR_USER:actuator}
-      password: ${ACTUATOR_PASSWORD:actuator123}
+      name: ${ACTUATOR_USER}
+      password: ${ACTUATOR_PASSWORD}
 
   jackson:
-    serialization:
-      write-dates-as-timestamps: false
     deserialization:
       fail-on-unknown-properties: false
     default-property-inclusion: non_null
@@ -83,9 +81,9 @@ auth:
     url: ${AUTH_SERVICE_URL:http://localhost:8080}
 
 cloudinary:
-  cloud-name: ${CLOUDINARY_CLOUD_NAME:your-cloud-name}
-  api-key: ${CLOUDINARY_API_KEY:your-api-key}
-  api-secret: ${CLOUDINARY_API_SECRET:your-api-secret}
+  cloud-name: ${CLOUDINARY_CLOUD_NAME}
+  api-key: ${CLOUDINARY_API_KEY}
+  api-secret: ${CLOUDINARY_API_SECRET}
 
 feign:
   client:
@@ -194,9 +192,9 @@ spring:
   config:
     activate:
       on-profile: test
+  mongodb:
+    uri: mongodb://localhost:27017/premisave-messenger-test
   data:
-    mongodb:
-      connection-string: mongodb://localhost:27017/premisave-messenger-test
     redis:
       url: redis://localhost:6379/1
 

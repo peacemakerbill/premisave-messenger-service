@@ -1,78 +1,105 @@
 package com.premisave.messenger.config;
 
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * Custom Prometheus metrics for the messenger service.
+ * Tracks message operations, delivery status, and real-time connections.
+ */
+@Slf4j
 @Component
-@RequiredArgsConstructor
 public class MessengerMetrics {
 
+    private final MeterRegistry meterRegistry;
+    private final AtomicInteger activeWebSocketConnections;
+
+    // Message counters
     private final Counter messagesCreated;
     private final Counter messagesDeleted;
     private final Counter chatsCreated;
-    private final Timer messageLatency;
-    private final AtomicInteger activeWebSocketConnections;
-    private final Counter failedDeliveries;
-    private final Counter partialDeliveries;
+    private final Counter messageDeliveryFailed;
+    private final Counter messageDeliveryPartial;
+
+    // Message send latency timer
+    private final Timer messageSendLatency;
 
     public MessengerMetrics(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+        this.activeWebSocketConnections = new AtomicInteger(0);
+
+        // Initialize counters
         this.messagesCreated = Counter.builder("messenger.messages.created.total")
-            .description("Total messages created")
-            .register(meterRegistry);
+                .description("Total number of messages created")
+                .register(meterRegistry);
 
         this.messagesDeleted = Counter.builder("messenger.messages.deleted.total")
-            .description("Total messages deleted")
-            .register(meterRegistry);
+                .description("Total number of messages deleted")
+                .register(meterRegistry);
 
         this.chatsCreated = Counter.builder("messenger.chats.created.total")
-            .description("Total chats created")
-            .register(meterRegistry);
+                .description("Total number of chats created")
+                .register(meterRegistry);
 
-        this.messageLatency = Timer.builder("messenger.message.send.latency")
-            .description("Message send latency in milliseconds")
-            .publishPercentiles(0.5, 0.95, 0.99)
-            .register(meterRegistry);
+        this.messageDeliveryFailed = Counter.builder("messenger.message.delivery.failed.total")
+                .description("Total number of failed message deliveries")
+                .register(meterRegistry);
 
-        this.activeWebSocketConnections = meterRegistry.gauge(
-            "messenger.websocket.connections.active",
-            new AtomicInteger(0)
-        );
+        this.messageDeliveryPartial = Counter.builder("messenger.message.delivery.partial.total")
+                .description("Total number of partially delivered messages")
+                .register(meterRegistry);
 
-        this.failedDeliveries = Counter.builder("messenger.message.delivery.failed.total")
-            .description("Total failed message deliveries")
-            .register(meterRegistry);
+        // Initialize timer for message send latency
+        this.messageSendLatency = Timer.builder("messenger.message.send.latency")
+                .description("Latency of sending messages to users")
+                .publishPercentiles(0.5, 0.95, 0.99)
+                .register(meterRegistry);
 
-        this.partialDeliveries = Counter.builder("messenger.message.delivery.partial.total")
-            .description("Total partial message deliveries")
-            .register(meterRegistry);
+        // Register gauge for active WebSocket connections
+        Gauge.builder("messenger.websocket.connections.active", activeWebSocketConnections, AtomicInteger::get)
+                .description("Number of active WebSocket connections")
+                .register(meterRegistry);
+
+        log.info("MessengerMetrics initialized successfully");
     }
 
-    public void recordMessageCreated() {
+    // Counter methods
+    public void incrementMessagesCreated() {
         messagesCreated.increment();
     }
 
-    public void recordMessageDeleted() {
+    public void incrementMessagesDeleted() {
         messagesDeleted.increment();
     }
 
-    public void recordChatCreated() {
+    public void incrementChatsCreated() {
         chatsCreated.increment();
     }
 
-    public void recordMessageLatency(long durationMs) {
-        messageLatency.record(Duration.ofMillis(durationMs));
+    public void incrementMessageDeliveryFailed() {
+        messageDeliveryFailed.increment();
     }
 
-    public void recordMessageLatency(Duration duration) {
-        messageLatency.record(duration);
+    public void incrementMessageDeliveryPartial() {
+        messageDeliveryPartial.increment();
     }
 
+    // Timer methods
+    public Timer.Sample startMessageSendTimer() {
+        return Timer.start(meterRegistry);
+    }
+
+    public void recordMessageSendLatency(Timer.Sample sample) {
+        sample.stop(messageSendLatency);
+    }
+
+    // WebSocket connection tracking
     public void incrementWebSocketConnections() {
         activeWebSocketConnections.incrementAndGet();
     }
@@ -83,13 +110,5 @@ public class MessengerMetrics {
 
     public int getActiveWebSocketConnections() {
         return activeWebSocketConnections.get();
-    }
-
-    public void recordFailedDelivery() {
-        failedDeliveries.increment();
-    }
-
-    public void recordPartialDelivery() {
-        partialDeliveries.increment();
     }
 }

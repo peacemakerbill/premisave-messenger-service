@@ -37,7 +37,7 @@ public class MessageService {
     private final ChatService chatService;
     private final UserService userService;
     private final SimpMessagingTemplate messagingTemplate;
-    private final MessengerMetrics metrics; // For tracking metrics
+    private final MessengerMetrics metrics;
 
     /**
      * Send message with idempotency guarantee and delivery tracking
@@ -90,7 +90,7 @@ public class MessageService {
 
         // Record metric
         if (metrics != null) {
-            metrics.recordMessageCreated();
+            metrics.incrementMessagesCreated();
         }
 
         // STEP 4: Async broadcast with retry (non-blocking)
@@ -156,6 +156,9 @@ public class MessageService {
                 message.setDeliveryState(MessageDeliveryState.NOTIFIED_ALL);
             } else {
                 message.setDeliveryState(MessageDeliveryState.PARTIALLY_NOTIFIED);
+                if (metrics != null) {
+                    metrics.incrementMessageDeliveryPartial();
+                }
             }
             
             messageRepository.save(message);
@@ -169,6 +172,9 @@ public class MessageService {
             message.setFailureReason(e.getMessage());
             message.setFailedAt(LocalDateTime.now());
             messageRepository.save(message);
+            if (metrics != null) {
+                metrics.incrementMessageDeliveryFailed();
+            }
         }
     }
 
@@ -261,7 +267,7 @@ public class MessageService {
 
         log.info("Message {} deleted for everyone by {}", messageId, userId);
         if (metrics != null) {
-            metrics.recordMessageDeleted();
+            metrics.incrementMessagesDeleted();
         }
     }
 
