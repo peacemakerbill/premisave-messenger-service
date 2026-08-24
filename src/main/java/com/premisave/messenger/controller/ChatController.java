@@ -64,6 +64,14 @@ public class ChatController {
         String currentUserEmail = currentUser.getEmail();
 
         String otherUserId = request.getOtherUserId();
+
+        if (otherUserId == null || otherUserId.isBlank()) {
+            throw new IllegalArgumentException("otherUserId is required");
+        }
+        if (otherUserId.equals(currentUserId)) {
+            throw new IllegalArgumentException("You cannot create a chat with yourself");
+        }
+
         String otherUserEmail = resolveEmail(otherUserId, authHeader);
 
         ChatService.PrivateChatResult result =
