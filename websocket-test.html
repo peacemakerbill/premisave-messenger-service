@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Premisave Messenger - WebSocket test</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+<style>
+  body { font-family: -apple-system, Segoe UI, sans-serif; background: #1e1e1e; color: #ddd; margin: 0; padding: 24px; }
+  h1 { font-size: 18px; font-weight: 500; margin: 0 0 4px; }
+  .sub { color: #999; font-size: 13px; margin-bottom: 20px; }
+  .shared { background: #2a2a2a; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; }
+  .shared label { font-size: 12px; color: #aaa; display: block; margin-bottom: 4px; }
+  .shared input { width: 100%; box-sizing: border-box; background: #111; border: 1px solid #444; color: #eee; padding: 8px 10px; border-radius: 6px; font-size: 13px; }
+  .cols { display: flex; gap: 20px; }
+  .col { flex: 1; background: #2a2a2a; border-radius: 8px; padding: 16px; min-width: 0; }
+  .col h2 { font-size: 15px; font-weight: 500; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #666; display: inline-block; }
+  .dot.on { background: #3fbf5f; }
+  label { font-size: 12px; color: #aaa; display: block; margin: 10px 0 4px; }
+  input, textarea { width: 100%; box-sizing: border-box; background: #111; border: 1px solid #444; color: #eee; padding: 8px 10px; border-radius: 6px; font-size: 13px; font-family: inherit; }
+  textarea { resize: vertical; min-height: 50px; }
+  button { margin-top: 10px; background: #3a7bd5; color: #fff; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  button:hover { background: #2f66b3; }
+  button.secondary { background: #444; }
+  button.secondary:hover { background: #555; }
+  .log { margin-top: 14px; background: #111; border-radius: 6px; padding: 10px; height: 220px; overflow-y: auto; font-family: ui-monospace, monospace; font-size: 12px; white-space: pre-wrap; }
+  .log .in { color: #6fd66f; }
+  .log .out { color: #6fb3f0; }
+  .log .err { color: #f07070; }
+  .log .sys { color: #999; }
+</style>
+</head>
+<body>
+
+<h1>Premisave Messenger - WebSocket test</h1>
+<div class="sub">Real STOMP client, runs in your browser, connects directly to your local server.</div>
+
+<div class="shared">
+  <label>WebSocket URL</label>
+  <input id="wsUrl" value="ws://localhost:8081/ws-messenger">
+  <label style="margin-top:10px">Chat ID (shared)</label>
+  <input id="chatId" placeholder="paste chatId here">
+</div>
+
+<div class="cols">
+  <div class="col" id="col-a"></div>
+  <div class="col" id="col-b"></div>
+</div>
+
+<script>
+function buildPanel(prefix, title) {
+  document.getElementById('col-' + prefix).innerHTML = `
+    <h2><span class="dot" id="${prefix}-dot"></span>${title}</h2>
+    <label>Bearer token</label>
+    <input id="${prefix}-token" placeholder="paste token here">
+    <button id="${prefix}-connect">Connect + subscribe</button>
+    <button id="${prefix}-disconnect" class="secondary">Disconnect</button>
+    <label>Message to send</label>
+    <textarea id="${prefix}-message">Hello from ${title}</textarea>
+    <button id="${prefix}-send">Send message</button>
+    <label>Message ID to mark as read</label>
+    <input id="${prefix}-message-id" placeholder="paste a received message's id">
+    <button id="${prefix}-mark-read" class="secondary">Mark as read</button>
+    <div class="log" id="${prefix}-log"></div>
+  `;
+}
+buildPanel('a', 'User A');
+buildPanel('b', 'User B');
+
+const clients = {};
+
+function log(prefix, cls, text) {
+  const el = document.getElementById(prefix + '-log');
+  const line = document.createElement('div');
+  line.className = cls;
+  const ts = new Date().toLocaleTimeString();
+  line.textContent = `[${ts}] ${text}`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+function setDot(prefix, on) {
+  document.getElementById(prefix + '-dot').classList.toggle('on', on);
+}
+
+function wireUp(prefix) {
+  document.getElementById(prefix + '-connect').onclick = () => {
+    const url = document.getElementById('wsUrl').value.trim();
+    const token = document.getElementById(prefix + '-token').value.trim();
+    if (!token) { log(prefix, 'err', 'Enter a bearer token first'); return; }
+
+    const socket = new WebSocket(url);
+    const client = Stomp.over(socket);
+    client.debug = null;
+    clients[prefix] = client;
+
+    client.connect(
+      { Authorization: 'Bearer ' + token },
+      () => {
+        setDot(prefix, true);
+        log(prefix, 'sys', 'Connected');
+
+        client.subscribe('/user/queue/messages', (frame) => {
+          log(prefix, 'in', 'MESSAGE: ' + frame.body);
+        });
+        client.subscribe('/user/queue/delivery-status', (frame) => {
+          log(prefix, 'in', 'DELIVERY STATUS: ' + frame.body);
+        });
+        client.subscribe('/user/queue/read-receipts', (frame) => {
+          log(prefix, 'in', 'READ RECEIPT: ' + frame.body);
+        });
+        client.subscribe('/topic/presence', (frame) => {
+          log(prefix, 'in', 'PRESENCE: ' + frame.body);
+        });
+
+        log(prefix, 'sys', 'Subscribed to messages, delivery-status, read-receipts, presence');
+      },
+      (err) => {
+        setDot(prefix, false);
+        log(prefix, 'err', 'CONNECT FAILED: ' + err);
+      }
+    );
+  };
+
+  document.getElementById(prefix + '-disconnect').onclick = () => {
+    const client = clients[prefix];
+    if (client && client.connected) {
+      client.disconnect(() => log(prefix, 'sys', 'Disconnected'));
+      setDot(prefix, false);
+    }
+  };
+
+  document.getElementById(prefix + '-send').onclick = () => {
+    const client = clients[prefix];
+    if (!client || !client.connected) { log(prefix, 'err', 'Not connected'); return; }
+
+    const chatId = document.getElementById('chatId').value.trim();
+    const content = document.getElementById(prefix + '-message').value;
+    if (!chatId) { log(prefix, 'err', 'Enter a chatId first'); return; }
+
+    const payload = { chatId, content, messageType: 'TEXT' };
+    client.send('/app/chat.sendMessage', {}, JSON.stringify(payload));
+    log(prefix, 'out', 'SENT: ' + JSON.stringify(payload));
+  };
+
+  document.getElementById(prefix + '-mark-read').onclick = () => {
+    const client = clients[prefix];
+    if (!client || !client.connected) { log(prefix, 'err', 'Not connected'); return; }
+
+    const messageId = document.getElementById(prefix + '-message-id').value.trim();
+    if (!messageId) { log(prefix, 'err', 'Enter a messageId first'); return; }
+
+    client.send('/app/chat.read', {}, JSON.stringify({ id: messageId }));
+    log(prefix, 'out', 'MARKED AS READ: ' + messageId);
+  };
+}
+
+wireUp('a');
+wireUp('b');
+</script>
+
+</body>
+</html>
