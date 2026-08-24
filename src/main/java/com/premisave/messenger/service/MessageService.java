@@ -94,7 +94,7 @@ public class MessageService {
         }
 
         // STEP 4: Async broadcast with retry (non-blocking)
-        broadcastMessageAsync(savedMessage);
+        broadcastMessageAsync(savedMessage, authToken);
 
         return convertToMessageResponse(savedMessage, authToken);
     }
@@ -103,7 +103,7 @@ public class MessageService {
      * Broadcast message to recipients with delivery tracking
      */
     @Transactional
-    protected void broadcastMessageAsync(Message message) {
+    protected void broadcastMessageAsync(Message message, String authToken) {
         try {
             Chat chat = chatRepository.findById(message.getChatId()).orElse(null);
             if (chat == null) {
@@ -115,7 +115,7 @@ public class MessageService {
                 return;
             }
 
-            MessageResponse response = convertToMessageResponse(message, "Bearer " + message.getSenderId());
+            MessageResponse response = convertToMessageResponse(message, authToken);
             List<Message.DeliveryReceipt> receipts = new ArrayList<>();
 
             // Determine recipients
@@ -304,7 +304,7 @@ public class MessageService {
             if (message.getRetryCount() < 3) {
                 try {
                     message.setRetryCount(message.getRetryCount() + 1);
-                    broadcastMessageAsync(message);
+                    broadcastMessageAsync(message, null);
                     log.info("Retried message {} (attempt {}/3)", message.getId(), message.getRetryCount());
                 } catch (Exception e) {
                     log.error("Retry failed for message {}", message.getId(), e);
