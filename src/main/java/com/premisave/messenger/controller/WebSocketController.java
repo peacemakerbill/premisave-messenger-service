@@ -1,6 +1,7 @@
 package com.premisave.messenger.controller;
 
 import com.premisave.messenger.dto.websocket.ChatMessage;
+import com.premisave.messenger.realtime.RedisMessagePublisher;
 import com.premisave.messenger.security.WebSocketPrincipal;
 import com.premisave.messenger.service.ChatService;
 import com.premisave.messenger.service.MessageService;
@@ -8,7 +9,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Controller;
 
@@ -21,7 +21,7 @@ public class WebSocketController {
 
     private final MessageService messageService;
     private final ChatService chatService;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final RedisMessagePublisher redisMessagePublisher;
 
     @MessageMapping("/chat.sendMessage")
     public void sendMessage(@Payload ChatMessage chatMessage, Principal principal) {
@@ -64,7 +64,7 @@ public class WebSocketController {
         typingMessage.setSenderId(senderId);
 
         if (typingMessage.getReceiverId() != null) {
-            messagingTemplate.convertAndSendToUser(
+            redisMessagePublisher.convertAndSendToUser(
                     typingMessage.getReceiverId(),
                     "/queue/typing",
                     typingMessage

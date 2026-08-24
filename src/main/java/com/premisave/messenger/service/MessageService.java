@@ -11,13 +11,13 @@ import com.premisave.messenger.enums.MessageDeliveryState;
 import com.premisave.messenger.enums.MessageStatus;
 import com.premisave.messenger.enums.MessageType;
 import com.premisave.messenger.exception.MessageNotFoundException;
+import com.premisave.messenger.realtime.RedisMessagePublisher;
 import com.premisave.messenger.repository.ChatRepository;
 import com.premisave.messenger.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,7 +36,7 @@ public class MessageService {
     private final ChatRepository chatRepository;
     private final ChatService chatService;
     private final UserService userService;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final RedisMessagePublisher redisMessagePublisher;
     private final MessengerMetrics metrics;
 
     /**
@@ -135,7 +135,7 @@ public class MessageService {
             // Notify each recipient
             for (String recipientId : recipients) {
                 try {
-                    messagingTemplate.convertAndSendToUser(recipientId, "/queue/messages", response);
+                    redisMessagePublisher.convertAndSendToUser(recipientId, "/queue/messages", response);
                     receipts.add(createReceipt(recipientId, MessageDeliveryState.NOTIFIED_ALL));
                     successCount++;
                     log.debug("Message {} delivered to user {}", message.getId(), recipientId);
@@ -215,7 +215,7 @@ public class MessageService {
                 }
 
                 // Notify sender of read receipt
-                messagingTemplate.convertAndSendToUser(
+                redisMessagePublisher.convertAndSendToUser(
                     message.getSenderId(),
                     "/queue/read-receipts",
                     Map.of(
@@ -324,7 +324,7 @@ public class MessageService {
     private void broadcastMessage(Message message, MessageResponse response) {
         Chat chat = chatRepository.findById(message.getChatId()).orElse(null);
         if (chat == null) {
-            messagingTemplate.convertAndSendToUser(message.getSenderId(), "/queue/messages", response);
+            redisMessagePublisher.convertAndSendToUser(message.getSenderId(), "/queue/messages", response);
             return;
         }
 
@@ -332,13 +332,13 @@ public class MessageService {
             chat.getParticipantIds().stream()
                 .filter(id -> !id.equals(message.getSenderId()))
                 .findFirst()
-                .ifPresent(receiver -> messagingTemplate.convertAndSendToUser(receiver, "/queue/messages", response));
+                .ifPresent(receiver -> redisMessagePublisher.convertAndSendToUser(receiver, "/queue/messages", response));
 
-            messagingTemplate.convertAndSendToUser(message.getSenderId(), "/queue/messages", response);
+            redisMessagePublisher.convertAndSendToUser(message.getSenderId(), "/queue/messages", response);
         } else {
             // Group chat
             chat.getParticipantIds().forEach(memberId ->
-                messagingTemplate.convertAndSendToUser(memberId, "/queue/messages", response)
+                redisMessagePublisher.convertAndSendToUser(memberId, "/queue/messages", response)
             );
         }
     }
@@ -381,13 +381,22 @@ public class MessageService {
         response.setDeleted(message.isDeletedForEveryone());
         response.setReplyToMessageId(message.getReplyToMessageId());
 
-        try {
-            UserSummaryResponse sender = userService.getUserSummary(message.getSenderId(), authToken);
-            response.setSenderName(sender.getDisplayName() != null ? sender.getDisplayName() : sender.getUsername());
-            response.setSenderProfilePic(sender.getProfilePictureUrl());
-        } catch (Exception e) {
-            log.warn("Failed to fetch sender details for {}", message.getSenderId());
+        if (authToken == null || authToken.isBlank()) {
+            // No real user token available - this happens for the
+            // background retry job (retryFailedMessages), which runs
+            // outside any HTTP request context and has no JWT to use.
+            // Skip the enrichment call entirely rather than making a
+            // Feign request that's guaranteed to fail.
             response.setSenderName("Unknown User");
+        } else {
+            try {
+                UserSummaryResponse sender = userService.getUserSummary(message.getSenderId(), authToken);
+                response.setSenderName(sender.getDisplayName() != null ? sender.getDisplayName() : sender.getUsername());
+                response.setSenderProfilePic(sender.getProfilePictureUrl());
+            } catch (Exception e) {
+                log.warn("Failed to fetch sender details for {}", message.getSenderId());
+                response.setSenderName("Unknown User");
+            }
         }
 
         if (message.getReplyToMessageId() != null) {
