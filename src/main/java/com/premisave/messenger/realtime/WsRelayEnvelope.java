@@ -5,12 +5,13 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Wraps a single "push this payload to this user's STOMP destination"
- * instruction for transport over Redis pub/sub. Every messenger-service
+ * Wraps a single WebSocket push for transport over Redis pub/sub - either
+ * targeted at one user (userId set) or a topic-wide broadcast (userId
+ * null, e.g. presence changes on /topic/presence). Every messenger-service
  * instance subscribes to the same channel and republishes locally via
  * SimpMessagingTemplate - so whichever instance actually holds the
- * recipient's live WebSocket session delivers it, regardless of which
- * instance originally handled the request.
+ * relevant session(s) delivers it, regardless of which instance
+ * originally handled the request.
  */
 @Data
 @NoArgsConstructor

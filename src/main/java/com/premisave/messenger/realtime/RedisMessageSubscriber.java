@@ -32,8 +32,12 @@ public class RedisMessageSubscriber implements MessageListener {
         try {
             String json = new String(message.getBody(), StandardCharsets.UTF_8);
             WsRelayEnvelope envelope = objectMapper.readValue(json, WsRelayEnvelope.class);
-            messagingTemplate.convertAndSendToUser(
-                    envelope.getUserId(), envelope.getDestination(), envelope.getPayload());
+            if (envelope.getUserId() != null) {
+                messagingTemplate.convertAndSendToUser(
+                        envelope.getUserId(), envelope.getDestination(), envelope.getPayload());
+            } else {
+                messagingTemplate.convertAndSend(envelope.getDestination(), envelope.getPayload());
+            }
         } catch (Exception e) {
             log.error("Failed to process WebSocket relay message: {}", e.getMessage(), e);
         }

@@ -41,4 +41,20 @@ public class RedisMessagePublisher {
                     userId, destination, e.getMessage(), e);
         }
     }
+
+    /**
+     * Same signature as SimpMessagingTemplate.convertAndSend(destination,
+     * payload) - for topic-wide broadcasts (e.g. /topic/presence) rather
+     * than a single targeted user. userId is left null in the envelope to
+     * signal this to RedisMessageSubscriber.
+     */
+    public void convertAndSend(String destination, Object payload) {
+        try {
+            WsRelayEnvelope envelope = new WsRelayEnvelope(null, destination, payload);
+            String json = objectMapper.writeValueAsString(envelope);
+            redisTemplate.convertAndSend(CHANNEL, json);
+        } catch (Exception e) {
+            log.error("Failed to publish WebSocket broadcast on {}: {}", destination, e.getMessage(), e);
+        }
+    }
 }

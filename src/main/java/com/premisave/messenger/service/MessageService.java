@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -112,6 +113,7 @@ public class MessageService {
                 message.setFailedAt(LocalDateTime.now());
                 messageRepository.save(message);
                 log.error("Chat not found for message {}", message.getId());
+                notifySenderOfDeliveryStatus(message);
                 return;
             }
 
@@ -125,6 +127,7 @@ public class MessageService {
                 log.warn("No recipients found for message {} in chat {}", message.getId(), message.getChatId());
                 message.setDeliveryState(MessageDeliveryState.NOTIFIED_ALL);
                 messageRepository.save(message);
+                notifySenderOfDeliveryStatus(message);
                 return;
             }
 
@@ -166,6 +169,8 @@ public class MessageService {
             log.info("Message {} delivery completed. Success: {}/{}, Failures: {}", 
                 message.getId(), successCount, recipients.size(), failureCount);
 
+            notifySenderOfDeliveryStatus(message);
+
         } catch (Exception e) {
             log.error("Broadcast failed for message {}: {}", message.getId(), e.getMessage(), e);
             message.setDeliveryState(MessageDeliveryState.FAILED_TO_NOTIFY);
@@ -175,6 +180,31 @@ public class MessageService {
             if (metrics != null) {
                 metrics.incrementMessageDeliveryFailed();
             }
+            notifySenderOfDeliveryStatus(message);
+        }
+    }
+
+    /**
+     * Pushes a live delivery-status update back to the message's own
+     * sender over /queue/delivery-status. Without this, a WebSocket
+     * client that sends a message has no real-time confirmation it was
+     * actually delivered - determineRecipients() deliberately excludes
+     * the sender from /queue/messages, so this is the only feedback
+     * channel for delivery outcome.
+     */
+    private void notifySenderOfDeliveryStatus(Message message) {
+        try {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("messageId", message.getId());
+            payload.put("chatId", message.getChatId());
+            payload.put("deliveryState", message.getDeliveryState() != null ? message.getDeliveryState().name() : null);
+            payload.put("deliveredAt", message.getDeliveredAt());
+            payload.put("failureReason", message.getFailureReason());
+
+            redisMessagePublisher.convertAndSendToUser(message.getSenderId(), "/queue/delivery-status", payload);
+        } catch (Exception e) {
+            log.warn("Failed to notify sender {} of delivery status for message {}: {}",
+                    message.getSenderId(), message.getId(), e.getMessage());
         }
     }
 
@@ -220,6 +250,7 @@ public class MessageService {
                     "/queue/read-receipts",
                     Map.of(
                         "messageId", messageId,
+                        "chatId", message.getChatId(),
                         "readBy", userId,
                         "timestamp", LocalDateTime.now().toString()
                     )

@@ -33,8 +33,8 @@ public class WebSocketPresenceListener {
     public void handleSessionConnected(SessionConnectedEvent event) {
         Principal user = extractPrincipal(event.getMessage());
         if (user != null && user.getName() != null) {
-            presenceService.userOnline(user.getName());
-            log.info("User {} connected via WebSocket - marked online", user.getName());
+            presenceService.registerConnect(user.getName());
+            log.info("User {} connected via WebSocket", user.getName());
         } else {
             log.debug("WebSocket session connected without a resolved principal - skipping presence update");
         }
@@ -44,8 +44,8 @@ public class WebSocketPresenceListener {
     public void handleSessionDisconnect(SessionDisconnectEvent event) {
         Principal user = extractPrincipal(event.getMessage());
         if (user != null && user.getName() != null) {
-            presenceService.userOffline(user.getName());
-            log.info("User {} disconnected from WebSocket - marked offline", user.getName());
+            presenceService.registerDisconnect(user.getName());
+            log.info("User {} disconnected from WebSocket", user.getName());
         } else {
             log.debug("WebSocket session disconnected without a resolved principal - skipping presence update");
         }
