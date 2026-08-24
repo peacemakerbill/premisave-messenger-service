@@ -1,14 +1,15 @@
 package com.premisave.messenger.controller;
 
 import com.premisave.messenger.dto.websocket.ChatMessage;
+import com.premisave.messenger.security.WebSocketPrincipal;
 import com.premisave.messenger.service.ChatService;
 import com.premisave.messenger.service.MessageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Controller;
 
 import java.security.Principal;
@@ -23,7 +24,7 @@ public class WebSocketController {
     private final SimpMessagingTemplate messagingTemplate;
 
     @MessageMapping("/chat.sendMessage")
-    public void sendMessage(@Payload ChatMessage chatMessage, Principal principal, SimpMessageHeaderAccessor headerAccessor) {
+    public void sendMessage(@Payload ChatMessage chatMessage, Principal principal) {
         if (principal == null || principal.getName() == null) {
             log.warn("Unauthenticated WebSocket message attempt");
             return;
@@ -40,11 +41,12 @@ public class WebSocketController {
             }
         }
 
-        // Use the REAL JWT stashed by WebSocketAuthInterceptor during CONNECT,
-        // not a fabricated "Bearer " + senderId string (senderId is a Mongo
-        // ObjectId, not a valid JWT - the old code silently broke every
-        // downstream auth-service enrichment call in MessageService).
-        String token = resolveRealToken(headerAccessor, senderId);
+        // Use the REAL JWT carried by WebSocketPrincipal (set during CONNECT
+        // by WebSocketAuthInterceptor), not a fabricated "Bearer " + senderId
+        // string - senderId is a Mongo ObjectId, not a valid JWT, so that
+        // fake token silently broke every downstream auth-service enrichment
+        // call in MessageService.
+        String token = resolveRealToken(principal, senderId);
 
         try {
             messageService.sendMessage(chatMessage, token);
@@ -81,21 +83,27 @@ public class WebSocketController {
     }
 
     /**
-     * Retrieves the real "Bearer <jwt>" token stashed in the STOMP session
-     * during CONNECT (see WebSocketAuthInterceptor). Falls back to a
-     * clearly-fake token only if it's genuinely missing, so downstream
+     * Retrieves the real "Bearer <jwt>" token carried by WebSocketPrincipal.
+     * The Principal injected here is the UsernamePasswordAuthenticationToken
+     * set in WebSocketAuthInterceptor during CONNECT; its wrapped principal
+     * is a WebSocketPrincipal holding both the real userId (returned by
+     * getName(), already proven reliable via senderId above) and the token.
+     *
+     * Falls back to a clearly-fake token only if it's genuinely missing
+     * (e.g. connected before this fix was deployed), so downstream
      * enrichment calls fail gracefully (they already catch exceptions and
      * fall back to "Unknown User") rather than throwing here and dropping
      * the message entirely.
      */
-    private String resolveRealToken(SimpMessageHeaderAccessor headerAccessor, String senderId) {
-        if (headerAccessor != null && headerAccessor.getSessionAttributes() != null) {
-            Object stored = headerAccessor.getSessionAttributes().get("jwt");
-            if (stored instanceof String jwt && !jwt.isBlank()) {
-                return jwt;
+    private String resolveRealToken(Principal principal, String senderId) {
+        if (principal instanceof UsernamePasswordAuthenticationToken authToken
+                && authToken.getPrincipal() instanceof WebSocketPrincipal wsPrincipal) {
+            String token = wsPrincipal.getToken();
+            if (token != null && !token.isBlank()) {
+                return token;
             }
         }
-        log.warn("No real JWT found in session for user {} - sender enrichment will fall back to defaults", senderId);
+        log.warn("No real JWT found on principal for user {} - sender enrichment will fall back to defaults", senderId);
         return "Bearer " + senderId;
     }
 }

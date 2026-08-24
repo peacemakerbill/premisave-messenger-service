@@ -72,6 +72,9 @@ public class ChatController {
             throw new IllegalArgumentException("You cannot create a chat with yourself");
         }
 
+        // auth-service's /profile/user/{userId} now includes email (privacy
+        // stripping was removed there) - resolve the other participant's
+        // real email instead of hardcoding null.
         String otherUserEmail = resolveEmail(otherUserId, authHeader);
 
         ChatService.PrivateChatResult result =

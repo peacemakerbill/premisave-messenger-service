@@ -23,9 +23,13 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
+        // Plain WebSocket endpoint - no SockJS. SockJS requires clients to
+        // speak its polling/handshake sub-protocol (extra sub-paths like
+        // /ws-messenger/info), which raw WebSocket clients (Postman, native
+        // STOMP libraries, most modern frontends) don't do - they connect
+        // directly to this path and get rejected with 400 if SockJS is on.
         registry.addEndpoint("/ws-messenger")
-                .setAllowedOriginPatterns("*")
-                .withSockJS();
+                .setAllowedOriginPatterns("*");
     }
 
     @Override

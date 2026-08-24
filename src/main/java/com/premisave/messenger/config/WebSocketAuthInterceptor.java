@@ -3,6 +3,7 @@ package com.premisave.messenger.config;
 import com.premisave.messenger.client.AuthServiceClient;
 import com.premisave.messenger.dto.response.UserSummaryResponse;
 import com.premisave.messenger.security.JwtService;
+import com.premisave.messenger.security.WebSocketPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.Message;
@@ -56,14 +57,13 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
      * app: Chat.participantIds, MessageService's recipientId in
      * convertAndSendToUser(), and PresenceService's userId key.
      *
-     * Without this, message routing via convertAndSendToUser(realId, ...)
-     * and presence lookups by real ID would never match a session whose
-     * Principal was keyed by email instead.
-     *
-     * Also stashes the full "Bearer <jwt>" string in the STOMP session
-     * attributes, so later frames (e.g. chat.sendMessage) can reuse the
-     * real token for their own downstream Feign calls instead of
-     * fabricating a fake one.
+     * The Principal set here carries the real userId AND the raw JWT
+     * together (via WebSocketPrincipal), since Principal propagation
+     * across the STOMP session is Spring's own reliable built-in
+     * mechanism - unlike ad-hoc session attribute mutation, which isn't
+     * guaranteed to survive without rebuilding the message via
+     * MessageBuilder. This way both pieces of data ride the same proven
+     * path instead of two different ones.
      */
     private void resolveAndAuthenticate(StompHeaderAccessor accessor, String fullAuthHeader) {
         try {
@@ -74,13 +74,8 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
                 return;
             }
 
-            accessor.setUser(new UsernamePasswordAuthenticationToken(currentUser.getId(), null, null));
-
-            if (accessor.getSessionAttributes() != null) {
-                accessor.getSessionAttributes().put("jwt", fullAuthHeader);
-            } else {
-                log.warn("STOMP session attributes were null - could not stash JWT for user {}", currentUser.getId());
-            }
+            WebSocketPrincipal principal = new WebSocketPrincipal(currentUser.getId(), fullAuthHeader);
+            accessor.setUser(new UsernamePasswordAuthenticationToken(principal, null, null));
 
             log.info("WebSocket authenticated for user: {} ({})", currentUser.getId(), currentUser.getEmail());
         } catch (Exception e) {
