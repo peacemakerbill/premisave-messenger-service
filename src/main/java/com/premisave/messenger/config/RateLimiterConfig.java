@@ -14,7 +14,7 @@ public class RateLimiterConfig {
     private int requestsPerMinute;
 
     @Bean
-    public RateLimiterBucket rateLimiterBucket() {
+    RateLimiterBucket rateLimiterBucket() {
         return new RateLimiterBucket(requestsPerMinute);
     }
 

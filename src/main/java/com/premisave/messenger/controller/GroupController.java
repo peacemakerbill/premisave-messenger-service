@@ -150,7 +150,7 @@ public class GroupController {
     @PostMapping("/{groupId}/photo")
     public ResponseEntity<Group> uploadGroupPhoto(
             @PathVariable String groupId,
-            @RequestParam("file") MultipartFile file,
+            @RequestParam MultipartFile file,
             Authentication authentication) {
 
         String adminId = authentication.getName();

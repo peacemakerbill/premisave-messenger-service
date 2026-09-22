@@ -23,13 +23,14 @@ public interface AuthServiceClient {
 
     @GetMapping("/profile/search")
     List<UserSummaryResponse> searchUsers(
-            @RequestParam("query") String query,
+            @RequestParam String query,
             @RequestHeader("Authorization") String token);
 
+    // auth-service's GET /profile/all takes no parameters at all
+    // (see ProfileController.getAllUsers()) - page/size were dead
+    // params, silently ignored server-side, so removed here.
     @GetMapping("/profile/all")
     List<UserSummaryResponse> getAllUsers(
-            @RequestParam(value = "page", defaultValue = "0") int page,
-            @RequestParam(value = "size", defaultValue = "50") int size,
             @RequestHeader("Authorization") String token);
 
     // ── Social ──────────────────────────────────────────────────────

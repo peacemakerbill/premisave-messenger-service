@@ -22,7 +22,7 @@ public class RedisMessagingConfig {
     private final RedisMessageSubscriber redisMessageSubscriber;
 
     @Bean
-    public RedisMessageListenerContainer redisMessageListenerContainer() {
+    RedisMessageListenerContainer redisMessageListenerContainer() {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(redisConnectionFactory);
         container.addMessageListener(redisMessageSubscriber, new ChannelTopic(RedisMessagePublisher.CHANNEL));

@@ -53,15 +53,20 @@ public class UserService {
     }
 
     /**
-     * Get all users (paginated)
+     * Get all users. Note: auth-service's /profile/all has no pagination
+     * (see AuthServiceClient.getAllUsers) - page/size are accepted here
+     * only to avoid breaking existing callers of this method, but have
+     * no effect. If you need actual pagination, it would need to be
+     * done client-side over the full list returned here, or added to
+     * auth-service itself.
      */
     public List<UserSummaryResponse> getAllUsers(int page, int size, String token) {
         try {
             if (token == null || !token.startsWith("Bearer ")) {
                 token = "Bearer " + token;
             }
-            log.debug("Fetching all users (page={}, size={}) | Token length: {}", page, size, token.length());
-            return authServiceClient.getAllUsers(page, size, token);
+            log.debug("Fetching all users | Token length: {}", token.length());
+            return authServiceClient.getAllUsers(token);
         } catch (Exception e) {
             log.error("Failed to fetch all users", e);
             return List.of();
