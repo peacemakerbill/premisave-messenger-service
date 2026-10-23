@@ -43,6 +43,9 @@ public class Chat {
 
     private boolean isActive = true;
 
+    // Users who flagged this chat as unread ("mark as unread"). Cleared when they open or read it.
+    private List<String> markedUnreadBy = new ArrayList<>();
+
     // Group-specific metadata cached in chat
     private String groupName;
     private String groupPhotoUrl;

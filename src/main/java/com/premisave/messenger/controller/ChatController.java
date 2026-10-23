@@ -7,6 +7,7 @@ import com.premisave.messenger.dto.response.UserSummaryResponse;
 import com.premisave.messenger.exception.DownstreamServiceException;
 import com.premisave.messenger.security.JwtService;
 import com.premisave.messenger.service.ChatService;
+import com.premisave.messenger.service.MessageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,7 @@ import java.util.Map;
 public class ChatController {
 
     private final ChatService chatService;
+    private final MessageService messageService;
     private final JwtService jwtService;
     private final AuthServiceClient authServiceClient;
 
@@ -120,6 +122,32 @@ public class ChatController {
 
         log.info("Chat {} deleted by user {}", chatId, currentUserId);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Mark every message in the chat as read by the caller. Called when a chat is opened.
+     * Also clears a manual "mark as unread" flag. Returns how many messages were marked.
+     */
+    @PostMapping("/{chatId}/read")
+    public ResponseEntity<Map<String, Object>> markChatRead(
+            @PathVariable String chatId,
+            @RequestHeader("Authorization") String authHeader) {
+
+        String userId = resolveCurrentUser(authHeader).getId();
+        int marked = messageService.markChatAsRead(chatId, userId);
+        chatService.clearMarkedUnread(chatId, userId);
+        return ResponseEntity.ok(Map.of("chatId", chatId, "marked", marked));
+    }
+
+    /** Flag the chat as unread for the caller, like "mark as unread" in WhatsApp. */
+    @PostMapping("/{chatId}/unread")
+    public ResponseEntity<Map<String, Object>> markChatUnread(
+            @PathVariable String chatId,
+            @RequestHeader("Authorization") String authHeader) {
+
+        String userId = resolveCurrentUser(authHeader).getId();
+        chatService.markChatUnread(chatId, userId);
+        return ResponseEntity.ok(Map.of("chatId", chatId, "markedUnread", true));
     }
 
     // ==================== Helper Methods ====================

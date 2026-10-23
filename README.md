@@ -257,7 +257,9 @@ Message <id> delivery completed. Success: 1/1, Failures: 0
 |---|---|---|
 | `POST` | `/api/chats/private` | Create or fetch a private chat (`201` new / `200` existing) |
 | `GET` | `/api/chats` | List the caller's chats, enriched with full profile + presence data |
-| `DELETE` | `/api/chats/{chatId}` | Archive a chat |
+| `DELETE` | `/api/chats/{chatId}` | Archive a private chat (participants only; groups are left through `/api/groups/{groupId}/leave`) |
+| `POST` | `/api/chats/{chatId}/read` | Mark every unread message in the chat as read and send read receipts |
+| `POST` | `/api/chats/{chatId}/unread` | Flag the chat as unread for the caller only (`markedUnread` on `GET /api/chats`) |
 | `POST` | `/api/messages` | Send a message (JSON with `chatId`, `content`, optional `attachmentId` and `replyToMessageId`, or multipart with `file`) |
 | `POST` | `/api/messages/{messageId}/reply` | Reply to a message (JSON or multipart) |
 | `GET` | `/api/messages/chat/{chatId}` | Paginated message history (`page`, `size`, newest first); hides messages you deleted for yourself |
@@ -266,12 +268,16 @@ Message <id> delivery completed. Success: 1/1, Failures: 0
 | `DELETE` | `/api/messages/{messageId}/me` | Delete a message for yourself only |
 | `GET` | `/api/users/me` | The caller's own profile, including the real user id |
 | `GET` | `/api/users`, `/api/users/search?query=`, `/api/users/{userId}` | List, search and look up users |
-| `POST` | `/api/groups` | Create a group |
+| `POST` | `/api/groups` | Create a group (`name`, optional `description`, optional repeated `memberIds`); the caller becomes the owner. Returns the group with its `chatId` and members |
+| `GET` | `/api/groups/{groupId}` | One group with its chat id and members resolved to profiles (members only) |
+| `PUT` | `/api/groups/{groupId}/name`, `/description` | Rename or re-describe a group (owner only) |
+| `POST` | `/api/groups/{groupId}/photo` | Set the group photo (owner only, images only) |
 | `POST` / `DELETE` | `/api/groups/{groupId}/members` | Add / remove a single member |
-| `POST` / `DELETE` | `/api/groups/{groupId}/members/bulk` | Add / remove members in bulk |
+| `POST` / `DELETE` | `/api/groups/{groupId}/members/bulk` | Add / remove members in bulk (JSON array of user ids) |
 | `POST` / `DELETE` | `/api/groups/{groupId}/admins` | Promote / demote a single admin |
+| `POST` / `DELETE` | `/api/groups/{groupId}/admins/bulk` | Promote / demote admins in bulk |
 | `POST` | `/api/groups/{groupId}/transfer-admin` | Transfer group ownership |
-| `POST` | `/api/groups/{groupId}/leave` | Leave a group |
+| `POST` | `/api/groups/{groupId}/leave` | Leave a group (the owner must transfer ownership first, unless alone) |
 | `GET` | `/api/groups/my-groups` | List the caller's groups |
 | `POST` | `/api/attachments` | Upload a file for a chat (multipart `file`, `chatId`); returns an `attachmentId` |
 | `GET` | `/api/attachments/{attachmentId}/content` | Download or stream a file (Bearer token or the signed link from a message) |
@@ -294,6 +300,7 @@ Connect with a STOMP client to `ws://<host>:8081/ws-messenger`, sending `Authori
 | Subscribe | `/user/queue/read-receipts` | Live "seen" notifications for messages *you* sent |
 | Subscribe | `/user/queue/typing` | Typing indicators from the other participant |
 | Subscribe | `/user/queue/errors` | Send failures for the message you just tried to send (`code`, `message`, `chatId`) |
+| Subscribe | `/user/queue/groups` | Group changes that concern you: `ADDED`, `REMOVED` or `UPDATED`, with `groupId` and `chatId` |
 | Subscribe | `/topic/presence` | Online/offline broadcasts for any user |
 
 ## Testing with the browser chat client
@@ -312,10 +319,12 @@ Connect with a STOMP client to `ws://<host>:8081/ws-messenger`, sending `Authori
 3. Sign in with an auth-service account. The service addresses can be changed under "Connection and token", and a token can be pasted instead of a password.
 4. Open a second tab in a private window and sign in as another user to chat with yourself from both sides. A private window keeps its own session, so the two users do not log each other out.
 
-What it covers: private chats, replies, emoji, photos, videos, audio, documents and voice notes (upload progress, captions, drag and drop, paste), live delivery and read ticks, typing and online status, unread counters, in-chat search, delete for me and for everyone, automatic reconnect with a polling fallback, and a mobile layout.
+What it covers: private chats, group chats, replies, emoji, photos, videos, audio, documents and voice notes (upload progress, captions, drag and drop, paste), live delivery and read ticks, typing and online status, unread counters, mark as read and unread, in-chat search, delete for me and for everyone, automatic reconnect with a polling fallback, and a mobile layout.
 
 Notes:
-- Group chats can be opened and used, but groups are created through the API, not the client.
+- Groups: create a group with members, edit its name, description and photo, add and remove members, promote admins, transfer ownership and leave, all from the client. Members are added to the group chat on the server, so they see the group and get its messages straight away. Typing indicators and per-member read receipts are not available in groups.
+- Read state: opening a chat marks its unread messages as read automatically (also when the tab becomes visible again and after a reconnect). Use the chat menu or a right click on a chat row for "Mark as unread" and "Mark as read". Your own messages never count as unread.
+- Profiles: click a contact's name or avatar (or a group member) to see their profile, followers, following, likes and reviews, then follow, like, or review them, or start a chat. Your own profile, with who follows you and who viewed it, is under the person icon on the left rail. Profile editing is not part of the client.
 - The client needs `GET /api/users/me`. If it is missing it falls back to the chat list to find your id.
 - Voice notes need microphone permission, which browsers only grant on `localhost` or HTTPS pages.
 
@@ -352,7 +361,9 @@ Notes:
 
 - **JWT authentication** on both REST (via filter) and WebSocket (via `STOMP CONNECT` interceptor, resolving the real user ID — never trusting the JWT's email subject as an identifier).
 - **Chat access validation** before any message operation — a user can only read or send within chats they're actually a participant of.
-- **Self-chat prevention** and **input validation** on chat creation.
+- **Privacy of private chats**: every send, read, reply, delete-for-me and typing event is checked against the chat's participants on the server. Typing events are relayed only to the other participant of the chat, never to a receiver id supplied by the client, and a reply must target a message in the same chat.
+- **Self-messaging blocked**: you cannot create a private chat with yourself, and a send into a chat with no other participant is refused with `You cannot send messages to yourself`.
+- **Input validation** on chat creation.
 - **CORS** configured centrally; tighten `setAllowedOriginPatterns` before production deployment.
 - **Stateless sessions** — no server-side session state beyond Redis-backed presence counters, fully horizontally scalable.
 

@@ -1,16 +1,23 @@
 package com.premisave.messenger.controller;
 
+import com.premisave.messenger.dto.response.GroupDetailsResponse;
+import com.premisave.messenger.dto.response.UserSummaryResponse;
 import com.premisave.messenger.entity.Group;
+import com.premisave.messenger.security.CurrentUserResolver;
 import com.premisave.messenger.service.GroupService;
+import com.premisave.messenger.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
+/**
+ * Every endpoint resolves the caller through auth-service: the JWT subject is
+ * an email, but group membership and chats are keyed by the real user id.
+ */
 @Slf4j
 @RestController
 @RequestMapping("/api/groups")
@@ -18,204 +25,209 @@ import java.util.List;
 public class GroupController {
 
     private final GroupService groupService;
+    private final UserService userService;
+    private final CurrentUserResolver currentUserResolver;
 
-    /**
-     * Create New Group
-     */
-    @PostMapping
-    public ResponseEntity<Group> createGroup(
-            @RequestParam String name,
-            @RequestParam(required = false) String description,
-            Authentication authentication) {
-
-        String adminId = authentication.getName();
-        Group group = groupService.createGroup(name, description, adminId);
-        return ResponseEntity.ok(group);
+    private String me(String authHeader) {
+        return currentUserResolver.resolve(authHeader).getId();
     }
 
-    /**
-     * Add multiple members to group
-     */
+    /** Create a group. memberIds is optional; the caller becomes the owner. */
+    @PostMapping
+    public ResponseEntity<GroupDetailsResponse> createGroup(
+            @RequestParam String name,
+            @RequestParam(required = false) String description,
+            @RequestParam(required = false) List<String> memberIds,
+            @RequestHeader("Authorization") String authHeader) {
+
+        Group group = groupService.createGroup(name, description, me(authHeader), memberIds);
+        return ResponseEntity.ok(details(group, authHeader));
+    }
+
+    /** One group with its chat id and members. Members only. */
+    @GetMapping("/{groupId}")
+    public ResponseEntity<GroupDetailsResponse> getGroup(
+            @PathVariable String groupId,
+            @RequestHeader("Authorization") String authHeader) {
+
+        Group group = groupService.getGroupFor(groupId, me(authHeader));
+        return ResponseEntity.ok(details(group, authHeader));
+    }
+
+    @GetMapping("/my-groups")
+    public ResponseEntity<List<Group>> getMyGroups(@RequestHeader("Authorization") String authHeader) {
+        return ResponseEntity.ok(groupService.getUserGroups(me(authHeader)));
+    }
+
+    @GetMapping("/{groupId}/members")
+    public ResponseEntity<List<String>> getGroupMembers(
+            @PathVariable String groupId,
+            @RequestHeader("Authorization") String authHeader) {
+
+        return ResponseEntity.ok(groupService.getGroupFor(groupId, me(authHeader)).getMemberIds());
+    }
+
+    // ---------------------------------------------------------------- members
+
     @PostMapping("/{groupId}/members/bulk")
     public ResponseEntity<String> addMembersBulk(
             @PathVariable String groupId,
             @RequestBody List<String> userIds,
-            Authentication authentication) {
+            @RequestHeader("Authorization") String authHeader) {
 
-        String adminId = authentication.getName();
-        groupService.addMembersToGroup(groupId, userIds, adminId);
+        groupService.addMembersToGroup(groupId, userIds, me(authHeader));
         return ResponseEntity.ok("Members added successfully");
     }
 
-    /**
-     * Remove multiple members from group
-     */
     @DeleteMapping("/{groupId}/members/bulk")
     public ResponseEntity<String> removeMembersBulk(
             @PathVariable String groupId,
             @RequestBody List<String> userIds,
-            Authentication authentication) {
+            @RequestHeader("Authorization") String authHeader) {
 
-        String removedBy = authentication.getName();
-        groupService.removeMembersFromGroup(groupId, userIds, removedBy);
+        groupService.removeMembersFromGroup(groupId, userIds, me(authHeader));
         return ResponseEntity.ok("Members removed successfully");
     }
 
-    /**
-     * Promote multiple users to admin
-     */
-    @PostMapping("/{groupId}/admins/bulk")
-    public ResponseEntity<String> addAdminsBulk(
-            @PathVariable String groupId,
-            @RequestBody List<String> userIds,
-            Authentication authentication) {
-
-        String currentAdmin = authentication.getName();
-        groupService.addAdminsToGroup(groupId, userIds, currentAdmin);
-        return ResponseEntity.ok("Users promoted to admin successfully");
-    }
-
-    /**
-     * Demote multiple admins
-     */
-    @DeleteMapping("/{groupId}/admins/bulk")
-    public ResponseEntity<String> removeAdminsBulk(
-            @PathVariable String groupId,
-            @RequestBody List<String> userIds,
-            Authentication authentication) {
-
-        String currentAdmin = authentication.getName();
-        groupService.removeAdminsFromGroup(groupId, userIds, currentAdmin);
-        return ResponseEntity.ok("Admins demoted successfully");
-    }
-
-    /**
-     * Add single member to group
-     */
     @PostMapping("/{groupId}/members")
     public ResponseEntity<String> addMember(
             @PathVariable String groupId,
             @RequestParam String userId,
-            Authentication authentication) {
+            @RequestHeader("Authorization") String authHeader) {
 
-        String adminId = authentication.getName();
-        groupService.addMemberToGroup(groupId, userId, adminId);
+        groupService.addMemberToGroup(groupId, userId, me(authHeader));
         return ResponseEntity.ok("Member added successfully");
     }
 
-    /**
-     * Remove single member from group
-     */
     @DeleteMapping("/{groupId}/members/{userId}")
     public ResponseEntity<String> removeMember(
             @PathVariable String groupId,
             @PathVariable String userId,
-            Authentication authentication) {
+            @RequestHeader("Authorization") String authHeader) {
 
-        String removedBy = authentication.getName();
-        groupService.removeMemberFromGroup(groupId, userId, removedBy);
+        groupService.removeMemberFromGroup(groupId, userId, me(authHeader));
         return ResponseEntity.ok("Member removed successfully");
     }
 
-    /**
-     * Leave group
-     */
     @PostMapping("/{groupId}/leave")
     public ResponseEntity<String> leaveGroup(
             @PathVariable String groupId,
-            Authentication authentication) {
+            @RequestHeader("Authorization") String authHeader) {
 
-        String userId = authentication.getName();
+        String userId = me(authHeader);
         groupService.removeMemberFromGroup(groupId, userId, userId);
         return ResponseEntity.ok("You have left the group");
     }
 
-    /**
-     * Update group description
-     */
-    @PutMapping("/{groupId}/description")
-    public ResponseEntity<Group> updateGroupDescription(
-            @PathVariable String groupId,
-            @RequestParam String description,
-            Authentication authentication) {
+    // ----------------------------------------------------------------- admins
 
-        String adminId = authentication.getName();
-        Group updatedGroup = groupService.updateGroupDescription(groupId, description, adminId);
-        return ResponseEntity.ok(updatedGroup);
+    @PostMapping("/{groupId}/admins/bulk")
+    public ResponseEntity<String> addAdminsBulk(
+            @PathVariable String groupId,
+            @RequestBody List<String> userIds,
+            @RequestHeader("Authorization") String authHeader) {
+
+        groupService.addAdminsToGroup(groupId, userIds, me(authHeader));
+        return ResponseEntity.ok("Users promoted to admin successfully");
     }
 
-    /**
-     * Update group photo
-     */
-    @PostMapping("/{groupId}/photo")
-    public ResponseEntity<Group> uploadGroupPhoto(
+    @DeleteMapping("/{groupId}/admins/bulk")
+    public ResponseEntity<String> removeAdminsBulk(
             @PathVariable String groupId,
-            @RequestParam MultipartFile file,
-            Authentication authentication) {
+            @RequestBody List<String> userIds,
+            @RequestHeader("Authorization") String authHeader) {
 
-        String adminId = authentication.getName();
-        Group updatedGroup = groupService.updateGroupPhoto(groupId, file, adminId);
-        return ResponseEntity.ok(updatedGroup);
+        groupService.removeAdminsFromGroup(groupId, userIds, me(authHeader));
+        return ResponseEntity.ok("Admins demoted successfully");
     }
 
-    /**
-     * Transfer admin rights
-     */
-    @PostMapping("/{groupId}/transfer-admin")
-    public ResponseEntity<Group> transferAdmin(
-            @PathVariable String groupId,
-            @RequestParam String newAdminId,
-            Authentication authentication) {
-
-        String currentAdmin = authentication.getName();
-        Group updatedGroup = groupService.transferAdmin(groupId, newAdminId, currentAdmin);
-        return ResponseEntity.ok(updatedGroup);
-    }
-
-    /**
-     * Promote single user to admin
-     */
     @PostMapping("/{groupId}/admins")
     public ResponseEntity<String> addAdmin(
             @PathVariable String groupId,
             @RequestParam String userId,
-            Authentication authentication) {
+            @RequestHeader("Authorization") String authHeader) {
 
-        String currentAdmin = authentication.getName();
-        groupService.addAdminToGroup(groupId, userId, currentAdmin);
+        groupService.addAdminToGroup(groupId, userId, me(authHeader));
         return ResponseEntity.ok("User promoted to admin successfully");
     }
 
-    /**
-     * Demote single admin
-     */
     @DeleteMapping("/{groupId}/admins/{userId}")
     public ResponseEntity<String> removeAdmin(
             @PathVariable String groupId,
             @PathVariable String userId,
-            Authentication authentication) {
+            @RequestHeader("Authorization") String authHeader) {
 
-        String currentAdmin = authentication.getName();
-        groupService.removeAdminFromGroup(groupId, userId, currentAdmin);
+        groupService.removeAdminFromGroup(groupId, userId, me(authHeader));
         return ResponseEntity.ok("User demoted from admin successfully");
     }
 
-    /**
-     * Get my groups
-     */
-    @GetMapping("/my-groups")
-    public ResponseEntity<List<Group>> getMyGroups(Authentication authentication) {
-        String userId = authentication.getName();
-        List<Group> groups = groupService.getUserGroups(userId);
-        return ResponseEntity.ok(groups);
+    @PostMapping("/{groupId}/transfer-admin")
+    public ResponseEntity<Group> transferAdmin(
+            @PathVariable String groupId,
+            @RequestParam String newAdminId,
+            @RequestHeader("Authorization") String authHeader) {
+
+        return ResponseEntity.ok(groupService.transferAdmin(groupId, newAdminId, me(authHeader)));
     }
 
-    /**
-     * Get group members
-     */
-    @GetMapping("/{groupId}/members")
-    public ResponseEntity<List<String>> getGroupMembers(@PathVariable String groupId) {
-        List<String> members = groupService.getGroupMemberIds(groupId);
-        return ResponseEntity.ok(members);
+    // ---------------------------------------------------------------- details
+
+    @PutMapping("/{groupId}/name")
+    public ResponseEntity<Group> updateGroupName(
+            @PathVariable String groupId,
+            @RequestParam String name,
+            @RequestHeader("Authorization") String authHeader) {
+
+        return ResponseEntity.ok(groupService.updateGroupName(groupId, name, me(authHeader)));
+    }
+
+    @PutMapping("/{groupId}/description")
+    public ResponseEntity<Group> updateGroupDescription(
+            @PathVariable String groupId,
+            @RequestParam String description,
+            @RequestHeader("Authorization") String authHeader) {
+
+        return ResponseEntity.ok(groupService.updateGroupDescription(groupId, description, me(authHeader)));
+    }
+
+    @PostMapping("/{groupId}/photo")
+    public ResponseEntity<Group> uploadGroupPhoto(
+            @PathVariable String groupId,
+            @RequestParam MultipartFile file,
+            @RequestHeader("Authorization") String authHeader) {
+
+        return ResponseEntity.ok(groupService.updateGroupPhoto(groupId, file, me(authHeader)));
+    }
+
+    // ---------------------------------------------------------------- mapping
+
+    private GroupDetailsResponse details(Group group, String authHeader) {
+        GroupDetailsResponse response = new GroupDetailsResponse();
+        response.setId(group.getId());
+        response.setChatId(groupService.getChatIdOf(group.getId()));
+        response.setName(group.getName());
+        response.setDescription(group.getDescription());
+        response.setGroupPhotoUrl(group.getGroupPhotoUrl());
+        response.setAdminId(group.getAdminId());
+        response.setModerators(group.getModerators());
+        response.setMemberIds(group.getMemberIds());
+        response.setCreatedAt(group.getCreatedAt());
+        response.setUpdatedAt(group.getUpdatedAt());
+
+        for (String memberId : group.getMemberIds()) {
+            UserSummaryResponse user = userService.getUserSummary(memberId, authHeader);
+            GroupDetailsResponse.Member member = new GroupDetailsResponse.Member();
+            member.setId(memberId);
+            member.setDisplayName(user.getDisplayName());
+            member.setUsername(user.getUsername());
+            member.setEmail(user.getEmail());
+            member.setFirstName(user.getFirstName());
+            member.setLastName(user.getLastName());
+            member.setProfilePictureUrl(user.getProfilePictureUrl());
+            member.setRole(memberId.equals(group.getAdminId()) ? "OWNER"
+                    : group.getModerators().contains(memberId) ? "ADMIN" : "MEMBER");
+            response.getMembers().add(member);
+        }
+        return response;
     }
 }

@@ -6,6 +6,7 @@ import com.premisave.messenger.dto.response.UserSummaryResponse;
 import com.premisave.messenger.entity.Chat;
 import com.premisave.messenger.enums.ChatType;
 import com.premisave.messenger.exception.ChatNotFoundException;
+import com.premisave.messenger.exception.HttpStatusException;
 import com.premisave.messenger.repository.ChatRepository;
 import com.premisave.messenger.repository.GroupRepository;
 import com.premisave.messenger.repository.MessageRepository;
@@ -54,6 +55,9 @@ public class ChatService {
      * an ID), this heals it in place rather than leaving stale data.
      */
     public PrivateChatResult getOrCreatePrivateChat(String userId1, String email1, String userId2, String email2) {
+        if (userId1 == null || userId2 == null || userId1.equals(userId2)) {
+            throw new IllegalArgumentException("You cannot create a chat with yourself");
+        }
         Optional<Chat> existing = chatRepository.findPrivateChatBetween(userId1, userId2);
 
         if (existing.isPresent()) {
@@ -180,8 +184,9 @@ public class ChatService {
         }
 
         // Unread count
-        long unread = messageRepository.countByChatIdAndReadByNotContaining(chat.getId(), currentUserId);
+        long unread = messageRepository.countUnreadFor(chat.getId(), currentUserId);
         response.setUnreadCount((int) unread);
+        response.setMarkedUnread(chat.getMarkedUnreadBy().contains(currentUserId));
 
         // Private Chat
         if (chat.getChatType() == ChatType.PRIVATE) {
@@ -262,7 +267,10 @@ public class ChatService {
                 .orElseThrow(() -> new ChatNotFoundException("Chat not found with id: " + chatId));
 
         if (!chat.getParticipantIds().contains(userId)) {
-            throw new RuntimeException("You are not a participant of this chat");
+            throw HttpStatusException.forbidden("You are not a participant of this chat");
+        }
+        if (chat.getChatType() == ChatType.GROUP) {
+            throw HttpStatusException.badRequest("Leave the group instead of deleting its chat");
         }
 
         chat.setActive(false);
@@ -278,5 +286,40 @@ public class ChatService {
     public boolean isUserInChat(String chatId, String userId) {
         Optional<Chat> chatOpt = chatRepository.findById(chatId);
         return chatOpt.map(chat -> chat.getParticipantIds().contains(userId)).orElse(false);
+    }
+
+    /**
+     * The other person in a private chat, or empty when the chat is not a
+     * private chat the user belongs to.
+     */
+    public Optional<String> otherParticipant(String chatId, String userId) {
+        return chatRepository.findByIdAndIsActiveTrue(chatId)
+                .filter(chat -> chat.getChatType() == ChatType.PRIVATE && chat.getParticipantIds().contains(userId))
+                .flatMap(chat -> chat.getParticipantIds().stream().filter(id -> !id.equals(userId)).findFirst());
+    }
+
+    /** Flags the chat as unread for this user ("mark as unread"). */
+    public void markChatUnread(String chatId, String userId) {
+        Chat chat = requireParticipant(chatId, userId);
+        if (!chat.getMarkedUnreadBy().contains(userId)) {
+            chat.getMarkedUnreadBy().add(userId);
+            chatRepository.save(chat);
+        }
+    }
+
+    /** Removes the manual unread flag for this user. */
+    public void clearMarkedUnread(String chatId, String userId) {
+        Chat chat = requireParticipant(chatId, userId);
+        if (chat.getMarkedUnreadBy().remove(userId)) {
+            chatRepository.save(chat);
+        }
+    }
+
+    private Chat requireParticipant(String chatId, String userId) {
+        if (!canAccessChat(chatId, userId)) {
+            throw HttpStatusException.forbidden("You are not a member of this chat");
+        }
+        return chatRepository.findById(chatId)
+                .orElseThrow(() -> new ChatNotFoundException("Chat not found: " + chatId));
     }
 }

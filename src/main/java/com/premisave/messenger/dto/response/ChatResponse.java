@@ -19,6 +19,8 @@ public class ChatResponse {
     private LocalDateTime lastMessageAt;
 
     private int unreadCount;
+    /** True when the caller flagged this chat as unread by hand. */
+    private boolean markedUnread;
     private boolean isOnline;
 
     // Group specific

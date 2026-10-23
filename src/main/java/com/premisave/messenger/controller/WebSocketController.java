@@ -1,6 +1,7 @@
 package com.premisave.messenger.controller;
 
 import com.premisave.messenger.dto.websocket.ChatMessage;
+import com.premisave.messenger.exception.HttpStatusException;
 import com.premisave.messenger.realtime.RedisMessagePublisher;
 import com.premisave.messenger.security.WebSocketPrincipal;
 import com.premisave.messenger.service.ChatService;
@@ -35,13 +36,8 @@ public class WebSocketController {
         String senderId = principal.getName();
         chatMessage.setSenderId(senderId);
 
-        // Security: Validate chat access for group messages
-        if (chatMessage.getChatId() != null) {
-            if (!chatService.canAccessChat(chatMessage.getChatId(), senderId)) {
-                log.warn("WebSocket: User {} attempted unauthorized access to chat {}", senderId, chatMessage.getChatId());
-                return;
-            }
-        }
+        // Access, self-messaging and reply checks happen in MessageService.sendMessage,
+        // the single place every message goes through.
 
         // Use the REAL JWT carried by WebSocketPrincipal (set during CONNECT
         // by WebSocketAuthInterceptor), not a fabricated "Bearer " + senderId
@@ -53,6 +49,9 @@ public class WebSocketController {
         try {
             messageService.sendMessage(chatMessage, token);
             log.info("WebSocket message sent by {} in chat {}", senderId, chatMessage.getChatId());
+        } catch (HttpStatusException e) {
+            log.warn("WebSocket message refused for {}: {}", senderId, e.getMessage());
+            notifySendFailure(senderId, chatMessage.getChatId(), e.getCode(), e.getMessage());
         } catch (IllegalArgumentException e) {
             // Bad request from the client (empty message, attachment already
             // sent or not theirs). Tell the sender instead of dropping it.
@@ -76,29 +75,38 @@ public class WebSocketController {
         }
     }
 
+    /**
+     * Typing is relayed only inside a private chat the sender belongs to, and
+     * only to the other person in it. The receiver is worked out here, never
+     * taken from the client, so nobody can ping a stranger.
+     */
     @MessageMapping("/chat.typing")
     public void userTyping(@Payload ChatMessage typingMessage, Principal principal) {
-        if (principal == null) return;
+        if (principal == null || principal.getName() == null) return;
 
         String senderId = principal.getName();
-        typingMessage.setSenderId(senderId);
+        String chatId = typingMessage.getChatId();
+        if (chatId == null || chatId.isBlank()) return;
 
-        if (typingMessage.getReceiverId() != null) {
-            redisMessagePublisher.convertAndSendToUser(
-                    typingMessage.getReceiverId(),
-                    "/queue/typing",
-                    typingMessage
-            );
-        }
+        chatService.otherParticipant(chatId, senderId).ifPresent(receiverId -> {
+            ChatMessage relay = new ChatMessage();
+            relay.setChatId(chatId);
+            relay.setSenderId(senderId);
+            relay.setReceiverId(receiverId);
+            redisMessagePublisher.convertAndSendToUser(receiverId, "/queue/typing", relay);
+        });
     }
 
     @MessageMapping("/chat.read")
     public void markAsRead(@Payload ChatMessage readMessage, Principal principal) {
-        if (principal == null) return;
+        if (principal == null || principal.getName() == null) return;
 
         String userId = principal.getName();
-        if (readMessage.getId() != null) {
+        if (readMessage.getId() == null) return;
+        try {
             messageService.markMessageAsRead(readMessage.getId(), userId);
+        } catch (RuntimeException e) {
+            log.warn("WebSocket read refused for {} on message {}: {}", userId, readMessage.getId(), e.getMessage());
         }
     }
 

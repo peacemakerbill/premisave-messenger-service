@@ -29,6 +29,14 @@ public class HttpStatusException extends RuntimeException {
         return new HttpStatusException(HttpStatus.FORBIDDEN, "FORBIDDEN", message);
     }
 
+    public static HttpStatusException badRequest(String message) {
+        return new HttpStatusException(HttpStatus.BAD_REQUEST, "BAD_REQUEST", message);
+    }
+
+    public static HttpStatusException conflict(String message) {
+        return new HttpStatusException(HttpStatus.CONFLICT, "CONFLICT", message);
+    }
+
     public static HttpStatusException notFound(String code, String message) {
         return new HttpStatusException(HttpStatus.NOT_FOUND, code, message);
     }

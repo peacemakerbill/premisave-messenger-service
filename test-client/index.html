@@ -238,7 +238,7 @@ input, textarea { font: inherit; color: inherit; }
 .rec .t { font-variant-numeric: tabular-nums; min-width: 42px; }
 .rec .hint { color: var(--text-2); font-size: 13px; flex: 1; }
 
-.pop { position: absolute; z-index: 20; background: var(--panel); border-radius: 12px; box-shadow: var(--pop-shadow); padding: 6px 0; min-width: 190px; }
+.pop { position: absolute; z-index: 60; background: var(--panel); border-radius: 12px; box-shadow: var(--pop-shadow); padding: 6px 0; min-width: 190px; }
 .pop button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 18px; text-align: left; }
 .pop button:hover { background: var(--panel-2); }
 .pop button .ico { width: 20px; height: 20px; color: var(--text-2); }
@@ -334,6 +334,84 @@ input, textarea { font: inherit; color: inherit; }
 @media (max-width: 860px) { .list-head .only-narrow { display: grid; } }
 @media (min-width: 861px) { .list-head .only-narrow { display: none; } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* groups */
+.fld.area { height: auto; min-height: 42px; padding: 10px 12px; resize: vertical; line-height: 1.4; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+.chips:empty { display: none; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; border-radius: 16px; background: var(--panel-2); font-size: 13.5px; }
+.chip button { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; color: var(--text-2); }
+.chip button:hover { background: var(--line); }
+.chip .ico { width: 14px; height: 14px; }
+.person .tick-box { margin-left: auto; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; color: transparent; flex: none; }
+.person.sel .tick-box { background: var(--accent); border-color: var(--accent); color: #fff; }
+.person .tick-box .ico { width: 14px; height: 14px; }
+.person.disabled { opacity: .5; cursor: default; }
+.av.icon { background: var(--accent) !important; }
+.av.icon .ico { width: 22px; height: 22px; }
+.g-hero { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding-bottom: 14px; border-bottom: 1px solid var(--line); margin: -4px -20px 8px; padding: 0 20px 16px; }
+.g-photo { position: relative; }
+.g-photo .cam { position: absolute; right: -2px; bottom: -2px; width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; border: 3px solid var(--panel); }
+.g-photo .cam .ico { width: 16px; height: 16px; }
+.g-name { font-size: 22px; font-weight: 600; margin-top: 10px; display: flex; align-items: center; gap: 4px; max-width: 100%; }
+.g-name span { overflow-wrap: anywhere; }
+.g-desc { color: var(--text-2); display: flex; align-items: center; gap: 4px; max-width: 100%; }
+.g-desc span { overflow-wrap: anywhere; white-space: pre-wrap; }
+.g-sub { font-size: 13px; color: var(--text-2); }
+.edit-btn { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--text-2); flex: none; }
+.edit-btn:hover { background: var(--panel-2); }
+.edit-btn .ico { width: 16px; height: 16px; }
+.inline-edit { display: flex; gap: 6px; align-items: center; width: 100%; }
+.inline-edit .fld { height: 38px; }
+.g-add { display: flex; align-items: center; gap: 14px; width: 100%; padding: 10px 0; text-align: left; font-weight: 500; color: var(--accent-strong); }
+.g-add .av { width: 40px; height: 40px; }
+.g-add:hover { background: var(--row-hover); }
+.g-members h3 { margin: 12px 0 4px; font-size: 13.5px; font-weight: 500; color: var(--text-2); }
+.m-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+.m-row .t { flex: 1; min-width: 0; }
+.m-row .n { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m-row .e { font-size: 13px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tag { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 10px; color: var(--accent-strong); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); flex: none; }
+.btn.danger { background: transparent; color: var(--danger); }
+.btn.danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.chat-head .who.hit, .chat-head .av.hit { cursor: pointer; }
+
+/* profile */
+.p-hero { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; margin-bottom: 14px; }
+.p-name { font-size: 22px; font-weight: 600; margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; }
+.p-sub { color: var(--text-2); font-size: 14px; overflow-wrap: anywhere; } .p-sub.live { color: var(--accent-strong); }
+.p-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+.p-stat { display: flex; flex-direction: column; align-items: center; padding: 10px 4px; border-radius: 12px; background: var(--panel-2); gap: 2px; }
+button.p-stat:hover { background: var(--row-hover); }
+.p-stat b { font-size: 18px; } .p-stat span { font-size: 12.5px; color: var(--text-2); }
+.p-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 14px; }
+.p-actions .btn { height: 38px; padding: 0 16px; }
+.btn.outline { background: transparent; color: var(--accent-strong); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.btn.outline:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.btn.outline.on { color: #e0557d; box-shadow: inset 0 0 0 1.5px #e0557d; }
+.btn .ico { width: 18px; height: 18px; }
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin: 0 -20px; padding: 0 12px; overflow-x: auto; }
+.tab { padding: 10px 12px; font-weight: 500; color: var(--text-2); border-bottom: 2.5px solid transparent; white-space: nowrap; }
+.tab.active { color: var(--accent-strong); border-bottom-color: var(--accent); }
+.p-pane { padding-top: 8px; }
+.p-pane .person { padding-left: 0; padding-right: 0; }
+.p-views { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 8px 0 10px; text-align: center; }
+.p-views b { display: block; font-size: 17px; } .p-views span { font-size: 12.5px; color: var(--text-2); }
+.stars { display: inline-flex; gap: 2px; }
+.stars button, .stars.ro span { display: inline-grid; place-items: center; color: var(--line); }
+.stars button { width: 36px; height: 36px; border-radius: 50%; }
+.stars button:hover { background: var(--panel-2); }
+.stars .on { color: #f5a623; }
+.stars .ico { width: 24px; height: 24px; } .stars.ro .ico { width: 16px; height: 16px; }
+.review-form { padding: 6px 0 14px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+.review-form .field-l { margin: 4px 0 4px; }
+.review-form .fld { margin-top: 8px; }
+.row-end { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.review { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.review p { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bubble .sender.hit { cursor: pointer; } .bubble .sender.hit:hover { text-decoration: underline; }
+.m-row.hit { cursor: pointer; }
+@media (max-width: 520px) { .p-stats, .p-views { grid-template-columns: repeat(2, 1fr); } }
 </style>
 </head>
 <body>
@@ -372,6 +450,15 @@ function h(tag, attrs, ...kids) {
 const $ = (sel, root = document) => root.querySelector(sel);
 
 const ICONS = {
+  star: '<polygon points="12 2 15.1 8.6 22 9.3 16.8 14 18.2 21 12 17.5 5.8 21 7.2 14 2 9.3 8.9 8.6"/>',
+  starfill: '<polygon class="f" points="12 2 15.1 8.6 22 9.3 16.8 14 18.2 21 12 17.5 5.8 21 7.2 14 2 9.3 8.9 8.6"/>',
+  heart: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21.2l7.8-7.7 1-1.1a5.5 5.5 0 0 0 0-7.8z"/>',
+  heartfill: '<path class="f" d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21.2l7.8-7.7 1-1.1a5.5 5.5 0 0 0 0-7.8z"/>',
+  user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  mail: '<path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="M22 6l-10 7L2 6"/>',
+  check: '<path d="M20 6L9 17l-5-5"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
   chat: '<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/>',
   newchat: '<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/>',
   sun: '<circle cx="12" cy="12" r="4.5"/><path d="M12 1.5v2M12 20.5v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1.5 12h2M20.5 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>',
@@ -548,6 +635,7 @@ async function api(path, opt = {}) {
   if (S.token && !opt.anon) headers.Authorization = 'Bearer ' + S.token;
   let body;
   if (opt.json !== undefined) { headers['Content-Type'] = 'application/json'; body = JSON.stringify(opt.json); }
+  else if (opt.form) body = opt.form;
   let res;
   try { res = await fetch(base + path, { method: opt.method || 'GET', headers, body }); }
   catch (e) { throw new ApiError(0, 'Cannot reach ' + base + '. Is the service running, and is the address right?'); }
@@ -697,6 +785,7 @@ function renderShell() {
     btn('rail-btn', 'New chat', 'newchat', openNewChat),
     h('div', { class: 'grow' }),
     themeButton('rail-btn'),
+    btn('rail-btn', 'Your profile', 'user', () => openProfile(S.me && S.me.id)),
     btn('rail-btn', 'Settings', 'sliders', openSettings),
     btn('rail-btn', 'Sign out', 'logout', () => signOut()));
 
@@ -754,7 +843,7 @@ function unreadOf(c) {
   const lm = c.lastMessage;
   const fromServer = c.unreadCount || 0;
   const guess = lm && S.me && lm.senderId !== S.me.id && !(lm.readBy || []).includes(S.me.id) && c.id !== S.active ? 1 : 0;
-  return c.id === S.active ? 0 : Math.max(fromServer, S.unread[c.id] || 0, guess);
+  return c.id === S.active ? 0 : Math.max(fromServer, S.unread[c.id] || 0, guess, c.markedUnread ? 1 : 0);
 }
 function sortedChats() {
   const q = S.filter.trim().toLowerCase();
@@ -787,7 +876,7 @@ function renderList() {
       if (pv.icon) preview.append(ico(pv.icon));
       preview.append(h('span', { class: 'txt' }, pv.text || (lm ? '' : 'No messages yet')));
     }
-    return h('button', { class: 'row' + (c.id === S.active ? ' active' : '') + (un ? ' unread' : ''), type: 'button', role: 'listitem', onclick: () => openChat(c.id) },
+    return h('button', { class: 'row' + (c.id === S.active ? ' active' : '') + (un ? ' unread' : ''), type: 'button', role: 'listitem', onclick: () => openChat(c.id), oncontextmenu: e => openRowMenu(e, c) },
       avatar(chatTitle(c), chatPhoto(c), otherId(c) || c.id, '', c.chatType !== 'GROUP' && pres.online),
       h('div', { class: 'body' },
         h('div', { class: 'top' }, h('div', { class: 'name' }, chatTitle(c)), h('div', { class: 'time' }, stamp)),
@@ -816,6 +905,7 @@ function updateConn() {
 }
 
 // ---------- header ----------
+function openHeader(c) { if (c.chatType === 'GROUP') openGroupInfo(c); else openProfile(otherId(c)); }
 function renderHeader() {
   const c = chatById(S.active);
   if (!c) { R.head.classList.add('hidden'); R.composer.classList.add('hidden'); R.placeholder.classList.remove('hidden'); return; }
@@ -830,8 +920,8 @@ function renderHeader() {
   else status = lastSeenText(pres.lastSeen);
   R.head.replaceChildren(
     btn('icon-btn back', 'Back to chats', 'back', closeChat),
-    avatar(chatTitle(c), chatPhoto(c), otherId(c) || c.id, 'sm'),
-    h('div', { class: 'who' }, h('div', { class: 'n' }, chatTitle(c)), h('div', { class: 's' + (live ? ' live' : '') }, status)),
+    h('div', { class: 'hit', onclick: () => openHeader(c) }, avatar(chatTitle(c), chatPhoto(c), otherId(c) || c.id, 'sm')),
+    h('div', { class: 'who hit', onclick: () => openHeader(c) }, h('div', { class: 'n' }, chatTitle(c)), h('div', { class: 's' + (live ? ' live' : '') }, status)),
     btn('icon-btn', 'Search in chat', 'search', toggleSearch),
     btn('icon-btn', 'Chat menu', 'more', e => openChatMenu(e.currentTarget)));
 }
@@ -979,7 +1069,7 @@ function buildMsg(m, prev) {
   const bubble = h('div', { class: 'bubble' + (mediaOnly ? ' media-only' : '') });
 
   if (c && c.chatType === 'GROUP' && !mine && first) {
-    bubble.append(h('div', { class: 'sender', style: 'color:' + colorFor(m.senderId) }, m.senderName || 'Member'));
+    bubble.append(h('div', { class: 'sender hit', style: 'color:' + colorFor(m.senderId), onclick: () => openProfile(m.senderId) }, m.senderName || 'Member'));
   }
   if (m.replyPreview && !m.deleted) {
     const rp = m.replyPreview;
@@ -1167,7 +1257,7 @@ async function openChat(id) {
   if (S.active !== id) return;
   renderThread();
   S.nearBottom = true; scrollBottom();
-  markAllRead(id);
+  markChatRead(id);
   if (matchMedia('(min-width: 861px)').matches) R.ta.focus();
 }
 function closeChat() {
@@ -1185,11 +1275,11 @@ function markAllRead(chatId) {
   }
 }
 function markRead(m) {
-  if (!S.ws || S.wsState !== 'open') return;
-  try {
-    S.ws.send('/app/chat.read', {}, JSON.stringify({ id: m.id, chatId: m.chatId }));
-    m.readBy = [...(m.readBy || []), S.me.id];
-  } catch (e) { /* socket closed, retried on reconnect */ }
+  m.readBy = [...(m.readBy || []), S.me.id];
+  if (S.ws && S.wsState === 'open') {
+    try { S.ws.send('/app/chat.read', {}, JSON.stringify({ id: m.id, chatId: m.chatId })); return; } catch (e) { /* fall back to REST */ }
+  }
+  api('/api/messages/read/' + encodeURIComponent(m.id), { method: 'POST' }).catch(() => { /* retried when the chat is opened again */ });
 }
 
 // ---------- adding messages ----------
@@ -1457,11 +1547,15 @@ async function deleteForEveryone(m) {
   } catch (e) { toast(e.message, true); }
 }
 function openChatMenu(anchor) {
+  const c = chatById(S.active);
+  const group = c && c.chatType === 'GROUP';
   const pop = h('div', { class: 'pop' },
+    group ? popItem('users', 'Group info', () => openGroupInfo(c)) : popItem('user', 'View profile', () => openProfile(otherId(c))),
     popItem('search', 'Search in chat', toggleSearch),
+    popItem('mail', 'Mark as unread', () => markChatUnread(c)),
     popItem('x', 'Close chat', closeChat),
     h('hr'),
-    popItem('trash', 'Delete chat', deleteChat, true));
+    group ? popItem('logout', 'Leave group', () => leaveGroup(c), true) : popItem('trash', 'Delete chat', deleteChat, true));
   showPop(pop, anchor); placePop(pop, anchor);
 }
 async function deleteChat() {
@@ -1552,10 +1646,14 @@ function openNewChat() {
     catch (e) { list.replaceChildren(h('div', { class: 'empty' }, h('p', null, e.message))); }
   };
   input.oninput = () => { clearTimeout(timer); timer = setTimeout(() => load(input.value.trim()), 260); };
-  openModal('New chat', [input, list]);
+  const grp = h('button', { class: 'person', type: 'button', style: 'margin:0 -20px 6px;width:calc(100% + 40px)', onclick: openNewGroup },
+    h('div', { class: 'av sm icon' }, ico('users')),
+    h('div', null, h('div', { class: 'n' }, 'New group'), h('div', { class: 'e' }, 'Chat with several people at once')));
+  openModal('New chat', [grp, input, list]);
   input.focus(); load('');
 }
 async function startChatWith(u) {
+  if (S.me && u.id === S.me.id) { toast('You cannot start a chat with yourself.', true); return; }
   closeModal();
   try {
     const r = await api('/api/chats/private', { method: 'POST', json: { otherUserId: u.id } });
@@ -1574,7 +1672,7 @@ function openSettings() {
   const authIn = h('input', { class: 'fld', value: S.cfg.auth });
   const me = S.me || {};
   const body = [
-    h('div', { style: 'display:flex;gap:14px;align-items:center;margin-bottom:18px' },
+    h('div', { style: 'display:flex;gap:14px;align-items:center;margin-bottom:18px;cursor:pointer', title: 'View profile', onclick: () => openProfile(me.id) },
       avatar(userName(me), me.profilePictureUrl, me.id, 'lg'),
       h('div', null, h('div', { style: 'font-size:18px;font-weight:600' }, userName(me)), h('div', { class: 'note', style: 'margin:2px 0 0' }, me.email || ''), h('div', { class: 'note', style: 'margin:2px 0 0;word-break:break-all' }, 'User id: ' + (me.id || '')))),
     h('label', { class: 'field-l' }, 'Messenger service'), apiIn,
@@ -1701,6 +1799,474 @@ function endRecordingUi() {
 }
 
 // ====================================================================
+// Groups
+// ====================================================================
+let info = null;   // { groupId, chatId } while the group info dialog is open
+
+// A searchable list of people with check marks and removable chips.
+function memberPicker(excludeIds, onChange) {
+  const exclude = new Set(excludeIds || []);
+  const picked = new Map();     // id -> user
+  const known = new Map();
+  const input = h('input', { class: 'fld', type: 'search', placeholder: 'Search people by name or email', 'aria-label': 'Search people' });
+  const chips = h('div', { class: 'chips' });
+  const list = h('div', { class: 'people' });
+  let timer = null, seq = 0;
+
+  const drawChips = () => {
+    chips.replaceChildren(...[...picked.values()].map(u => h('span', { class: 'chip' }, userName(u),
+      h('button', { type: 'button', 'aria-label': 'Remove ' + userName(u), onclick: () => { picked.delete(u.id); drawChips(); drawList(lastRows); onChange(); } }, ico('x')))));
+  };
+  let lastRows = [];
+  const drawList = users => {
+    lastRows = users || [];
+    const rows = lastRows.filter(u => u && u.id && !exclude.has(u.id) && (!S.me || u.id !== S.me.id));
+    list.replaceChildren(...(rows.length ? rows.map(u => {
+      const on = picked.has(u.id);
+      return h('button', { class: 'person' + (on ? ' sel' : ''), type: 'button', 'aria-pressed': on ? 'true' : 'false',
+        onclick: () => { on ? picked.delete(u.id) : picked.set(u.id, u); drawChips(); drawList(lastRows); onChange(); } },
+        avatar(userName(u), u.profilePictureUrl, u.id, 'sm'),
+        h('div', null, h('div', { class: 'n' }, userName(u)), h('div', { class: 'e' }, u.email || u.username || '')),
+        h('span', { class: 'tick-box' }, ico('check')));
+    }) : [h('div', { class: 'empty' }, h('p', null, 'No one found.'))]));
+  };
+  const load = async q => {
+    const mine = ++seq;
+    try {
+      const users = q ? await api('/api/users/search?query=' + encodeURIComponent(q)) : await api('/api/users?page=0&size=50');
+      if (mine !== seq) return;
+      (users || []).forEach(u => known.set(u.id, u));
+      drawList(users);
+    } catch (e) { if (mine === seq) list.replaceChildren(h('div', { class: 'empty' }, h('p', null, e.message))); }
+  };
+  input.oninput = () => { clearTimeout(timer); timer = setTimeout(() => load(input.value.trim()), 260); };
+  list.replaceChildren(h('div', { class: 'empty' }, h('p', null, 'Loading')));
+  load('');
+  return { nodes: [input, chips, list], ids: () => [...picked.keys()], count: () => picked.size, focus: () => input.focus() };
+}
+
+// ---------- create ----------
+function openNewGroup() {
+  const name = h('input', { class: 'fld', placeholder: 'Group name', maxlength: 80, 'aria-label': 'Group name' });
+  const desc = h('textarea', { class: 'fld area', rows: 2, placeholder: 'Description (optional)', maxlength: 300, 'aria-label': 'Description' });
+  const create = h('button', { class: 'btn', type: 'button', disabled: true }, ico('check'), 'Create group');
+  const picker = memberPicker([], () => sync());
+  const sync = () => {
+    create.disabled = !name.value.trim();
+    create.lastChild.textContent = picker.count() ? 'Create with ' + picker.count() + (picker.count() === 1 ? ' person' : ' people') : 'Create group';
+  };
+  name.oninput = sync;
+  create.onclick = async () => {
+    create.disabled = true;
+    try {
+      const q = new URLSearchParams();
+      q.set('name', name.value.trim());
+      if (desc.value.trim()) q.set('description', desc.value.trim());
+      picker.ids().forEach(id => q.append('memberIds', id));
+      const g = await api('/api/groups?' + q.toString(), { method: 'POST' });
+      closeModal();
+      await loadChats(true);
+      if (g && g.chatId && chatById(g.chatId)) await openChat(g.chatId);
+      else toast('Group created. It will appear in your chats.');
+    } catch (e) { create.disabled = false; toast(e.message, true); }
+  };
+  openModal('New group', [
+    h('label', { class: 'field-l' }, 'Name'), name,
+    h('label', { class: 'field-l' }, 'Description'), desc,
+    h('label', { class: 'field-l' }, 'Add people'), ...picker.nodes
+  ], create, true);
+  name.focus();
+}
+
+// ---------- info ----------
+async function openGroupInfo(chat) {
+  const c = typeof chat === 'string' ? chatById(chat) : chat;
+  if (!c || !c.groupId) { toast('This group is not available.', true); return; }
+  info = { groupId: c.groupId, chatId: c.id };
+  const box = h('div', { class: 'g-members' }, h('div', { class: 'empty' }, h('p', null, 'Loading')));
+  const leave = h('button', { class: 'btn danger', type: 'button', onclick: () => leaveGroup(c) }, ico('logout'), 'Leave group');
+  const m = openModal('Group info', [box], leave, true);
+  const mo = new MutationObserver(() => { if (!document.body.contains(m)) { info = null; mo.disconnect(); } });
+  mo.observe(document.body, { childList: true });
+  info.box = box;
+  await refreshInfo();
+}
+async function refreshInfo() {
+  if (!info) return;
+  const cur = info;
+  try {
+    const g = await api('/api/groups/' + encodeURIComponent(cur.groupId));
+    if (info !== cur) return;
+    renderGroupInfo(cur.box, g);
+  } catch (e) {
+    if (info === cur) cur.box.replaceChildren(h('div', { class: 'empty' }, h('p', null, e.message)));
+  }
+}
+
+function editable(text, canEdit, opt, save) {
+  const view = h('div', { class: opt.cls });
+  const draw = () => {
+    view.replaceChildren(h('span', null, text || opt.empty || ''));
+    if (canEdit) view.append(h('button', { class: 'edit-btn', type: 'button', 'aria-label': opt.label, title: opt.label, onclick: edit }, ico('edit')));
+  };
+  const edit = () => {
+    const field = opt.multi
+      ? h('textarea', { class: 'fld area', rows: 2, maxlength: opt.max, 'aria-label': opt.label })
+      : h('input', { class: 'fld', maxlength: opt.max, 'aria-label': opt.label });
+    field.value = text || '';
+    const done = async ok => {
+      if (!ok) { draw(); return; }
+      const v = field.value.trim();
+      if (opt.required && !v) { toast('This cannot be empty.', true); return; }
+      field.disabled = true;
+      try { await save(v); } catch (e) { toast(e.message, true); draw(); }
+    };
+    field.onkeydown = e => { if (e.key === 'Enter' && !(opt.multi && e.shiftKey)) { e.preventDefault(); done(true); } if (e.key === 'Escape') { e.stopPropagation(); done(false); } };
+    view.replaceChildren(h('div', { class: 'inline-edit' }, field, btn('edit-btn', 'Save', 'check', () => done(true)), btn('edit-btn', 'Cancel', 'x', () => done(false))));
+    field.focus(); field.select && field.select();
+  };
+  draw();
+  return view;
+}
+
+function renderGroupInfo(box, g) {
+  const meId = S.me && S.me.id;
+  const owner = g.adminId === meId;
+  const members = (g.members || []).slice().sort((a, b) => {
+    const rank = r => (r === 'OWNER' ? 0 : r === 'ADMIN' ? 1 : 2);
+    return rank(a.role) - rank(b.role) || userName(a).localeCompare(userName(b));
+  });
+  const refresh = async () => { await refreshInfo(); loadChats(true); };
+
+  const photo = h('div', { class: 'g-photo' }, avatar(g.name, g.groupPhotoUrl, g.id, 'lg'));
+  if (owner) {
+    const file = h('input', { type: 'file', accept: 'image/*', class: 'hidden', onchange: async e => {
+      const f = e.target.files[0]; e.target.value = '';
+      if (!f) return;
+      const fd = new FormData(); fd.append('file', f);
+      try { await api('/api/groups/' + encodeURIComponent(g.id) + '/photo', { method: 'POST', form: fd }); await refresh(); toast('Group photo updated'); }
+      catch (ex) { toast(ex.message, true); }
+    } });
+    photo.append(h('button', { class: 'cam', type: 'button', 'aria-label': 'Change group photo', title: 'Change group photo', onclick: () => file.click() }, ico('camera')), file);
+  }
+  const put = (path, v) => api('/api/groups/' + encodeURIComponent(g.id) + path + encodeURIComponent(v), { method: 'PUT' }).then(refresh);
+
+  const hero = h('div', { class: 'g-hero' },
+    photo,
+    editable(g.name, owner, { cls: 'g-name', label: 'Edit group name', max: 80, required: true }, v => put('/name?name=', v)),
+    editable(g.description, owner, { cls: 'g-desc', label: 'Edit description', max: 300, multi: true, empty: owner ? 'Add a description' : '' }, v => put('/description?description=', v)),
+    h('div', { class: 'g-sub' }, (g.members || []).length + (members.length === 1 ? ' member' : ' members') + (g.createdAt ? ' · Created ' + (toDate(g.createdAt) ? toDate(g.createdAt).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : '') : '')));
+
+  const rows = members.map(u => {
+    const you = u.id === meId;
+    const row = h('div', { class: 'm-row' },
+      avatar(userName(u), u.profilePictureUrl, u.id, 'sm'),
+      h('div', { class: 't' }, h('div', { class: 'n' }, userName(u) + (you ? ' (You)' : '')), h('div', { class: 'e' }, u.email || u.username || '')),
+      u.role === 'OWNER' ? h('span', { class: 'tag' }, 'Owner') : u.role === 'ADMIN' ? h('span', { class: 'tag' }, 'Admin') : null);
+    row.classList.add('hit');
+    row.addEventListener('click', e => { if (!e.target.closest('button')) openProfile(u.id); });
+    if (owner && !you) row.append(btn('icon-btn', 'Manage ' + userName(u), 'more', e => memberMenu(e.currentTarget, g, u, refresh)));
+    return row;
+  });
+
+  box.replaceChildren(...[hero,
+    owner ? h('button', { class: 'g-add', type: 'button', onclick: () => openAddMembers(g) }, h('div', { class: 'av icon' }, ico('plus')), 'Add members') : null,
+    h('h3', null, 'Members'), ...rows].filter(Boolean));
+}
+
+function memberMenu(anchor, g, u, refresh) {
+  const base = '/api/groups/' + encodeURIComponent(g.id);
+  const q = id => encodeURIComponent(id);
+  const run = async (fn, ok) => { try { await fn(); await refresh(); if (ok) toast(ok); } catch (e) { toast(e.message, true); } };
+  const items = [];
+  if (u.role === 'ADMIN') items.push(popItem('users', 'Remove as admin', () => run(() => api(base + '/admins/' + q(u.id), { method: 'DELETE' }), 'Admin removed')));
+  else items.push(popItem('users', 'Make admin', () => run(() => api(base + '/admins?userId=' + q(u.id), { method: 'POST' }), 'Made admin')));
+  items.push(popItem('check', 'Make owner', () => {
+    if (confirm('Make ' + userName(u) + ' the owner? You will stay on as an admin.')) run(() => api(base + '/transfer-admin?newAdminId=' + q(u.id), { method: 'POST' }), 'Ownership transferred');
+  }));
+  items.push(h('hr'));
+  items.push(popItem('trash', 'Remove from group', () => {
+    if (confirm('Remove ' + userName(u) + ' from this group?')) run(() => api(base + '/members/' + q(u.id), { method: 'DELETE' }), 'Member removed');
+  }, true));
+  const pop = h('div', { class: 'pop' }, items);
+  showPop(pop, anchor); placePop(pop, anchor);
+}
+
+function openAddMembers(g) {
+  const add = h('button', { class: 'btn', type: 'button', disabled: true }, ico('plus'), 'Add');
+  const picker = memberPicker(g.memberIds || [], () => {
+    add.disabled = !picker.count();
+    add.lastChild.textContent = picker.count() ? 'Add ' + picker.count() : 'Add';
+  });
+  add.onclick = async () => {
+    add.disabled = true;
+    try {
+      await api('/api/groups/' + encodeURIComponent(g.id) + '/members/bulk', { method: 'POST', json: picker.ids() });
+      toast('Members added');
+      loadChats(true);
+      const chat = chatById(info ? info.chatId : S.active) || S.chats.find(c => c.groupId === g.id);
+      if (chat) openGroupInfo(chat); else closeModal();
+    } catch (e) { add.disabled = false; toast(e.message, true); }
+  };
+  const back = S.chats.find(c => c.groupId === g.id);
+  openModal('Add members to ' + g.name, picker.nodes, [h('button', { class: 'btn ghost', type: 'button', onclick: () => back ? openGroupInfo(back) : closeModal() }, 'Back'), add], true);
+}
+
+async function leaveGroup(c) {
+  if (!c) return;
+  if (!confirm('Leave "' + chatTitle(c) + '"? You will stop receiving its messages.')) return;
+  try {
+    await api('/api/groups/' + encodeURIComponent(c.groupId) + '/leave', { method: 'POST' });
+    closeModal();
+    S.chats = S.chats.filter(x => x.id !== c.id);
+    if (S.active === c.id) closeChat(); else renderList();
+    toast('You left the group');
+    loadChats(true);
+  } catch (e) { toast(e.message, true); }
+}
+
+// Pushed by the server when a group changes (added, removed, renamed, roles).
+async function onGroupEvent(d) {
+  const before = S.chats.length;
+  if (d.event === 'REMOVED') {
+    const wasActive = S.active && S.active === d.chatId;
+    S.chats = S.chats.filter(c => c.id !== d.chatId);
+    if (wasActive) closeChat(); else renderList();
+    if (info && info.groupId === d.groupId) closeModal();
+    toast('You are no longer in that group');
+    return;
+  }
+  await loadChats(true);
+  if (d.event === 'ADDED' && S.chats.length > before) {
+    const c = S.chats.find(x => x.groupId === d.groupId);
+    toast('You were added to ' + (c ? chatTitle(c) : 'a group'));
+  }
+  if (info && info.groupId === d.groupId) refreshInfo();
+}
+
+// ====================================================================
+// Read state: mark as read and unread
+// ====================================================================
+function markChatReadLocal(id) {
+  const c = chatById(id);
+  if (c) {
+    c.unreadCount = 0; c.markedUnread = false;
+    if (c.lastMessage && S.me && c.lastMessage.senderId !== S.me.id) c.lastMessage.readBy = [...new Set([...(c.lastMessage.readBy || []), S.me.id])];
+  }
+  S.unread[id] = 0;
+  const b = S.msgs[id];
+  if (b && S.me) b.list.forEach(m => { if (m.id && m.senderId !== S.me.id && !(m.readBy || []).includes(S.me.id)) m.readBy = [...(m.readBy || []), S.me.id]; });
+}
+// One request that marks the whole chat read. The server tells each sender.
+function markChatRead(id) {
+  markChatReadLocal(id);
+  api('/api/chats/' + encodeURIComponent(id) + '/read', { method: 'POST' }).catch(() => { /* retried on the next open */ });
+  renderList();
+}
+async function markChatUnread(c) {
+  try {
+    await api('/api/chats/' + encodeURIComponent(c.id) + '/unread', { method: 'POST' });
+    c.markedUnread = true;
+    if (S.active === c.id) closeChat(); else renderList();
+  } catch (e) { toast(e.message, true); }
+}
+function openRowMenu(e, c) {
+  e.preventDefault();
+  const unread = unreadOf(c) > 0;
+  const pop = h('div', { class: 'pop' },
+    unread ? popItem('check', 'Mark as read', () => markChatRead(c.id)) : popItem('mail', 'Mark as unread', () => markChatUnread(c)),
+    c.chatType === 'GROUP' ? popItem('users', 'Group info', () => openGroupInfo(c)) : popItem('user', 'View profile', () => openProfile(otherId(c))));
+  showPop(pop, e.currentTarget); placePop(pop, e.currentTarget);
+}
+
+// ====================================================================
+// Profiles, follows, likes and reviews
+// ====================================================================
+const userCache = new Map();
+async function getUser(id) {
+  if (!id) return { id: '', displayName: 'Unknown' };
+  if (userCache.has(id)) return userCache.get(id);
+  const p = api('/api/users/' + encodeURIComponent(id)).catch(() => ({ id, displayName: 'Unknown user' }));
+  userCache.set(id, p);
+  return p;
+}
+let prof = null;     // { id, box, tab }
+
+function presenceLine(u) {
+  const p = S.presence[u.id];
+  const online = p ? p.online : !!u.online;
+  if (online) return { text: 'Online', live: true };
+  const t = toDate((p && p.lastSeen) || u.lastSeen);
+  return { text: t ? lastSeenText(t) : '', live: false };
+}
+function stars(n, size) {
+  const v = Math.round(n || 0);
+  return h('span', { class: 'stars ro', 'aria-label': v + ' out of 5' }, [1, 2, 3, 4, 5].map(i => h('span', { class: i <= v ? 'on' : '' }, ico(i <= v ? 'starfill' : 'star'))));
+}
+function personRow(u, extra) {
+  return h('button', { class: 'person', type: 'button', onclick: () => openProfile(u.id) },
+    avatar(userName(u), u.profilePictureUrl, u.id, 'sm'),
+    h('div', null, h('div', { class: 'n' }, userName(u)), h('div', { class: 'e' }, extra || u.email || u.username || '')));
+}
+
+async function openProfile(userId) {
+  if (!userId) return;
+  const me = S.me && userId === S.me.id;
+  const box = h('div', { class: 'prof' }, h('div', { class: 'empty' }, h('p', null, 'Loading')));
+  const m = openModal(me ? 'Your profile' : 'Profile', [box], null, true);
+  prof = { id: userId, box, tab: me ? 'followers' : 'reviews' };
+  const mo = new MutationObserver(() => { if (!document.body.contains(m)) { prof = null; mo.disconnect(); } });
+  mo.observe(document.body, { childList: true });
+  await loadProfile();
+}
+async function loadProfile() {
+  const cur = prof; if (!cur) return;
+  const me = S.me && cur.id === S.me.id;
+  const safe = p => p.catch(() => null);
+  try {
+    const [user, stats, liked, following, mutual, reviews, views] = await Promise.all([
+      me ? Promise.resolve(S.me) : getUser(cur.id),
+      safe(api('/api/social/stats/' + encodeURIComponent(cur.id))),
+      me ? null : safe(api('/api/social/like/status/' + encodeURIComponent(cur.id))),
+      me ? null : safe(api('/api/social/follow/status/' + encodeURIComponent(cur.id))),
+      me ? null : safe(api('/api/social/follow/mutual/' + encodeURIComponent(cur.id))),
+      safe(api(me ? '/api/social/my-reviews' : '/api/social/reviews/' + encodeURIComponent(cur.id))),
+      me ? safe(api('/api/profile/views/my-stats')) : null
+    ]);
+    if (prof !== cur) return;
+    if (!me && !cur.viewed) { cur.viewed = true; api('/api/profile/views/' + encodeURIComponent(cur.id), { method: 'POST' }).catch(() => { /* a view that fails to record is not worth a message */ }); }
+    cur.data = { user, stats: stats || {}, liked: !!(liked && liked.liked), following: !!(following && following.following), mutual: !!(mutual && mutual.mutual), reviews: reviews || [], views: views || {} };
+    renderProfile();
+  } catch (e) {
+    if (prof === cur) cur.box.replaceChildren(h('div', { class: 'empty' }, h('p', null, e.message)));
+  }
+}
+
+function renderProfile() {
+  const cur = prof; if (!cur || !cur.data) return;
+  const { user, stats, liked, following, mutual, reviews, views } = cur.data;
+  const me = S.me && cur.id === S.me.id;
+  const pres = me ? null : presenceLine(user);
+  const rerun = async () => { await loadProfile(); };
+
+  const act = (fn, ok) => async () => { try { const r = await fn(); toast((r && r.message) || ok); await rerun(); } catch (e) { toast(e.message, true); } };
+  const base = '/api/social';
+  const sbody = id => ({ method: 'POST', json: { targetId: id } });
+
+  const hero = h('div', { class: 'p-hero' },
+    avatar(userName(user), user.profilePictureUrl, user.id, 'lg'),
+    h('div', { class: 'p-name' }, userName(user), me ? h('span', { class: 'tag' }, 'You') : null, mutual ? h('span', { class: 'tag' }, 'Follow each other') : null),
+    h('div', { class: 'p-sub' }, [user.username ? '@' + user.username : '', user.email || ''].filter(Boolean).join('  ')),
+    pres && pres.text ? h('div', { class: 'p-sub' + (pres.live ? ' live' : '') }, pres.text) : null);
+
+  const stat = (n, label, tab) => h(tab ? 'button' : 'div', { class: 'p-stat', type: tab ? 'button' : null, onclick: tab ? () => { cur.tab = tab; renderProfile(); } : null }, h('b', null, n), h('span', null, label));
+  const avg = (stats.averageRating || 0);
+  const statRow = h('div', { class: 'p-stats' },
+    stat(stats.followerCount || 0, 'Followers', me ? 'followers' : null),
+    stat(stats.followingCount || 0, 'Following', me ? 'following' : null),
+    stat(stats.likeCount || 0, 'Likes', me ? 'likedby' : null),
+    stat(stats.totalReviews ? avg.toFixed(1) : 'None', stats.totalReviews ? stats.totalReviews + (stats.totalReviews === 1 ? ' review' : ' reviews') : 'Reviews', 'reviews'));
+
+  let actions = null;
+  if (!me) {
+    actions = h('div', { class: 'p-actions' },
+      h('button', { class: 'btn', type: 'button', onclick: () => startChatWith(user) }, ico('chat'), 'Message'),
+      h('button', { class: 'btn ' + (following ? 'outline' : ''), type: 'button', onclick: act(() => following ? api(base + '/unfollow/' + encodeURIComponent(user.id), { method: 'DELETE' }) : api(base + '/follow', sbody(user.id)), following ? 'Unfollowed' : 'Following') }, ico(following ? 'check' : 'newchat'), following ? 'Following' : 'Follow'),
+      h('button', { class: 'btn outline' + (liked ? ' on' : ''), type: 'button', 'aria-pressed': liked ? 'true' : 'false', onclick: act(() => liked ? api(base + '/unlike/' + encodeURIComponent(user.id), { method: 'DELETE' }) : api(base + '/like', sbody(user.id)), liked ? 'Like removed' : 'Liked') }, ico(liked ? 'heartfill' : 'heart'), liked ? 'Liked' : 'Like'));
+  }
+
+  const tabs = me
+    ? [['followers', 'Followers'], ['following', 'Following'], ['likedby', 'Liked by'], ['views', 'Profile views'], ['reviews', 'Reviews']]
+    : [['reviews', 'Reviews']];
+  const tabBar = tabs.length > 1 ? h('div', { class: 'tabs', role: 'tablist' }, tabs.map(([k, label]) =>
+    h('button', { class: 'tab' + (cur.tab === k ? ' active' : ''), type: 'button', role: 'tab', 'aria-selected': cur.tab === k ? 'true' : 'false', onclick: () => { cur.tab = k; renderProfile(); } }, label))) : null;
+  const pane = h('div', { class: 'p-pane' });
+
+  cur.box.replaceChildren(...[hero, statRow, actions, tabBar, pane].filter(Boolean));
+  paintTab(pane, cur, me, reviews, views, user, rerun);
+}
+
+async function paintTab(pane, cur, me, reviews, views, user, rerun) {
+  const tab = cur.tab;
+  const loading = () => pane.replaceChildren(h('div', { class: 'empty' }, h('p', null, 'Loading')));
+  const people = async (path, emptyText, key) => {
+    loading();
+    try {
+      const rows = (await api(path)) || [];
+      if (prof !== cur || cur.tab !== tab) return;
+      pane.replaceChildren(...(rows.length ? rows.map(u => personRow(key ? Object.assign({}, u, { id: u[key] || u.id }) : u)) : [h('div', { class: 'empty' }, h('p', null, emptyText))]));
+    } catch (e) { pane.replaceChildren(h('div', { class: 'empty' }, h('p', null, e.message))); }
+  };
+  if (tab === 'followers') return people('/api/social/my-followers', 'Nobody follows you yet.');
+  if (tab === 'following') return people('/api/social/my-following', 'You are not following anyone yet.');
+  if (tab === 'likedby') return people('/api/social/my-likers', 'Nobody has liked your profile yet.');
+  if (tab === 'views') {
+    loading();
+    try {
+      const rows = (await api('/api/profile/views/who-viewed-me')) || [];
+      if (prof !== cur || cur.tab !== tab) return;
+      const head = h('div', { class: 'p-views' },
+        h('div', null, h('b', null, views.totalViews || 0), h('span', null, 'Total')),
+        h('div', null, h('b', null, views.last7Days || 0), h('span', null, 'Last 7 days')),
+        h('div', null, h('b', null, views.last30Days || 0), h('span', null, 'Last 30 days')),
+        h('div', null, h('b', null, views.uniqueViewers || 0), h('span', null, 'People')));
+      pane.replaceChildren(head, ...(rows.length ? rows.map(v => personRow({ id: v.viewerId, displayName: v.viewerName, profilePictureUrl: v.viewerProfilePicture }, v.viewedAt ? 'Viewed ' + (toDate(v.viewedAt) ? toDate(v.viewedAt).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '') : ''))
+        : [h('div', { class: 'empty' }, h('p', null, 'Nobody has viewed your profile yet.'))]));
+    } catch (e) { pane.replaceChildren(h('div', { class: 'empty' }, h('p', null, e.message))); }
+    return;
+  }
+
+  // reviews
+  const mine = me ? null : reviews.find(r => r.userId === S.me.id);
+  const nodes = [];
+  if (!me) nodes.push(reviewForm(user, mine, rerun));
+  if (!reviews.length) nodes.push(h('div', { class: 'empty' }, h('p', null, me ? 'Nobody has reviewed you yet.' : 'No reviews yet. Be the first.')));
+  const list = h('div', { class: 'reviews' });
+  nodes.push(list);
+  pane.replaceChildren(...nodes);
+  for (const r of reviews.slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))) {
+    const who = await getUser(r.userId);
+    if (prof !== cur || cur.tab !== tab) return;
+    const when = toDate(r.createdAt);
+    list.append(h('div', { class: 'review' },
+      h('button', { class: 'person', type: 'button', style: 'padding:0 0 6px', onclick: () => openProfile(r.userId) },
+        avatar(userName(who), who.profilePictureUrl, who.id, 'xs'),
+        h('div', null, h('div', { class: 'n' }, r.userId === (S.me && S.me.id) ? 'You' : userName(who)), h('div', { class: 'e' }, when ? when.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : ''))),
+      stars(r.rating),
+      r.comment ? h('p', null, r.comment) : null));
+  }
+}
+
+function reviewForm(user, mine, rerun) {
+  let rating = mine ? mine.rating : 0;
+  const starBox = h('div', { class: 'stars', role: 'radiogroup', 'aria-label': 'Rating' });
+  const text = h('textarea', { class: 'fld area', rows: 2, maxlength: 500, placeholder: 'Write a comment (optional)', 'aria-label': 'Comment' });
+  text.value = mine ? (mine.comment || '') : '';
+  const submit = h('button', { class: 'btn', type: 'button' }, ico('check'), mine ? 'Update review' : 'Post review');
+  const paint = () => {
+    starBox.replaceChildren(...[1, 2, 3, 4, 5].map(i => h('button', { type: 'button', class: i <= rating ? 'on' : '', role: 'radio', 'aria-checked': i === rating ? 'true' : 'false', 'aria-label': i + (i === 1 ? ' star' : ' stars'), onclick: () => { rating = i; paint(); } }, ico(i <= rating ? 'starfill' : 'star'))));
+    submit.disabled = !rating;
+  };
+  paint();
+  submit.onclick = async () => {
+    submit.disabled = true;
+    try {
+      const body = mine ? { reviewId: mine.id, targetId: user.id, rating, comment: text.value.trim() } : { targetId: user.id, rating, comment: text.value.trim() };
+      const r = await api('/api/social/review', { method: mine ? 'PUT' : 'POST', json: body });
+      toast((r && r.message) || (mine ? 'Review updated' : 'Review posted'));
+      await rerun();
+    } catch (e) { submit.disabled = false; toast(e.message, true); }
+  };
+  const del = mine ? h('button', { class: 'btn danger', type: 'button', onclick: async () => {
+    if (!confirm('Delete your review?')) return;
+    try { await api('/api/social/review/' + encodeURIComponent(mine.id), { method: 'DELETE' }); toast('Review deleted'); await rerun(); } catch (e) { toast(e.message, true); }
+  } }, 'Delete') : null;
+  return h('div', { class: 'review-form' },
+    h('div', { class: 'field-l' }, mine ? 'Your review of ' + userName(user) : 'Review ' + userName(user)),
+    starBox, text, h('div', { class: 'row-end' }, del, submit));
+}
+
+// ====================================================================
 // Boot and session
 // ====================================================================
 async function boot() {
@@ -1763,7 +2329,7 @@ function connectWS(force) {
     S.wsState = 'open'; S.retry = 0; updateConn();
     subscribeAll(client);
     if (S.wasDown) { S.wasDown = false; resync(); }
-    if (S.active) markAllRead(S.active);
+    if (S.active) markChatRead(S.active);
   }, () => {
     if (S.ws !== client) return;
     S.ws = null; S.wsState = 'down'; S.wasDown = true; updateConn();
@@ -1790,6 +2356,7 @@ function subscribeAll(client) {
   client.subscribe('/user/queue/read-receipts', f => { const d = parse(f); if (d) onReadReceipt(d); });
   client.subscribe('/user/queue/typing', f => { const d = parse(f); if (d) onTyping(d); });
   client.subscribe('/user/queue/errors', f => { const d = parse(f); if (d) toast(d.message || 'Something went wrong', true); });
+  client.subscribe('/user/queue/groups', f => { const d = parse(f); if (d) onGroupEvent(d); });
   client.subscribe('/topic/presence', f => { const d = parse(f); if (d) onPresence(d); });
 }
 
@@ -1883,7 +2450,7 @@ function stopPolling() { clearInterval(pollTimer); pollTimer = null; }
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible' || !S.me) return;
-  if (S.active) { S.unread[S.active] = 0; markAllRead(S.active); renderList(); }
+  if (S.active) markChatRead(S.active);
   if (S.wsState !== 'open') resync();
 });
 window.addEventListener('online', () => { if (S.token && S.wsState !== 'open') { S.retry = 0; connectWS(true); } });

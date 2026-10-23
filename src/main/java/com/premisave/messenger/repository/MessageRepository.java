@@ -42,4 +42,11 @@ public interface MessageRepository extends MongoRepository<Message, String> {
      * Count messages in delivery state for a chat
      */
     long countByChatIdAndDeliveryState(String chatId, MessageDeliveryState state);
+
+    /** Messages from other people that this user has not read. Own, deleted and hidden messages are not counted. */
+    @Query(value = "{'chatId': ?0, 'senderId': {$ne: ?1}, 'readBy': {$ne: ?1}, 'isActive': true, 'deletedForUsers': {$ne: ?1}}", count = true)
+    long countUnreadFor(String chatId, String userId);
+
+    @Query("{'chatId': ?0, 'senderId': {$ne: ?1}, 'readBy': {$ne: ?1}, 'isActive': true, 'deletedForUsers': {$ne: ?1}}")
+    List<Message> findUnreadFor(String chatId, String userId, org.springframework.data.domain.Pageable pageable);
 }

@@ -11,6 +11,7 @@ import com.premisave.messenger.enums.ChatType;
 import com.premisave.messenger.enums.MessageDeliveryState;
 import com.premisave.messenger.enums.MessageStatus;
 import com.premisave.messenger.enums.MessageType;
+import com.premisave.messenger.exception.HttpStatusException;
 import com.premisave.messenger.exception.MessageNotFoundException;
 import com.premisave.messenger.realtime.RedisMessagePublisher;
 import com.premisave.messenger.repository.ChatRepository;
@@ -53,6 +54,8 @@ public class MessageService {
      */
     @Transactional
     public MessageResponse sendMessage(ChatMessage chatMessage, String authToken) {
+        authorizeSend(chatMessage);
+
         boolean hasAttachment = chatMessage.getAttachmentId() != null && !chatMessage.getAttachmentId().isBlank();
         boolean hasText = chatMessage.getContent() != null && !chatMessage.getContent().isBlank();
         if (!hasAttachment && !hasText && chatMessage.getMediaUrl() == null) {
@@ -70,6 +73,40 @@ public class MessageService {
                 attachmentService.release(attachment.getId());
             }
             throw e;
+        }
+    }
+
+    /**
+     * The one place that decides whether a message may be sent, whichever way
+     * it arrived (REST or WebSocket): the sender must belong to the chat, a
+     * private chat needs someone else in it, and a reply must point at a
+     * message from the same chat.
+     */
+    private void authorizeSend(ChatMessage chatMessage) {
+        String chatId = chatMessage.getChatId();
+        String senderId = chatMessage.getSenderId();
+
+        if (chatId == null || chatId.isBlank()) {
+            throw new IllegalArgumentException("chatId is required");
+        }
+        if (senderId == null || !chatService.canAccessChat(chatId, senderId)) {
+            throw HttpStatusException.forbidden("You are not a member of this chat");
+        }
+
+        Chat chat = chatRepository.findById(chatId)
+                .orElseThrow(() -> HttpStatusException.notFound("CHAT_NOT_FOUND", "Chat not found"));
+        if (chat.getChatType() == ChatType.PRIVATE
+                && chat.getParticipantIds().stream().noneMatch(id -> !id.equals(senderId))) {
+            throw new IllegalArgumentException("You cannot send messages to yourself");
+        }
+
+        String replyTo = chatMessage.getReplyToMessageId();
+        if (replyTo != null && !replyTo.isBlank()) {
+            Message original = messageRepository.findById(replyTo)
+                    .orElseThrow(() -> new IllegalArgumentException("The message you are replying to no longer exists"));
+            if (!chatId.equals(original.getChatId())) {
+                throw HttpStatusException.forbidden("You can only reply to messages in the same chat");
+            }
         }
     }
 
@@ -103,6 +140,7 @@ public class MessageService {
             message.setMimeType(attachment.getMimeType());
         }
         message.setStatus(MessageStatus.SENT);
+        message.getReadBy().add(chatMessage.getSenderId());   // never unread for the sender
         message.setCreatedAt(LocalDateTime.now());
         message.setActive(true);
         message.setReplyToMessageId(chatMessage.getReplyToMessageId());
@@ -277,14 +315,20 @@ public class MessageService {
                 Message message = messageRepository.findById(messageId)
                     .orElseThrow(() -> new MessageNotFoundException("Message not found: " + messageId));
 
-                if (!message.getReadBy().contains(userId)) {
-                    message.getReadBy().add(userId);
-                    if (message.getStatus() != MessageStatus.READ) {
-                        message.setStatus(MessageStatus.READ);
-                    }
-                    messageRepository.save(message);
-                    log.debug("Message {} marked as read by {}", messageId, userId);
+                // Only people in the chat can read its messages, and nobody "reads" their own.
+                if (!chatService.canAccessChat(message.getChatId(), userId)) {
+                    throw HttpStatusException.forbidden("You are not a member of this chat");
                 }
+                if (userId.equals(message.getSenderId()) || message.getReadBy().contains(userId)) {
+                    return;
+                }
+
+                message.getReadBy().add(userId);
+                if (message.getStatus() != MessageStatus.READ) {
+                    message.setStatus(MessageStatus.READ);
+                }
+                messageRepository.save(message);
+                log.debug("Message {} marked as read by {}", messageId, userId);
 
                 // Notify sender of read receipt
                 redisMessagePublisher.convertAndSendToUser(
@@ -317,6 +361,27 @@ public class MessageService {
     }
 
     /**
+     * Marks everything the user has not read in a chat as read (up to 500 at a
+     * time) and tells the senders. Returns how many messages were marked.
+     */
+    public int markChatAsRead(String chatId, String userId) {
+        if (!chatService.canAccessChat(chatId, userId)) {
+            throw HttpStatusException.forbidden("You are not a member of this chat");
+        }
+        List<Message> unread = messageRepository.findUnreadFor(chatId, userId, PageRequest.of(0, 500));
+        int marked = 0;
+        for (Message message : unread) {
+            try {
+                markMessageAsRead(message.getId(), userId);
+                marked++;
+            } catch (RuntimeException e) {
+                log.warn("Could not mark message {} as read for {}: {}", message.getId(), userId, e.getMessage());
+            }
+        }
+        return marked;
+    }
+
+    /**
      * Delete message for everyone
      */
     @Transactional
@@ -325,7 +390,7 @@ public class MessageService {
             .orElseThrow(() -> new MessageNotFoundException("Message not found: " + messageId));
 
         if (!message.getSenderId().equals(userId)) {
-            throw new RuntimeException("Only sender can delete message for everyone");
+            throw HttpStatusException.forbidden("Only the sender can delete a message for everyone");
         }
 
         message.setDeletedForEveryone(true);
@@ -357,6 +422,10 @@ public class MessageService {
     public void deleteMessageForMe(String messageId, String userId) {
         Message message = messageRepository.findById(messageId)
             .orElseThrow(() -> new MessageNotFoundException("Message not found: " + messageId));
+
+        if (!chatService.canAccessChat(message.getChatId(), userId)) {
+            throw HttpStatusException.forbidden("You are not a member of this chat");
+        }
 
         if (!message.getDeletedForUsers().contains(userId)) {
             message.getDeletedForUsers().add(userId);
