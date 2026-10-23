@@ -301,8 +301,16 @@ Connect with a STOMP client to `ws://<host>:8081/ws-messenger`, sending `Authori
 `test-client/index.html` is a single-file chat client styled like WhatsApp Web, with light and dark themes. It talks to the real service over REST and raw STOMP, so it exercises everything described above.
 
 1. Start auth-service (`8080`) and this service (`8081`).
-2. Open `test-client/index.html` in a browser (or serve the folder with any static server) and sign in with an auth-service account. The service addresses can be changed under "Connection and token", and a token can be pasted instead of a password.
-3. Open a second tab or a private window and sign in as another user to chat with yourself from both sides.
+2. Serve the client (recommended). Localhost is a secure origin, so microphone access for voice notes works and CORS behaves like a real front end:
+
+   ```bash
+   cd test-client
+   python3 -m http.server 5500
+   ```
+
+   Then open `http://localhost:5500`. You can also open `test-client/index.html` straight from disk, but the browser may block auth-service sign-in on a `file://` page. If it does, serve it as above or paste a token on the login screen.
+3. Sign in with an auth-service account. The service addresses can be changed under "Connection and token", and a token can be pasted instead of a password.
+4. Open a second tab in a private window and sign in as another user to chat with yourself from both sides. A private window keeps its own session, so the two users do not log each other out.
 
 What it covers: private chats, replies, emoji, photos, videos, audio, documents and voice notes (upload progress, captions, drag and drop, paste), live delivery and read ticks, typing and online status, unread counters, in-chat search, delete for me and for everyone, automatic reconnect with a polling fallback, and a mobile layout.
 
