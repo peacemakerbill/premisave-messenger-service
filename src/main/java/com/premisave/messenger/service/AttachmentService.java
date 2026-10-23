@@ -49,6 +49,9 @@ public class AttachmentService {
     private final AttachmentUrlSigner urlSigner;
     private final StorageProperties props;
 
+    /** Folder and chat id used for the files behind statuses. They belong to no chat. */
+    public static final String STATUS_FOLDER = "status";
+
     public record Content(Attachment attachment, Path path) {
     }
 
@@ -101,6 +104,52 @@ public class AttachmentService {
         log.info("Attachment {} uploaded by {} to chat {} ({} bytes, {})",
                 a.getId(), userId, chatId, a.getSize(), a.getMimeType());
         return toResponse(a);
+    }
+
+    /**
+     * Stores the file behind a status. Unlike a chat upload it is attached at once,
+     * because the status is created in the same request, and it belongs to no chat.
+     * Downloads work through the signed link in the status response.
+     */
+    public Attachment storeForStatus(MultipartFile file, String userId) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("A non-empty file is required");
+        }
+        long max = props.getMaxFileSize().toBytes();
+        if (file.getSize() > max) {
+            throw HttpStatusException.tooLarge("File is larger than " + props.getMaxFileSize().toMegabytes() + " MB");
+        }
+
+        String fileName = sanitizeFileName(file.getOriginalFilename());
+        StoredFile stored;
+        try (InputStream in = file.getInputStream()) {
+            stored = fileStorage.store(in, STATUS_FOLDER, max);
+        } catch (IOException e) {
+            log.error("Could not read status upload stream: {}", e.getMessage());
+            throw new IllegalArgumentException("Could not read the uploaded file");
+        }
+
+        String mimeType = ContentTypes.detect(file.getContentType(), fileName, stored.head());
+
+        Attachment a = new Attachment();
+        a.setChatId(STATUS_FOLDER);
+        a.setUploaderId(userId);
+        a.setFileName(fileName);
+        a.setMimeType(mimeType);
+        a.setSize(stored.size());
+        a.setSha256(stored.sha256());
+        a.setCategory(ContentTypes.categorize(mimeType));
+        a.setStoragePath(stored.relativePath());
+        a.setStatus(AttachmentStatus.ATTACHED);
+        a.setCreatedAt(LocalDateTime.now());
+        a.setAttachedAt(a.getCreatedAt());
+
+        try {
+            return attachmentRepository.save(a);
+        } catch (RuntimeException e) {
+            fileStorage.deleteQuietly(stored.relativePath());
+            throw e;
+        }
     }
 
     /**

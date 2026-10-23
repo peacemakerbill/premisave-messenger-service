@@ -106,6 +106,7 @@ It was built as a sibling service to `auth-service` (which owns user identity an
 | **Group chats** | Create, add/remove members (single or bulk), promote/demote admins, transfer ownership, group photo, leave group. |
 | **File attachments** | Send images, video, audio, documents and any other file type in a chat. Upload first (`POST /api/attachments`), then send a message carrying the `attachmentId`, over REST or WebSocket. Stored on local disk or a mounted network share, downloaded through expiring signed links with range support. |
 | **Public media** | Group photos and `/api/media/upload` files use the same storage and are served without a token from `/api/media/files/...`. |
+| **Statuses** | Post text, photo, video or audio statuses that your followers can watch until they disappear. You choose how long each stays, up to `STATUS_MAX_HOURS` (24 by default). Followers can view, like, react and comment; the owner sees views, likes, reactions and comments, and can delete. Disappeared statuses move to the owner's past statuses and stay, with everything people did on them, until the owner deletes them. |
 | **Structured downstream error handling** | A dependency being unavailable (e.g. `auth-service` down) returns a clean `503` naming which service failed, in a structured `details` field — not a raw stack trace. |
 | **Production observability** | Prometheus metrics, Kubernetes-style health/liveness/readiness/startup probes, structured logging. |
 | **Redis-backed caching** | Chat access, user profiles, and group data cached with tuned per-purpose TTLs. |
@@ -248,6 +249,11 @@ Message <id> delivery completed. Success: 1/1, Failures: 0
 | `STORAGE_PUBLIC_BASE_URL` | No | `http://localhost:8081` | Public address of this service, used in download and photo links. |
 | `STORAGE_MAX_FILE_SIZE` / `STORAGE_MAX_REQUEST_SIZE` | No | `50MB` / `60MB` | Largest single file, and the request limit (keep it a little higher). |
 | `MESSAGE_EDIT_WINDOW_HOURS` | No | `1` | How long after sending a person can edit their own message (`message.edit-window-hours` in `application.yml`). `0` turns editing off. Past the window the edit is refused with `EDIT_WINDOW_EXPIRED`. |
+| `STATUS_MAX_HOURS` | No | `24` | The longest a status can stay, in hours (`status.max-hours`). Nobody can choose more. A longer request is refused with 400. |
+| `STATUS_DEFAULT_HOURS` | No | `24` | How long a status stays when the person does not choose (`status.default-hours`). Never above `STATUS_MAX_HOURS`. |
+| `STATUS_TEXT_MAX_LENGTH` | No | `700` | Most characters in a text status or a caption. |
+| `STATUS_COMMENT_MAX_LENGTH` | No | `300` | Most characters in a comment on a status. |
+| `STATUS_PAST_VISIBLE_TO_FOLLOWERS` | No | `false` | When `true`, followers can also open a person's past statuses. The owner always can. |
 | `STORAGE_URL_TTL` / `STORAGE_UNCLAIMED_TTL` | No | `6h` / `24h` | Lifetime of a signed link, and how long an unsent upload is kept. |
 | `STORAGE_SIGNING_SECRET` | No | `JWT_SECRET` | Key used to sign download links. |
 | `STORAGE_NETWORK_*` | NETWORK mode | blank | `PROTOCOL`, `HOST`, `SHARE`, `MOUNT_PATH`, `DIRECTORY`, `REQUIRE_MOUNT`. With `REQUIRE_MOUNT=true` the service refuses to start or write unless the path is on a mounted network share. |
@@ -268,6 +274,21 @@ Message <id> delivery completed. Success: 1/1, Failures: 0
 | `PUT` | `/api/messages/{messageId}` | Edit your own message (`content`, optional `mentionedUserIds`) within the edit window; everyone in the chat gets the update live and the message shows `editedAt` |
 | `PUT` | `/api/messages/{messageId}/reaction` | React with an emoji (`emoji`). One reaction per person per message, so a new one replaces the old. Anyone in the chat can react, including to their own message. Returns `messageId`, `chatId`, `reactions` (emoji to user ids), `userId`, `emoji` |
 | `DELETE` | `/api/messages/{messageId}/reaction` | Remove your reaction |
+| `GET` | `/api/status/settings` | The longest a status can stay, the default, and the text and comment limits |
+| `POST` | `/api/status` | Post a status. JSON `{text, backgroundColor, durationHours}` for text, or multipart `file`, `caption`, `durationHours` for a photo, video or audio. `durationHours` is 1 up to `STATUS_MAX_HOURS` |
+| `GET` | `/api/status/feed` | New statuses: what the people you follow have posted and not yet expired, grouped by person, unseen first |
+| `GET` | `/api/status/mine` | Your statuses that are still showing, with `stats` (views, likes, reactions, comments) |
+| `GET` | `/api/status/mine/past` | Your past statuses (disappeared), newest first, paged with `page` and `size`, with their `stats` |
+| `GET` | `/api/status/user/{userId}` | Someone's statuses that are still showing. You must follow them |
+| `GET` | `/api/status/user/{userId}/past` | Someone's past statuses. Owner only, unless `STATUS_PAST_VISIBLE_TO_FOLLOWERS` is on |
+| `GET` | `/api/status/{statusId}` | One status with its owner |
+| `POST` | `/api/status/{statusId}/view` | Record that you opened a status. Counted once per person, never for the owner |
+| `PUT` / `DELETE` | `/api/status/{statusId}/like` | Like or unlike a status you follow the owner of. Not your own |
+| `PUT` / `DELETE` | `/api/status/{statusId}/reaction` | React with an emoji (`emoji`, one per person, a new one replaces the old) or remove it |
+| `GET` / `POST` | `/api/status/{statusId}/comments` | Read or add comments. Followers read them while the status is showing; afterwards only the owner |
+| `DELETE` | `/api/status/{statusId}/comments/{commentId}` | Delete a comment. The author or the status owner can |
+| `GET` | `/api/status/{statusId}/insights` | Owner only: who viewed, liked and reacted, the reaction totals and the comments. Works for past statuses |
+| `DELETE` | `/api/status/{statusId}` | Owner only: delete the status, its activity and its file, even after it has disappeared |
 | `GET` | `/api/messages/settings` | Message settings for clients, currently `editWindowHours` |
 | `DELETE` | `/api/messages/{messageId}` | Delete a message for everyone (sender only; also removes the stored file) |
 | `DELETE` | `/api/messages/{messageId}/me` | Delete a message for yourself only |
@@ -307,6 +328,7 @@ Connect with a STOMP client to `ws://<host>:8081/ws-messenger`, sending `Authori
 | Subscribe | `/user/queue/errors` | Send failures for the message you just tried to send (`code`, `message`, `chatId`) |
 | Subscribe | `/user/queue/groups` | Group changes that concern you: `ADDED`, `REMOVED` or `UPDATED`, with `groupId` and `chatId` |
 | Subscribe | `/user/queue/reactions` | Someone reacted to or removed a reaction from a message in one of your chats. Same payload as the reaction endpoints, with the full `reactions` map |
+| Subscribe | `/user/queue/status` | `NEW_STATUS` and `STATUS_DELETED` for the people who follow the owner, and `ACTIVITY` with the new totals for the owner when someone views, likes, reacts or comments |
 | Subscribe | `/topic/presence` | Online/offline broadcasts for any user |
 
 ## Testing with the browser chat client
@@ -332,6 +354,7 @@ Notes:
 - Read state: opening a chat marks its unread messages as read automatically (also when the tab becomes visible again and after a reconnect). Use the chat menu or a right click on a chat row for "Mark as unread" and "Mark as read". Your own messages never count as unread.
 - Editing: open the message menu on one of your own messages and choose Edit, change the text in the message box and press Enter (Escape cancels). The menu only offers Edit while the edit window is open, and the edited message shows "edited" for everyone. The window comes from `MESSAGE_EDIT_WINDOW_HOURS` (default 1 hour).
 - Reactions: hover a message and click the smiley beside it, or open the message menu, then pick one of the six quick emojis or the plus for the full list. Picking the emoji you already used removes it. Reactions show as chips under the message, tapping a chip reacts with that emoji too, and the count button lists who reacted. Messages in the history carry a `reactions` map, and changes arrive live on `/user/queue/reactions`. An emoji must be a single emoji of up to 16 characters, and a message holds at most 50 different ones. Deleted messages cannot be reacted to.
+- Status: the Status button on the left rail has three tabs. New lists what the people you follow have posted, with a ring around people you have not watched yet. My status lists yours with their views, likes, reactions and comments, and the Add status button posts a text, photo, video or audio status and lets you choose how long it stays (up to the server maximum). Past keeps the ones that disappeared, still with their numbers, and you can open or delete them. Opening a status plays it full screen: it advances on its own after 6 seconds, or when a video or audio ends, and you tap the sides or use the arrow keys to move. Followers can like, react with an emoji and comment; on your own statuses the bar at the bottom opens the list of who viewed, liked, reacted and commented. A profile also has a Statuses tab (Status record on your own).
 - Tagging: type `@` in the message box to pick someone from the chat (the other person in a private chat, the members in a group). The tag is stored as `mentionedUserIds`, shown highlighted in the message, and a chat row shows `@` when you were tagged in an unread message. The server keeps only people who are in the chat.
 - Search: the box above the chat list matches chat names and emails, and lists matching people below your chats with their email and a profile button. You never appear in people lists.
 - Profiles: click a contact's name or avatar (or a group member) to see their profile, followers, following, likes and reviews, then follow, like, or review them, or start a chat. Your own profile, with who follows you and who viewed it, is under the person icon on the left rail. Reviews show the reviewer's picture, name and email, and clicking one opens their profile. The auth-service returns `reviewerName`, `reviewerEmail` and `reviewerProfilePicture` with every review (`GET /api/social/reviews/{id}`, `my-reviews`, `my-written-reviews`), and the messenger passes them through and adds a `reviewer` object built from them. It looks the profile up by `userId` only when a review arrives without those fields. When the reviewer's account was deleted all three are null, `reviewer` is null and the client shows "Unknown user". `updatedAt` differs from `createdAt` when a review was edited, and the client marks those reviews as edited. Names are shown as first and last name wherever the profile has them, falling back to the display name and then the username. Profile editing is not part of the client.
@@ -346,6 +369,9 @@ Notes:
 | `Message` | `messages` | `chatId`, `senderId`, `content`, `deliveryState`, `receipts`, `readBy`, `@Version` for optimistic locking |
 | `Group` | `groups` | `name`, `adminId`, `memberIds`, `groupPhotoUrl` |
 | `UserPresence` | `user_presence` | `userId`, `isOnline`, `lastSeen` |
+| `Status` | `statuses` | `ownerId`, `type`, `text`, `attachmentId`, `durationHours`, `expiresAt`, view, like, reaction and comment totals. Never removed when it expires, only when the owner deletes it |
+| `StatusActivity` | `status_activity` | `statusId`, `userId`, `kind` (VIEW, LIKE, REACTION), `emoji`. Unique per person and kind |
+| `StatusComment` | `status_comments` | `statusId`, `authorId`, `content` |
 
 ## Scaling and production readiness
 

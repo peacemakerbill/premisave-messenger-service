@@ -446,6 +446,101 @@ button.p-stat:hover { background: var(--row-hover); }
 .react-grid button { padding: 4px 0; justify-content: center; font-size: 22px; border-radius: 8px; }
 .pop > .react-row { border-bottom: 1px solid var(--line); margin-bottom: 4px; padding: 2px 10px 6px; }
 .big-em { font-size: 22px; margin-left: auto; }
+
+/* status */
+body.sv-open .scrim { z-index: 80; }
+body.sv-open .toasts, body.sv-open .toast { z-index: 90; }
+.status-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.status-pane .tabs { padding: 0 12px; }
+.status-pane .tab .badge { margin-left: 6px; position: static; display: inline-grid; }
+.status-body { flex: 1; min-height: 0; overflow-y: auto; }
+.srow { display: flex; align-items: center; gap: 14px; width: 100%; padding: 10px 18px; text-align: left; }
+.srow:hover { background: var(--row-hover); }
+.srow .body { min-width: 0; flex: 1; }
+.srow .n { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.srow .e { font-size: 13px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ring { padding: 3px; border-radius: 50%; border: 2.5px solid var(--line); flex: none; }
+.ring.new { border-color: var(--accent); }
+.ring .av { width: 44px; height: 44px; }
+.sthumb { width: 52px; height: 52px; border-radius: 12px; flex: none; background: var(--panel-2) center / cover; display: grid; place-items: center; color: var(--text-2); overflow: hidden; font-size: 10px; line-height: 1.15; padding: 4px; text-align: center; word-break: break-word; }
+.sthumb.txt { color: #fff; font-weight: 600; }
+.sthumb.icon { background: #2b3a42; color: #fff; } .sthumb.icon.audio { background: #7048e8; }
+.sthumb.add { background: var(--accent); color: #fff; border-radius: 50%; } .sthumb.add .ico { width: 26px; height: 26px; }
+.sthumb .ico { width: 24px; height: 24px; }
+.counts { display: flex; gap: 12px; margin-top: 3px; color: var(--text-2); font-size: 12.5px; }
+.counts .cc { display: inline-flex; align-items: center; gap: 3px; }
+.counts .ico { width: 14px; height: 14px; }
+.note-pad { padding: 14px 20px; color: var(--text-2); font-size: 13.5px; }
+.more-btn { display: block; margin: 8px auto 16px; padding: 8px 18px; border-radius: 18px; color: var(--accent-strong); font-weight: 600; }
+.more-btn:hover { background: var(--row-hover); }
+.sc-modes { margin: -6px -4px 12px; }
+.sc-stage { display: grid; gap: 10px; }
+.sc-text { width: 100%; min-height: 200px; border-radius: 12px; padding: 24px; color: #fff; font-size: 24px; font-weight: 500; text-align: center; resize: none; border: 0; outline: none; }
+.sc-text::placeholder { color: rgba(255,255,255,.7); }
+.swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+.sw { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; }
+.sw.on { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--text); }
+.sc-pick { display: grid; place-items: center; gap: 8px; min-height: 160px; border: 2px dashed var(--line); border-radius: 12px; color: var(--text-2); }
+.sc-pick .ico { width: 34px; height: 34px; }
+.sc-pick:hover { border-color: var(--accent); color: var(--accent-strong); }
+.sc-prev { display: grid; gap: 8px; justify-items: center; }
+.sc-prev img, .sc-prev video { max-width: 100%; max-height: 300px; border-radius: 12px; }
+.sc-prev audio { width: 100%; }
+.link { color: var(--accent-strong); font-size: 13px; }
+body.sv-open { overflow: hidden; }
+.sv { position: fixed; inset: 0; z-index: 70; background: rgba(8,12,14,.96); display: grid; place-items: center; }
+.sv-stage { position: relative; width: min(440px, 100vw); height: min(100vh, 860px); background: #101517; overflow: hidden; display: flex; flex-direction: column; border-radius: 14px; }
+@media (max-width: 520px) { .sv-stage { border-radius: 0; height: 100dvh; } }
+.sv-bars { position: absolute; top: 8px; left: 10px; right: 10px; display: flex; gap: 4px; z-index: 5; }
+.sv-bar { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,.3); overflow: hidden; }
+.sv-bar i { display: block; height: 100%; background: #fff; }
+.sv-top { position: absolute; top: 16px; left: 0; right: 0; display: flex; align-items: center; gap: 4px; padding: 0 10px; z-index: 6; color: #fff; background: linear-gradient(rgba(0,0,0,.55), transparent); padding-bottom: 18px; padding-top: 4px; }
+.sv-top .grow { flex: 1; }
+.sv-who { display: flex; align-items: center; gap: 10px; color: #fff; text-align: left; }
+.sv-who b { display: block; font-size: 15px; } .sv-who span { font-size: 12.5px; opacity: .8; }
+.sv-btn { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: #fff; flex: none; }
+.sv-btn:hover { background: rgba(255,255,255,.14); }
+.sv-btn.on { color: #ff5a79; } .sv-btn.sm { width: 32px; height: 32px; }
+.sv-btn .ico { width: 22px; height: 22px; }
+.sv-emoji { font-size: 22px; line-height: 1; }
+.sv-media { position: absolute; inset: 0; display: grid; place-items: center; background: #000; }
+.sv-img, .sv-vid { width: 100%; height: 100%; object-fit: contain; }
+.sv-text { width: 100%; height: 100%; display: grid; place-items: center; padding: 36px 28px; }
+.sv-text p { margin: 0; color: #fff; font-weight: 600; text-align: center; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.25; }
+.sv-audio { display: grid; gap: 18px; justify-items: center; width: 100%; padding: 0 28px; color: #fff; }
+.sv-audio .disc { width: 150px; height: 150px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, #7048e8, #d6336c); }
+.sv-audio .disc .ico { width: 64px; height: 64px; }
+.sv-audio .fn { font-size: 14px; opacity: .85; text-align: center; overflow-wrap: anywhere; }
+.sv-audio audio { width: 100%; }
+.sv-cap { position: absolute; left: 0; right: 0; bottom: 84px; padding: 10px 18px; color: #fff; text-align: center; font-size: 15px; background: linear-gradient(transparent, rgba(0,0,0,.6)); white-space: pre-wrap; z-index: 3; }
+.sv-zone { position: absolute; top: 70px; bottom: 150px; width: 34%; z-index: 4; }
+.sv-zone.prev { left: 0; } .sv-zone.next { right: 0; width: 66%; }
+.sv-foot { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; display: flex; align-items: center; gap: 4px; padding: 26px 10px 12px; background: linear-gradient(transparent, rgba(0,0,0,.7)); }
+.sv-reply { flex: 1; min-width: 0; }
+.sv-input { width: 100%; height: 42px; border-radius: 21px; padding: 0 16px; background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.28); outline: none; font-size: 14.5px; }
+.sv-input::placeholder { color: rgba(255,255,255,.7); }
+.sv-input:focus { border-color: #fff; }
+.sv-statbar { display: flex; align-items: center; gap: 18px; width: 100%; height: 44px; padding: 0 14px; border-radius: 22px; background: rgba(255,255,255,.14); color: #fff; }
+.sv-stat { display: inline-flex; align-items: center; gap: 5px; font-size: 14px; }
+.sv-stat .ico { width: 18px; height: 18px; }
+.sv-more { margin-left: auto; font-size: 13px; opacity: .85; }
+.sv-react-pop { position: absolute; right: 10px; bottom: 66px; display: flex; gap: 2px; padding: 6px 8px; border-radius: 26px; background: var(--panel); box-shadow: var(--pop-shadow); }
+.sv-react-pop button { width: 38px; height: 38px; border-radius: 50%; font-size: 24px; }
+.sv-react-pop button:hover { background: var(--panel-2); } .sv-react-pop button.on { box-shadow: inset 0 0 0 2px var(--accent); }
+.sv-drawer { position: absolute; left: 0; right: 0; bottom: 0; height: 70%; z-index: 20; background: var(--panel); color: var(--text); border-radius: 16px 16px 0 0; display: flex; flex-direction: column; box-shadow: 0 -8px 30px rgba(0,0,0,.35); }
+.sv-dhead { display: flex; align-items: center; justify-content: space-between; padding: 8px 8px 8px 18px; border-bottom: 1px solid var(--line); }
+.sv-dhead .sv-btn, .sv-drawer .sv-btn { color: var(--text-2); }
+.sv-dhead .sv-btn:hover, .sv-drawer .sv-btn:hover { background: var(--row-hover); }
+.sv-dbody { flex: 1; min-height: 0; overflow-y: auto; }
+.sv-dfoot { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--line); }
+.sv-dfoot .sv-input { background: var(--panel-2); color: var(--text); border-color: var(--line); }
+.sv-dfoot .sv-input::placeholder { color: var(--text-2); }
+.sv-clist, .sv-plist { padding: 4px 0; }
+.sv-c { display: flex; gap: 10px; padding: 8px 14px; align-items: flex-start; }
+.sv-c .cb { flex: 1; min-width: 0; } .sv-c .cb b { font-size: 14px; } .sv-c .cb p { margin: 1px 0; overflow-wrap: anywhere; white-space: pre-wrap; } .sv-c .cb span { font-size: 12px; color: var(--text-2); }
+.sv-cwho { flex: none; }
+.sv-break { display: flex; gap: 14px; flex-wrap: wrap; padding: 10px 18px; font-size: 16px; }
+.sv-ins .tabs { padding: 0 10px; position: sticky; top: 0; background: var(--panel); z-index: 1; }
 </style>
 </head>
 <body>
@@ -826,11 +921,14 @@ function renderShell() {
   R.rows = h('div', { class: 'rows scroll', role: 'list' });
   R.meBox = h('button', { class: 'rail-btn', type: 'button', title: 'Settings', 'aria-label': 'Settings', onclick: openSettings });
   R.railBadge = h('span', { class: 'badge hidden' });
-  R.chatsBtn = h('button', { class: 'rail-btn active', type: 'button', title: 'Chats', 'aria-label': 'Chats' }, ico('chat'), R.railBadge);
+  R.chatsBtn = h('button', { class: 'rail-btn active', type: 'button', title: 'Chats', 'aria-label': 'Chats', onclick: () => showSection('chats') }, ico('chat'), R.railBadge);
+  R.statusBadge = h('span', { class: 'badge hidden' });
+  R.statusBtn = h('button', { class: 'rail-btn', type: 'button', title: 'Status', 'aria-label': 'Status', onclick: () => showSection('status') }, ico('status'), R.statusBadge);
 
   const rail = h('nav', { class: 'rail' },
     h('div', { class: 'brand' }, ico('chat')),
     R.chatsBtn,
+    R.statusBtn,
     btn('rail-btn', 'New chat', 'newchat', openNewChat),
     h('div', { class: 'grow' }),
     themeButton('rail-btn'),
@@ -838,15 +936,19 @@ function renderShell() {
     btn('rail-btn', 'Settings', 'sliders', openSettings),
     btn('rail-btn', 'Sign out', 'logout', () => signOut()));
 
+  R.listTitle = h('h1', null, 'Chats');
+  R.searchBox = h('div', { class: 'search' }, ico('search'), R.search);
+  R.statusPane = h('div', { class: 'status-pane hidden' });
   const list = h('section', { class: 'list' },
     h('div', { class: 'list-head' },
-      h('h1', null, 'Chats'),
+      R.listTitle,
       h('div', { style: 'display:flex;gap:2px' },
         themeButton('icon-btn only-narrow'),
+        btn('icon-btn only-narrow', 'Chats and status', 'status', () => showSection(S.section === 'status' ? 'chats' : 'status')),
         btn('icon-btn', 'New chat', 'newchat', openNewChat),
         btn('icon-btn only-narrow', 'Settings', 'sliders', openSettings))),
-    h('div', { class: 'search' }, ico('search'), R.search),
-    R.conn, R.rows);
+    R.searchBox,
+    R.conn, R.rows, R.statusPane);
 
   // chat panel
   R.head = h('header', { class: 'chat-head hidden' });
@@ -2287,8 +2389,8 @@ function renderProfile() {
   }
 
   const tabs = me
-    ? [['followers', 'Followers'], ['following', 'Following'], ['likedby', 'Liked by'], ['views', 'Profile views'], ['reviews', 'Reviews']]
-    : [['reviews', 'Reviews']];
+    ? [['followers', 'Followers'], ['following', 'Following'], ['likedby', 'Liked by'], ['views', 'Profile views'], ['reviews', 'Reviews'], ['statuses', 'Status record']]
+    : following ? [['reviews', 'Reviews'], ['statuses', 'Statuses']] : [['reviews', 'Reviews']];
   const tabBar = tabs.length > 1 ? h('div', { class: 'tabs', role: 'tablist' }, tabs.map(([k, label]) =>
     h('button', { class: 'tab' + (cur.tab === k ? ' active' : ''), type: 'button', role: 'tab', 'aria-selected': cur.tab === k ? 'true' : 'false', onclick: () => { cur.tab = k; renderProfile(); } }, label))) : null;
   const pane = h('div', { class: 'p-pane' });
@@ -2308,6 +2410,7 @@ async function paintTab(pane, cur, me, reviews, views, user, rerun) {
       pane.replaceChildren(...(rows.length ? rows.map(u => personRow(key ? Object.assign({}, u, { id: u[key] || u.id }) : u)) : [h('div', { class: 'empty' }, h('p', null, emptyText))]));
     } catch (e) { pane.replaceChildren(h('div', { class: 'empty' }, h('p', null, e.message))); }
   };
+  if (tab === 'statuses') return paintStatusesTab(pane, cur, me, user);
   if (tab === 'followers') return people('/api/social/my-followers', 'Nobody follows you yet.');
   if (tab === 'following') return people('/api/social/my-following', 'You are not following anyone yet.');
   if (tab === 'likedby') return people('/api/social/my-likers', 'Nobody has liked your profile yet.');
@@ -2696,6 +2799,583 @@ async function showReactors(m) {
     list.children[i] && list.children[i].replaceWith(row(who, r.emoji, r.id));
   }));
 }
+// ====================================================================
+// Statuses: panel, composer
+// ====================================================================
+Object.assign(ICONS, {
+  eye: '<path d="M1 12s4-7.5 11-7.5S23 12 23 12s-4 7.5-11 7.5S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>',
+  status: '<circle cx="12" cy="12" r="9.5" stroke-dasharray="4.2 2.6"/><circle cx="12" cy="12" r="4.2"/>',
+  comment: '<path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  text: '<path d="M4 7V4h16v3M9 20h6M12 4v16"/>'
+});
+
+S.section = 'chats';
+S.status = { tab: 'new', feed: [], mine: [], past: { items: [], page: 0, more: false, loading: false, loaded: false }, settings: null, timer: null, feedLoaded: false, mineLoaded: false };
+
+const STATUS_COLORS = ['#128c7e', '#3b5bdb', '#7048e8', '#d6336c', '#e8590c', '#2b8a3e', '#495057', '#0b7285'];
+
+function stampStatus(s) {
+  const left = typeof s.remainingSeconds === 'number' ? s.remainingSeconds : Math.max(0, (toDate(s.expiresAt) - Date.now()) / 1000);
+  s._expireAt = Date.now() + left * 1000;
+  return s;
+}
+const secondsLeft = s => s._expireAt ? Math.max(0, Math.round((s._expireAt - Date.now()) / 1000)) : 0;
+function leftText(sec) {
+  if (sec <= 0) return 'Disappeared';
+  const hrs = Math.floor(sec / 3600), min = Math.floor((sec % 3600) / 60);
+  if (hrs >= 1) return 'Disappears in ' + hrs + ' h' + (min ? ' ' + min + ' min' : '');
+  return 'Disappears in ' + Math.max(1, min) + ' min';
+}
+function relTime(v) {
+  const d = toDate(v); if (!d) return '';
+  const s = Math.max(0, (Date.now() - d) / 1000);
+  if (s < 45) return 'just now';
+  if (s < 3600) return Math.round(s / 60) + ' min ago';
+  if (s < 86400) return Math.floor(s / 3600) + ' h ago';
+  return d.toLocaleDateString([], { day: 'numeric', month: 'short' }) + ', ' + fmtTime(d);
+}
+const fullStamp = v => { const d = toDate(v); return d ? d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) + ', ' + fmtTime(d) : ''; };
+
+async function loadStatusSettings() {
+  if (S.status.settings) return S.status.settings;
+  try { S.status.settings = await api('/api/status/settings'); }
+  catch (e) { S.status.settings = { maxHours: 24, defaultHours: 24, textMaxLength: 700, commentMaxLength: 300, pastVisibleToFollowers: false }; }
+  return S.status.settings;
+}
+async function refreshStatusFeed() {
+  try {
+    const groups = (await api('/api/status/feed')) || [];
+    groups.forEach(g => (g.statuses || []).forEach(stampStatus));
+    S.status.feed = groups; S.status.feedLoaded = true; S.status.feedError = null;
+  } catch (e) { S.status.feedError = e.message; }
+  syncStatusBadge(); renderStatusPanel();
+}
+async function refreshMyStatuses() {
+  try {
+    S.status.mine = ((await api('/api/status/mine')) || []).map(stampStatus); S.status.mineError = null;
+  } catch (e) { S.status.mineError = e.message; }
+  S.status.mineLoaded = true;
+  renderStatusPanel();
+}
+async function loadPastStatuses(reset) {
+  const p = S.status.past;
+  if (p.loading) return;
+  if (reset) { p.items = []; p.page = 0; p.more = false; p.loaded = false; }
+  p.loading = true; renderStatusPanel();
+  try {
+    const r = await api('/api/status/mine/past?page=' + p.page + '&size=20');
+    p.items.push(...(r.items || []).map(stampStatus)); p.more = !!r.hasMore; p.page = (r.page || 0) + 1; p.loaded = true; p.error = null;
+  } catch (e) { p.error = e.message; p.loaded = true; }
+  p.loading = false; renderStatusPanel();
+}
+function unseenGroups() { return S.status.feed.filter(g => g.unseenCount > 0).length; }
+function syncStatusBadge() {
+  if (!R.statusBadge) return;
+  const n = unseenGroups();
+  R.statusBadge.textContent = n > 99 ? '99+' : n;
+  R.statusBadge.classList.toggle('hidden', !n);
+}
+
+// ---------- switching between Chats and Status ----------
+function showSection(name) {
+  S.section = name;
+  const st = name === 'status';
+  R.listTitle.textContent = st ? 'Status' : 'Chats';
+  R.searchBox.classList.toggle('hidden', st);
+  R.rows.classList.toggle('hidden', st);
+  R.statusPane.classList.toggle('hidden', !st);
+  R.chatsBtn.classList.toggle('active', !st);
+  R.statusBtn.classList.toggle('active', st);
+  if (!st) { renderList(); return; }
+  loadStatusSettings();
+  refreshStatusFeed(); refreshMyStatuses();
+  if (S.status.tab === 'past' && !S.status.past.loaded) loadPastStatuses(true);
+  if (!S.status.timer) S.status.timer = setInterval(tickStatuses, 30000);
+  renderStatusPanel();
+}
+// Statuses that ran out move from My status to Past without a reload.
+function tickStatuses() {
+  if (!S.me) return;
+  if (S.status.mine.some(s => secondsLeft(s) <= 0)) { refreshMyStatuses(); S.status.past.loaded = false; if (S.status.tab === 'past') loadPastStatuses(true); }
+  else if (S.section === 'status') renderStatusPanel();
+}
+
+// ---------- panel ----------
+function statusThumb(s) {
+  if (s.type === 'IMAGE' && s.mediaUrl) return h('div', { class: 'sthumb', style: 'background-image:url("' + String(s.mediaUrl).replace(/"/g, '%22') + '")' });
+  if (s.type === 'VIDEO') return h('div', { class: 'sthumb icon' }, ico('video'));
+  if (s.type === 'AUDIO') return h('div', { class: 'sthumb icon audio' }, ico('music'));
+  return h('div', { class: 'sthumb txt', style: 'background:' + (s.backgroundColor || STATUS_COLORS[0]) }, (s.text || '').slice(0, 24));
+}
+function statusTitle(s) {
+  if (s.type === 'TEXT') return s.text || 'Text';
+  const base = s.type === 'IMAGE' ? 'Photo' : s.type === 'VIDEO' ? 'Video' : 'Audio';
+  return s.caption ? base + ': ' + s.caption : base;
+}
+function countChips(s) {
+  const st = s.stats || {};
+  const chip = (icon, n, label) => h('span', { class: 'cc', title: n + ' ' + label }, ico(icon), String(n || 0));
+  return h('div', { class: 'counts' }, chip('eye', st.views, 'views'), chip('heartfill', st.likes, 'likes'), chip('smile', st.reactions, 'reactions'), chip('comment', st.comments, 'comments'));
+}
+function statusRow(s, onclick, sub) {
+  return h('button', { class: 'srow', type: 'button', onclick },
+    statusThumb(s),
+    h('div', { class: 'body' },
+      h('div', { class: 'n' }, statusTitle(s)),
+      h('div', { class: 'e' }, sub),
+      s.stats ? countChips(s) : null));
+}
+function groupRow(g, idx) {
+  const unseen = g.unseenCount > 0;
+  const first = Math.max(0, g.statuses.findIndex(s => !s.viewedByMe));
+  return h('button', { class: 'srow', type: 'button', onclick: () => openStatusViewer({ items: g.statuses, index: unseen ? first : 0, mode: 'feed', user: g.user, groups: S.status.feed.slice(), gi: idx }) },
+    h('div', { class: 'ring' + (unseen ? ' new' : '') }, avatar(userName(g.user), g.user.profilePictureUrl, g.user.id, '')),
+    h('div', { class: 'body' },
+      h('div', { class: 'n' }, userName(g.user)),
+      h('div', { class: 'e' }, (unseen ? g.unseenCount + ' new, ' : '') + relTime(g.latestAt))));
+}
+function emptyBlock(icon, title, text, action) {
+  return h('div', { class: 'empty' }, ico(icon), h('h3', null, title), h('p', null, text), action || null);
+}
+
+function renderStatusPanel() {
+  if (!R.statusPane || S.section !== 'status') return;
+  const st = S.status;
+  const tab = (key, label, badge) => h('button', { class: 'tab' + (st.tab === key ? ' active' : ''), type: 'button', role: 'tab', 'aria-selected': st.tab === key ? 'true' : 'false',
+    onclick: () => { st.tab = key; if (key === 'past' && !st.past.loaded) loadPastStatuses(true); renderStatusPanel(); } }, label, badge ? h('span', { class: 'badge' }, badge) : null);
+  const tabs = h('div', { class: 'tabs', role: 'tablist' }, tab('new', 'New', unseenGroups() || null), tab('mine', 'My status'), tab('past', 'Past'));
+
+  let body;
+  if (st.tab === 'new') {
+    if (st.feedError) body = [emptyBlock('alert', 'Could not load statuses', st.feedError)];
+    else if (!st.feedLoaded) body = [h('div', { class: 'empty' }, h('p', null, 'Loading'))];
+    else if (!st.feed.length) body = [emptyBlock('status', 'No new statuses', 'Statuses from people you follow show up here, for as long as they stay.')];
+    else body = st.feed.map((g, i) => groupRow(g, i));
+  } else if (st.tab === 'mine') {
+    const add = h('button', { class: 'srow', type: 'button', onclick: openStatusComposer },
+      h('div', { class: 'sthumb add' }, ico('plus')),
+      h('div', { class: 'body' }, h('div', { class: 'n' }, 'Add status'), h('div', { class: 'e' }, 'Text, photo, video or audio. You choose how long it stays.')));
+    const rows = st.mine.map((s, i) => statusRow(s, () => openStatusViewer({ items: st.mine, index: i, mode: 'mine', user: S.me }),
+      leftText(secondsLeft(s)) + ', posted ' + relTime(s.createdAt)));
+    body = [add, ...(st.mineError ? [emptyBlock('alert', 'Could not load your statuses', st.mineError)] : rows.length ? rows
+      : [h('div', { class: 'note-pad' }, 'You have no statuses showing. When one disappears it moves to Past, with everything people did on it.')])];
+  } else {
+    const p = st.past;
+    const rows = p.items.map((s, i) => statusRow(s, () => openStatusViewer({ items: p.items, index: i, mode: 'past', user: S.me }),
+      'Disappeared ' + fullStamp(s.expiresAt)));
+    if (p.error) body = [emptyBlock('alert', 'Could not load past statuses', p.error)];
+    else if (!p.loaded) body = [h('div', { class: 'empty' }, h('p', null, 'Loading'))];
+    else if (!rows.length) body = [emptyBlock('clock', 'No past statuses', 'Statuses you post are kept here after they disappear, with their views, likes, reactions and comments.')];
+    else body = [...rows, p.more ? h('button', { class: 'more-btn', type: 'button', disabled: p.loading ? true : null, onclick: () => loadPastStatuses(false) }, p.loading ? 'Loading' : 'Show older') : null];
+  }
+  R.statusPane.replaceChildren(tabs, h('div', { class: 'status-body scroll' }, ...body.filter(Boolean)));
+}
+
+// ---------- composer ----------
+function hourChoices(max, def) {
+  const set = new Set([1, 2, 3, 6, 12, 24, 48, 72, 168].filter(x => x <= max));
+  set.add(max); set.add(def); set.add(1);
+  return [...set].filter(x => x >= 1 && x <= max).sort((a, b) => a - b);
+}
+const hoursLabel = n => n === 1 ? '1 hour' : n + ' hours';
+
+function postStatusForm(fd, onProgress) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open('POST', S.cfg.api + '/api/status');
+    x.setRequestHeader('Authorization', 'Bearer ' + S.token);
+    x.upload.onprogress = e => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+    x.onload = () => {
+      let d = null; try { d = JSON.parse(x.responseText); } catch (e) { /* not json */ }
+      if (x.status >= 200 && x.status < 300) resolve(d); else reject(new ApiError(x.status, (d && d.message) || 'Could not post the status (' + x.status + ')', d));
+    };
+    x.onerror = () => reject(new ApiError(0, 'Could not reach the service'));
+    x.send(fd);
+  });
+}
+
+async function openStatusComposer() {
+  const cfg = await loadStatusSettings();
+  const choices = hourChoices(cfg.maxHours, cfg.defaultHours);
+  const c = { mode: 'text', color: STATUS_COLORS[0], file: null, hours: cfg.defaultHours, busy: false };
+  const stage = h('div', { class: 'sc-stage' });
+  const modes = h('div', { class: 'tabs sc-modes', role: 'tablist' });
+  const when = h('div', { class: 'note' });
+  const hoursSel = h('select', { class: 'fld', 'aria-label': 'How long the status stays', onchange: e => { c.hours = Number(e.target.value); paintWhen(); } },
+    choices.map(n => h('option', { value: n, selected: n === c.hours ? true : null }, hoursLabel(n))));
+  const fileIn = h('input', { type: 'file', class: 'hidden', onchange: e => { c.file = e.target.files[0] || null; paintStage(); } });
+  const post = h('button', { class: 'btn', type: 'button', onclick: submit }, ico('send'), 'Post status');
+  const cancel = h('button', { class: 'btn outline', type: 'button', onclick: closeModal }, 'Cancel');
+  let ta = null, cap = null;
+
+  function paintWhen() {
+    const at = new Date(Date.now() + c.hours * 3600e3);
+    when.textContent = 'It disappears ' + at.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }) + ' at ' + fmtTime(at) + ', then moves to Past. You can delete it any time.';
+  }
+  function setMode(m) { c.mode = m; c.file = null; fileIn.value = ''; paintModes(); paintStage(); }
+  function paintModes() {
+    modes.replaceChildren(...[['text', 'Text'], ['media', 'Photo or video'], ['audio', 'Audio']].map(([k, label]) =>
+      h('button', { class: 'tab' + (c.mode === k ? ' active' : ''), type: 'button', role: 'tab', 'aria-selected': c.mode === k ? 'true' : 'false', onclick: () => setMode(k) }, label)));
+  }
+  function paintStage() {
+    const keepText = ta ? ta.value : '', keepCap = cap ? cap.value : '';
+    if (c.mode === 'text') {
+      ta = h('textarea', { class: 'sc-text', maxlength: cfg.textMaxLength, placeholder: 'Type a status', 'aria-label': 'Status text', style: 'background:' + c.color });
+      ta.value = keepText;
+      const sw = h('div', { class: 'swatches', role: 'radiogroup', 'aria-label': 'Background colour' }, STATUS_COLORS.map(col =>
+        h('button', { type: 'button', class: 'sw' + (col === c.color ? ' on' : ''), style: 'background:' + col, role: 'radio', 'aria-checked': col === c.color ? 'true' : 'false', 'aria-label': col, onclick: () => { c.color = col; ta.style.background = col; paintStage(); } })));
+      stage.replaceChildren(ta, sw);
+      return;
+    }
+    const audio = c.mode === 'audio';
+    fileIn.accept = audio ? 'audio/*' : 'image/*,video/*';
+    cap = h('input', { class: 'fld', maxlength: cfg.textMaxLength, placeholder: 'Add a caption (optional)', 'aria-label': 'Caption' });
+    cap.value = keepCap;
+    let preview;
+    if (!c.file) preview = h('button', { class: 'sc-pick', type: 'button', onclick: () => fileIn.click() }, ico(audio ? 'music' : 'image'), audio ? 'Choose an audio file' : 'Choose a photo or video');
+    else {
+      const url = URL.createObjectURL(c.file);
+      const el = c.file.type.startsWith('video/') ? h('video', { src: url, controls: true, playsinline: true }) : c.file.type.startsWith('audio/') ? h('audio', { src: url, controls: true }) : h('img', { src: url, alt: 'Preview' });
+      preview = h('div', { class: 'sc-prev' }, el, h('button', { class: 'link', type: 'button', onclick: () => fileIn.click() }, 'Choose a different file'));
+    }
+    stage.replaceChildren(preview, cap);
+  }
+  async function submit() {
+    if (c.busy) return;
+    let fd = null, json = null;
+    if (c.mode === 'text') {
+      const text = ta.value.trim();
+      if (!text) { toast('Type something first', true); return; }
+      json = { text, backgroundColor: c.color, durationHours: c.hours };
+    } else {
+      if (!c.file) { toast('Choose a file first', true); return; }
+      if (c.mode === 'media' && !/^(image|video)\//.test(c.file.type)) { toast('Choose a photo or a video', true); return; }
+      if (c.mode === 'audio' && !c.file.type.startsWith('audio/')) { toast('Choose an audio file', true); return; }
+      fd = new FormData();
+      fd.append('file', c.file, c.file.name); fd.append('caption', cap.value.trim()); fd.append('durationHours', String(c.hours));
+    }
+    c.busy = true; post.disabled = true; cancel.disabled = true;
+    try {
+      if (fd) await postStatusForm(fd, f => { post.lastChild.textContent = 'Uploading ' + Math.round(f * 100) + '%'; });
+      else await api('/api/status', { method: 'POST', json });
+      closeModal(); toast('Status posted');
+      S.status.tab = 'mine';
+      if (S.section !== 'status') showSection('status'); else { await refreshMyStatuses(); }
+    } catch (e) { c.busy = false; post.disabled = false; cancel.disabled = false; post.lastChild.textContent = 'Post status'; toast(e.message, true); }
+  }
+  paintModes(); paintStage(); paintWhen();
+  openModal('New status', [modes, stage, fileIn,
+    h('label', { class: 'field-l' }, 'Stays for'), hoursSel, when], [cancel, post]);
+}
+// ====================================================================
+// Statuses: full-screen viewer, comments, owner insights
+// ====================================================================
+let SV = null;
+const IMAGE_MS = 6000;
+
+function closeStatusViewer() {
+  if (!SV) return;
+  const v = SV; SV = null;
+  cancelAnimationFrame(v.raf);
+  document.removeEventListener('keydown', v.key, true);
+  if (v.media && v.media.pause) v.media.pause();
+  v.el.remove();
+  document.body.classList.remove('sv-open');
+  if (v.mode === 'feed') refreshStatusFeed(); else renderStatusPanel();
+}
+
+function openStatusViewer(opts) {
+  closeStatusViewer();
+  const items = opts.items;
+  if (!items || !items.length) return;
+  const v = SV = { items, i: Math.min(Math.max(opts.index || 0, 0), items.length - 1), mode: opts.mode, user: opts.user, groups: opts.groups, gi: opts.gi,
+    held: false, typing: false, drawer: null, elapsed: 0, last: 0, raf: 0, media: null, timed: true, downAt: 0 };
+  const own = v.mode !== 'feed';
+  const cfg = S.status.settings || { commentMaxLength: 300 };
+
+  const bars = h('div', { class: 'sv-bars' });
+  const top = h('div', { class: 'sv-top' });
+  const media = h('div', { class: 'sv-media' });
+  const foot = h('div', { class: 'sv-foot' });
+  const stage = h('div', { class: 'sv-stage' }, bars, top, media,
+    h('button', { class: 'sv-zone prev', type: 'button', 'aria-label': 'Previous', onclick: () => tapZone(prev) }),
+    h('button', { class: 'sv-zone next', type: 'button', 'aria-label': 'Next', onclick: () => tapZone(next) }), foot);
+  v.el = h('div', { class: 'sv', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Status', onmousedown: e => { if (e.target === v.el) closeStatusViewer(); } }, stage);
+  document.body.append(v.el); document.body.classList.add('sv-open');
+
+  const cur = () => v.items[v.i];
+  const paused = () => v.held || v.typing || !!v.drawer || !!modal || document.hidden;
+  function syncPlayback() {
+    const m = v.media; if (!m || !m.play) return;
+    if (paused()) m.pause(); else m.play().catch(() => { m.muted = true; m.play().catch(() => {}); });
+  }
+  v.setHeld = on => { v.held = on; syncPlayback(); };
+  function tapZone(fn) { if (Date.now() - v.downAt < 280) fn(); }
+  stage.addEventListener('pointerdown', e => { if (e.target.closest('.sv-zone')) { v.downAt = Date.now(); v.setHeld(true); } });
+  const release = () => { if (v.held) v.setHeld(false); };
+  stage.addEventListener('pointerup', release); stage.addEventListener('pointerleave', release); stage.addEventListener('pointercancel', release);
+
+  function next() {
+    if (v.i < v.items.length - 1) { v.i++; show(); return; }
+    if (v.mode === 'feed' && v.groups) {
+      for (let k = v.gi + 1; k < v.groups.length; k++) {
+        const g = v.groups[k];
+        if (g.unseenCount > 0 || g.statuses.some(s => !s.viewedByMe)) { openStatusViewer({ items: g.statuses, index: Math.max(0, g.statuses.findIndex(s => !s.viewedByMe)), mode: 'feed', user: g.user, groups: v.groups, gi: k }); return; }
+      }
+    }
+    closeStatusViewer();
+  }
+  function prev() { if (v.elapsed > 1500 || v.i === 0) { v.elapsed = 0; if (v.media && v.media.currentTime) v.media.currentTime = 0; return; } v.i--; show(); }
+
+  function paintBars() {
+    bars.replaceChildren(...v.items.map((_, k) => h('div', { class: 'sv-bar' }, h('i', { style: 'width:' + (k < v.i ? 100 : 0) + '%' }))));
+  }
+  function paintTop() {
+    const s = cur();
+    const who = own ? S.me : v.user;
+    const sub = v.mode === 'feed' ? relTime(s.createdAt) : v.mode === 'mine' ? leftText(secondsLeft(s)) : 'Disappeared ' + fullStamp(s.expiresAt);
+    top.replaceChildren(...[
+      h('button', { class: 'sv-who', type: 'button', onclick: () => { if (who && who.id) openProfile(who.id); } },
+        avatar(userName(who), who && who.profilePictureUrl, who && who.id, 'sm'),
+        h('div', null, h('b', null, own ? 'You' : userName(who)), h('span', null, sub))),
+      h('div', { class: 'grow' }),
+      own ? btn('sv-btn', 'Delete status', 'trash', removeCurrent) : null,
+      btn('sv-btn', 'Close', 'x', closeStatusViewer)].filter(Boolean));
+  }
+
+  function paintMedia() {
+    const s = cur();
+    cancelMedia();
+    v.timed = s.type === 'TEXT' || s.type === 'IMAGE';
+    let el;
+    if (s.type === 'TEXT') {
+      const len = (s.text || '').length;
+      el = h('div', { class: 'sv-text', style: 'background:' + (s.backgroundColor || STATUS_COLORS[0]) }, h('p', { style: 'font-size:' + (len > 220 ? 20 : len > 90 ? 26 : 34) + 'px' }, s.text));
+    } else if (s.type === 'IMAGE') {
+      el = h('img', { class: 'sv-img', src: s.mediaUrl, alt: s.caption || 'Photo' });
+    } else if (s.type === 'VIDEO') {
+      el = h('video', { class: 'sv-vid', src: s.mediaUrl, playsinline: true, preload: 'auto' });
+      v.media = el;
+      el.addEventListener('ended', next);
+    } else {
+      const au = h('audio', { src: s.mediaUrl, preload: 'auto' });
+      v.media = au; au.addEventListener('ended', next);
+      el = h('div', { class: 'sv-audio' }, h('div', { class: 'disc' }, ico('music')), h('div', { class: 'fn' }, s.fileName || 'Audio'), au);
+    }
+    media.replaceChildren(...[el, s.caption && s.type !== 'TEXT' ? h('div', { class: 'sv-cap' }, s.caption) : null].filter(Boolean));
+    syncPlayback();
+  }
+  function cancelMedia() { if (v.media && v.media.pause) { v.media.pause(); v.media.removeAttribute('src'); v.media.load && v.media.load(); } v.media = null; }
+
+  function paintFoot() {
+    const s = cur();
+    if (own) {
+      const st = s.stats || {};
+      const stat = (icon, n, label) => h('span', { class: 'sv-stat', title: label }, ico(icon), String(n || 0));
+      foot.replaceChildren(h('button', { class: 'sv-statbar', type: 'button', onclick: () => openInsights(0), 'aria-label': 'See who engaged with this status' },
+        stat('eye', st.views, 'Views'), stat('heartfill', st.likes, 'Likes'), stat('smile', st.reactions, 'Reactions'), stat('comment', st.comments, 'Comments'), h('span', { class: 'sv-more' }, 'Details')));
+      return;
+    }
+    const input = h('input', { class: 'sv-input', maxlength: cfg.commentMaxLength, placeholder: 'Write a comment', 'aria-label': 'Write a comment',
+      onfocus: () => { v.typing = true; syncPlayback(); }, onblur: () => { v.typing = false; syncPlayback(); } });
+    const like = h('button', { class: 'sv-btn' + (s.likedByMe ? ' on' : ''), type: 'button', 'aria-label': s.likedByMe ? 'Unlike' : 'Like', 'aria-pressed': s.likedByMe ? 'true' : 'false', onclick: toggleLike }, ico(s.likedByMe ? 'heartfill' : 'heart'));
+    const react = h('button', { class: 'sv-btn' + (s.myReaction ? ' on' : ''), type: 'button', 'aria-label': 'React', onclick: e => { e.stopPropagation(); toggleReactPop(foot); } }, s.myReaction ? h('span', { class: 'sv-emoji' }, s.myReaction) : ico('smile'));
+    const form = h('form', { class: 'sv-reply', onsubmit: async e => {
+      e.preventDefault();
+      const text = input.value.trim(); if (!text) return;
+      input.disabled = true;
+      try { await api('/api/status/' + encodeURIComponent(s.id) + '/comments', { method: 'POST', json: { content: text } }); input.value = ''; toast('Comment sent'); }
+      catch (er) { toast(er.message, true); }
+      input.disabled = false; input.focus();
+    } }, input);
+    foot.replaceChildren(btn('sv-btn', 'See comments', 'comment', openComments), form, like, react);
+  }
+  function toggleReactPop(anchor) {
+    const old = v.el.querySelector('.sv-react-pop'); if (old) { old.remove(); return; }
+    const s = cur();
+    const pop = h('div', { class: 'sv-react-pop' }, QUICK_REACTIONS.map(e => h('button', { type: 'button', class: e === s.myReaction ? 'on' : '', 'aria-label': 'React ' + e, onclick: () => { pop.remove(); setStatusReaction(s, e); } }, e)));
+    anchor.append(pop);
+  }
+  async function setStatusReaction(s, emoji) {
+    const url = '/api/status/' + encodeURIComponent(s.id) + '/reaction';
+    try {
+      const r = emoji === s.myReaction ? await api(url, { method: 'DELETE' }) : await api(url, { method: 'PUT', json: { emoji } });
+      s.myReaction = r.myReaction || null;
+      if (SV === v && cur() === s) paintFoot();
+    } catch (e) { toast(e.message, true); }
+  }
+  async function toggleLike() {
+    const s = cur(), url = '/api/status/' + encodeURIComponent(s.id) + '/like';
+    try {
+      const r = await api(url, { method: s.likedByMe ? 'DELETE' : 'PUT' });
+      s.likedByMe = !!r.likedByMe;
+      if (SV === v && cur() === s) paintFoot();
+    } catch (e) { toast(e.message, true); }
+  }
+
+  async function removeCurrent() {
+    const s = cur();
+    v.setHeld(true);
+    if (!confirm('Delete this status? ' + (s.stats && (s.stats.comments || s.stats.views) ? 'Its views, likes, reactions and comments are deleted with it.' : 'This cannot be undone.'))) { v.setHeld(false); return; }
+    try {
+      await api('/api/status/' + encodeURIComponent(s.id), { method: 'DELETE' });
+      toast('Status deleted');
+      const drop = list => { const k = list.indexOf(s); if (k >= 0) list.splice(k, 1); };
+      drop(S.status.mine); drop(S.status.past.items);
+      if (v.items !== S.status.mine && v.items !== S.status.past.items) drop(v.items);
+      v.held = false;
+      if (!v.items.length) { closeStatusViewer(); return; }
+      v.i = Math.min(v.i, v.items.length - 1); show();
+    } catch (e) { toast(e.message, true); v.setHeld(false); }
+  }
+
+  // ----- drawers -----
+  function openDrawer(title, bodyNode, footNode) {
+    closeDrawer();
+    v.drawer = h('div', { class: 'sv-drawer' },
+      h('div', { class: 'sv-dhead' }, h('b', null, title), btn('sv-btn', 'Close', 'x', closeDrawer)),
+      h('div', { class: 'sv-dbody scroll' }, bodyNode), footNode || null);
+    stage.append(v.drawer); syncPlayback();
+    return v.drawer;
+  }
+  function closeDrawer() { if (v.drawer) { v.drawer.remove(); v.drawer = null; syncPlayback(); } }
+  v.closeDrawer = closeDrawer;
+
+  function commentRow(c, s, onGone) {
+    return h('div', { class: 'sv-c' },
+      h('button', { class: 'sv-cwho', type: 'button', onclick: () => c.author && c.author.id && openProfile(c.author.id) }, avatar(userName(c.author), c.author && c.author.profilePictureUrl, c.author && c.author.id, 'sm')),
+      h('div', { class: 'cb' }, h('b', null, c.mine ? 'You' : userName(c.author)), h('p', null, c.content), h('span', null, relTime(c.createdAt))),
+      c.canDelete ? btn('sv-btn sm', 'Delete comment', 'trash', async () => {
+        try { await api('/api/status/' + encodeURIComponent(s.id) + '/comments/' + encodeURIComponent(c.id), { method: 'DELETE' }); onGone(c); } catch (e) { toast(e.message, true); }
+      }) : null);
+  }
+  async function openComments() {
+    const s = cur();
+    const list = h('div', { class: 'sv-clist' }, h('div', { class: 'empty' }, h('p', null, 'Loading')));
+    const input = h('input', { class: 'sv-input', maxlength: cfg.commentMaxLength, placeholder: 'Write a comment', 'aria-label': 'Write a comment' });
+    let rows = [];
+    const draw = () => list.replaceChildren(...(rows.length ? rows.map(c => commentRow(c, s, gone => { rows = rows.filter(x => x !== gone); draw(); })) : [h('div', { class: 'empty' }, h('p', null, 'No comments yet.'))]));
+    const form = h('form', { class: 'sv-dfoot', onsubmit: async e => {
+      e.preventDefault(); const text = input.value.trim(); if (!text) return;
+      try { const c = await api('/api/status/' + encodeURIComponent(s.id) + '/comments', { method: 'POST', json: { content: text } }); rows.push(c); input.value = ''; draw(); list.scrollTop = list.scrollHeight; }
+      catch (er) { toast(er.message, true); }
+    } }, input, btn('sv-btn', 'Send comment', 'send', null, { type: 'submit' }));
+    openDrawer('Comments', list, form);
+    try { rows = (await api('/api/status/' + encodeURIComponent(s.id) + '/comments')) || []; } catch (e) { list.replaceChildren(h('div', { class: 'empty' }, h('p', null, e.message))); return; }
+    draw();
+  }
+  async function openInsights(tabIndex) {
+    const s = cur();
+    const body = h('div', { class: 'sv-ins' }, h('div', { class: 'empty' }, h('p', null, 'Loading')));
+    openDrawer(v.mode === 'past' ? 'Activity on this status' : 'Who engaged', body);
+    let d;
+    try { d = await api('/api/status/' + encodeURIComponent(s.id) + '/insights'); } catch (e) { body.replaceChildren(h('div', { class: 'empty' }, h('p', null, e.message))); return; }
+    if (!SV || v.drawer == null) return;
+    let tab = tabIndex || 0;
+    const person = (p, extra) => {
+      const u = p.user || { id: '', displayName: 'Unknown user' };
+      return h('button', { class: 'person', type: 'button', onclick: () => u.id && openProfile(u.id) },
+        avatar(userName(u), u.profilePictureUrl, u.id, 'sm'),
+        h('div', null, h('div', { class: 'n' }, userName(u)), h('div', { class: 'e' }, relTime(p.at))),
+        extra ? h('span', { class: 'big-em' }, extra) : null);
+    };
+    const paint = () => {
+      const sets = [
+        ['Views', d.viewers.length, () => d.viewers.map(p => person(p)), 'Nobody has viewed this yet.'],
+        ['Likes', d.likers.length, () => d.likers.map(p => person(p)), 'No likes yet.'],
+        ['Reactions', d.reactors.length, () => [
+          h('div', { class: 'sv-break' }, Object.entries(d.reactionBreakdown || {}).map(([e, n]) => h('span', null, e + ' ' + n))),
+          ...d.reactors.map(p => person(p, p.emoji))], 'No reactions yet.'],
+        ['Comments', d.comments.length, () => d.comments.map(c => commentRow(c, s, gone => { d.comments = d.comments.filter(x => x !== gone); if (s.stats) s.stats.comments = Math.max(0, (s.stats.comments || 1) - 1); paint(); paintFoot(); })), 'No comments yet.']
+      ];
+      const [, n, rows, empty] = sets[tab];
+      body.replaceChildren(
+        h('div', { class: 'tabs', role: 'tablist' }, sets.map(([label, count], k) => h('button', { class: 'tab' + (tab === k ? ' active' : ''), type: 'button', role: 'tab', 'aria-selected': tab === k ? 'true' : 'false', onclick: () => { tab = k; paint(); } }, label + ' ' + count))),
+        h('div', { class: 'sv-plist' }, ...(n ? rows() : [h('div', { class: 'empty' }, h('p', null, empty))])));
+    };
+    paint();
+  }
+
+  // ----- showing one status -----
+  function show() {
+    const s = cur();
+    v.elapsed = 0; v.last = 0;
+    closeDrawer();
+    paintBars(); paintTop(); paintMedia(); paintFoot();
+    if (v.mode === 'feed' && !s.viewedByMe) {
+      s.viewedByMe = true;
+      const g = v.groups && v.groups[v.gi]; if (g) g.unseenCount = g.statuses.filter(x => !x.viewedByMe).length;
+      api('/api/status/' + encodeURIComponent(s.id) + '/view', { method: 'POST' }).catch(() => { /* a view that fails to record is not worth a message */ });
+    }
+  }
+  v.refreshStats = () => { if (SV === v && own) paintFoot(); };
+
+  function tick(ts) {
+    v.raf = requestAnimationFrame(tick);
+    const dt = v.last ? Math.min(ts - v.last, 100) : 0; v.last = ts;
+    const now = paused(); if (now !== v.wasPaused) { v.wasPaused = now; syncPlayback(); }
+    let pct = 0;
+    if (v.timed) { if (!paused()) v.elapsed += dt; pct = v.elapsed / IMAGE_MS; }
+    else if (v.media && v.media.duration && isFinite(v.media.duration)) { pct = v.media.currentTime / v.media.duration; v.elapsed = v.media.currentTime * 1000; }
+    const bar = bars.children[v.i] && bars.children[v.i].firstChild;
+    if (bar) bar.style.width = Math.min(100, pct * 100) + '%';
+    if (v.timed && pct >= 1) next();
+  }
+  v.key = e => {
+    if (!SV || SV !== v) return;
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target || {}).tagName);
+    if (e.key === 'Escape') { e.stopPropagation(); if (v.drawer) closeDrawer(); else closeStatusViewer(); }
+    else if (typing) return;
+    else if (e.key === 'ArrowRight') next();
+    else if (e.key === 'ArrowLeft') prev();
+    else if (e.key === ' ') { e.preventDefault(); v.held = !v.held; syncPlayback(); }
+  };
+  document.addEventListener('keydown', v.key, true);
+  show();
+  v.raf = requestAnimationFrame(tick);
+}
+
+// ====================================================================
+// Statuses: live events and the Statuses tab on a profile
+// ====================================================================
+function onStatusEvent(d) {
+  if (!d) return;
+  if (d.event === 'NEW_STATUS' || d.event === 'STATUS_DELETED') { refreshStatusFeed(); return; }
+  if (d.event === 'ACTIVITY') {
+    const s = [...S.status.mine, ...S.status.past.items].find(x => x.id === d.statusId);
+    if (!s) return;
+    s.stats = { views: d.views, likes: d.likes, reactions: d.reactions, comments: d.comments };
+    renderStatusPanel();
+    if (SV && SV.refreshStats) SV.refreshStats();
+  }
+}
+
+async function paintStatusesTab(pane, cur, me, user) {
+  const tab = cur.tab;
+  const alive = () => prof === cur && cur.tab === tab;
+  pane.replaceChildren(h('div', { class: 'empty' }, h('p', null, 'Loading')));
+  const cfg = await loadStatusSettings();
+  const sections = [];
+  try {
+    if (me) {
+      const r = await api('/api/status/mine/past?page=0&size=20');
+      const items = (r.items || []).map(stampStatus);
+      sections.push(['Past statuses', items, i => openStatusViewer({ items, index: i, mode: 'past', user: S.me }), s => 'Disappeared ' + fullStamp(s.expiresAt), 'No past statuses yet. Statuses you post are kept here after they disappear, with what people did on them.']);
+    } else {
+      const active = ((await api('/api/status/user/' + encodeURIComponent(user.id))) || []).map(stampStatus);
+      sections.push(['Showing now', active, i => openStatusViewer({ items: active, index: i, mode: 'feed', user }), s => leftText(secondsLeft(s)), 'No statuses showing right now.']);
+      if (cfg.pastVisibleToFollowers) {
+        const r = await api('/api/status/user/' + encodeURIComponent(user.id) + '/past?page=0&size=20');
+        const items = (r.items || []).map(stampStatus);
+        sections.push(['Past statuses', items, i => openStatusViewer({ items, index: i, mode: 'feed', user }), s => 'Disappeared ' + fullStamp(s.expiresAt), 'No past statuses.']);
+      }
+    }
+  } catch (e) { if (alive()) pane.replaceChildren(h('div', { class: 'empty' }, h('p', null, e.message))); return; }
+  if (!alive()) return;
+  pane.replaceChildren(...sections.flatMap(([title, items, open, sub, empty]) => [
+    h('div', { class: 'list-h' }, title),
+    ...(items.length ? items.map((s, i) => statusRow(s, () => open(i), sub(s))) : [h('div', { class: 'note-pad' }, empty)])]));
+}
 
 // ====================================================================
 // Boot and session
@@ -2714,6 +3394,8 @@ async function boot() {
     S.chats.forEach(c => { const id = otherId(c); if (id) { const p = presenceOf(c); S.presence[id] = { online: p.online, lastSeen: p.lastSeen }; } });
     renderList(); renderHeader();
     api('/api/messages/settings').then(s => { if (s && s.editWindowHours != null) S.editWindow = Number(s.editWindowHours); }).catch(() => {});
+    S.section = 'chats'; S.status.feed = []; S.status.mine = []; S.status.feedLoaded = false; S.status.past = { items: [], page: 0, more: false, loading: false, loaded: false };
+    refreshStatusFeed();
     connectWS();
     startPolling();
   } catch (e) {
@@ -2789,6 +3471,7 @@ function subscribeAll(client) {
   client.subscribe('/user/queue/typing', f => { const d = parse(f); if (d) onTyping(d); });
   client.subscribe('/user/queue/errors', f => { const d = parse(f); if (d) toast(d.message || 'Something went wrong', true); });
   client.subscribe('/user/queue/reactions', f => { const d = parse(f); if (d) onReaction(d); });
+  client.subscribe('/user/queue/status', f => { const d = parse(f); if (d) onStatusEvent(d); });
   client.subscribe('/user/queue/groups', f => { const d = parse(f); if (d) onGroupEvent(d); });
   client.subscribe('/topic/presence', f => { const d = parse(f); if (d) onPresence(d); });
 }

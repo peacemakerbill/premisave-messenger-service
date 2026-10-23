@@ -567,7 +567,6 @@ public class MessageService {
 
     // ===== REACTIONS =====
 
-    private static final int MAX_EMOJI_LENGTH = 16;
     private static final int MAX_DISTINCT_REACTIONS = 50;
 
     /**
@@ -577,7 +576,7 @@ public class MessageService {
      * /user/queue/reactions.
      */
     public ReactionResponse react(String messageId, String userId, String emoji) {
-        String clean = validEmoji(emoji);
+        String clean = com.premisave.messenger.util.Emojis.validate(emoji);
         return changeReaction(messageId, userId, clean);
     }
 
@@ -648,22 +647,6 @@ public class MessageService {
         Map<String, List<String>> reactions = message.getReactions() == null
                 ? new java.util.LinkedHashMap<>() : message.getReactions();
         return new ReactionResponse(message.getId(), message.getChatId(), reactions, userId, emoji);
-    }
-
-    /**
-     * An emoji is short, has no spaces and is not plain text. It is also used as a
-     * database key, so it cannot contain a dot or a dollar sign.
-     */
-    private String validEmoji(String emoji) {
-        String value = emoji == null ? "" : emoji.trim();
-        boolean ok = !value.isEmpty()
-                && value.length() <= MAX_EMOJI_LENGTH
-                && value.chars().noneMatch(c -> Character.isWhitespace(c) || c == '.' || c == '$')
-                && value.codePoints().anyMatch(cp -> cp >= 0x2000);
-        if (!ok) {
-            throw HttpStatusException.badRequest("Reaction must be a single emoji");
-        }
-        return value;
     }
 
     /** Tells everyone in the chat. Best effort: a failed push never fails the reaction. */

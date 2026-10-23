@@ -147,6 +147,17 @@ message:
   # 0 turns editing off. Set MESSAGE_EDIT_WINDOW_HOURS in .env to change it.
   edit-window-hours: ${MESSAGE_EDIT_WINDOW_HOURS:1}
 
+# Statuses: posts that followers can watch until they disappear. A person picks how
+# long theirs stays, from 1 hour up to max-hours. Disappeared statuses move to the
+# owner's past statuses and stay until the owner deletes them.
+status:
+  max-hours: ${STATUS_MAX_HOURS:24}
+  default-hours: ${STATUS_DEFAULT_HOURS:24}
+  text-max-length: ${STATUS_TEXT_MAX_LENGTH:700}
+  comment-max-length: ${STATUS_COMMENT_MAX_LENGTH:300}
+  # true lets followers open a person's past statuses too. The owner always can.
+  past-visible-to-followers: ${STATUS_PAST_VISIBLE_TO_FOLLOWERS:false}
+
 rate-limit:
   requests-per-minute: 60
   websocket-messages-per-minute: 100
