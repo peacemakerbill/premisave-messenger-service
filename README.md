@@ -64,7 +64,7 @@
 7. [Configuration reference](#configuration-reference)
 8. [API reference](#api-reference)
 9. [WebSocket destinations reference](#websocket-destinations-reference)
-10. [Testing real-time messaging](#testing-real-time-messaging)
+10. [Testing with the browser chat client](#testing-with-the-browser-chat-client)
 11. [Data model](#data-model)
 12. [Scaling and production readiness](#scaling-and-production-readiness)
 13. [Security notes](#security-notes)
