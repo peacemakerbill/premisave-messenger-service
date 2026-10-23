@@ -113,7 +113,7 @@ public class MessageController {
             log.warn("User {} tried to read unauthorized chat {}", userId, chatId);
             throw HttpStatusException.forbidden("You are not a member of this chat");
         }
-        return ResponseEntity.ok(messageService.getChatMessages(chatId, page, Math.min(size, 100), authHeader));
+        return ResponseEntity.ok(messageService.getChatMessages(chatId, userId, page, Math.min(size, 100), authHeader));
     }
 
     @PostMapping("/read/{messageId}")

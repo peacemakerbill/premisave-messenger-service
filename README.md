@@ -18,7 +18,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java 21" />
-  <img src="https://img.shields.io/badge/Spring_Boot-4.1.1-6DB33F?style=for-the-badge&logo=springboot&logoColor=white" alt="Spring Boot 4.1.1" />
+  <img src="https://img.shields.io/badge/Spring_Boot-4.1.2-6DB33F?style=for-the-badge&logo=springboot&logoColor=white" alt="Spring Boot 4.1.2" />
   <img src="https://img.shields.io/badge/Spring_Framework-7.0.9-6DB33F?style=for-the-badge&logo=spring&logoColor=white" alt="Spring Framework 7" />
   <img src="https://img.shields.io/badge/Spring_Cloud-2025.1.2-6DB33F?style=for-the-badge&logo=spring&logoColor=white" alt="Spring Cloud 2025.1.2 Oakwood" />
   <img src="https://img.shields.io/badge/MongoDB-Spring_Data-47A248?style=for-the-badge&logo=mongodb&logoColor=white" alt="MongoDB with Spring Data" />
@@ -258,8 +258,14 @@ Message <id> delivery completed. Success: 1/1, Failures: 0
 | `POST` | `/api/chats/private` | Create or fetch a private chat (`201` new / `200` existing) |
 | `GET` | `/api/chats` | List the caller's chats, enriched with full profile + presence data |
 | `DELETE` | `/api/chats/{chatId}` | Archive a chat |
-| `GET` | `/api/messages/{chatId}` | Paginated message history for a chat |
-| `DELETE` | `/api/messages/{messageId}` | Delete a message (for everyone or for self) |
+| `POST` | `/api/messages` | Send a message (JSON with `chatId`, `content`, optional `attachmentId` and `replyToMessageId`, or multipart with `file`) |
+| `POST` | `/api/messages/{messageId}/reply` | Reply to a message (JSON or multipart) |
+| `GET` | `/api/messages/chat/{chatId}` | Paginated message history (`page`, `size`, newest first); hides messages you deleted for yourself |
+| `POST` | `/api/messages/read/{messageId}` | Mark a message as read |
+| `DELETE` | `/api/messages/{messageId}` | Delete a message for everyone (sender only; also removes the stored file) |
+| `DELETE` | `/api/messages/{messageId}/me` | Delete a message for yourself only |
+| `GET` | `/api/users/me` | The caller's own profile, including the real user id |
+| `GET` | `/api/users`, `/api/users/search?query=`, `/api/users/{userId}` | List, search and look up users |
 | `POST` | `/api/groups` | Create a group |
 | `POST` / `DELETE` | `/api/groups/{groupId}/members` | Add / remove a single member |
 | `POST` / `DELETE` | `/api/groups/{groupId}/members/bulk` | Add / remove members in bulk |
@@ -280,18 +286,30 @@ Connect with a STOMP client to `ws://<host>:8081/ws-messenger`, sending `Authori
 
 | Direction | Destination | Purpose |
 |---|---|---|
-| Send | `/app/chat.sendMessage` | Send a message (`chatId`, `content`, `messageType`) |
+| Send | `/app/chat.sendMessage` | Send a message (`chatId`, `content`, `messageType`, optional `attachmentId`) |
 | Send | `/app/chat.typing` | Notify the recipient you're typing |
 | Send | `/app/chat.read` | Mark a message as read (`id`) |
 | Subscribe | `/user/queue/messages` | Incoming messages from others |
 | Subscribe | `/user/queue/delivery-status` | Live delivery confirmation for messages *you* sent |
 | Subscribe | `/user/queue/read-receipts` | Live "seen" notifications for messages *you* sent |
 | Subscribe | `/user/queue/typing` | Typing indicators from the other participant |
+| Subscribe | `/user/queue/errors` | Send failures for the message you just tried to send (`code`, `message`, `chatId`) |
 | Subscribe | `/topic/presence` | Online/offline broadcasts for any user |
 
-## Testing real-time messaging
+## Testing with the browser chat client
 
-Since most HTTP tools (including Postman, at the time of writing) don't offer a native STOMP frame builder for raw WebSocket connections, this repo includes `websocket-test.html` — a small, dependency-free page that runs a real STOMP client in your browser. Open it locally, paste in two users' tokens and a `chatId`, and you can connect, subscribe, send, and mark-as-read from both sides at once, watching messages, delivery status, read receipts, and presence changes all update live.
+`test-client/index.html` is a single-file chat client styled like WhatsApp Web, with light and dark themes. It talks to the real service over REST and raw STOMP, so it exercises everything described above.
+
+1. Start auth-service (`8080`) and this service (`8081`).
+2. Open `test-client/index.html` in a browser (or serve the folder with any static server) and sign in with an auth-service account. The service addresses can be changed under "Connection and token", and a token can be pasted instead of a password.
+3. Open a second tab or a private window and sign in as another user to chat with yourself from both sides.
+
+What it covers: private chats, replies, emoji, photos, videos, audio, documents and voice notes (upload progress, captions, drag and drop, paste), live delivery and read ticks, typing and online status, unread counters, in-chat search, delete for me and for everyone, automatic reconnect with a polling fallback, and a mobile layout.
+
+Notes:
+- Group chats can be opened and used, but groups are created through the API, not the client.
+- The client needs `GET /api/users/me`. If it is missing it falls back to the chat list to find your id.
+- Voice notes need microphone permission, which browsers only grant on `localhost` or HTTPS pages.
 
 ## Data model
 
@@ -338,7 +356,8 @@ premisave-messenger-service/
 │   ├── config/          # Security, Mongo, Redis, WebSocket, Cache, Async
 │   ├── client/           # Feign client for auth-service integration
 │   ├── controller/       # REST + WebSocket (@MessageMapping) controllers
-│   ├── service/          # Chat, Message, Group, Presence, Media, User services
+│   ├── service/          # Chat, Message, Group, Presence, Media, User, Attachment services
+│   ├── storage/          # FileStorage (local or mounted network share), StoredFile
 │   ├── realtime/         # Redis pub/sub relay (publisher, subscriber, envelope)
 │   ├── entity/            # MongoDB documents
 │   ├── dto/               # Request/response DTOs
@@ -348,7 +367,8 @@ premisave-messenger-service/
 │   └── PremisaveMessengerServiceApplication.java
 ├── src/main/resources/
 │   └── application.yml
-├── websocket-test.html   # Standalone browser-based STOMP test client
+├── test-client/
+│   └── index.html        # Browser chat client for manual testing (light and dark themes)
 └── pom.xml
 ```
 

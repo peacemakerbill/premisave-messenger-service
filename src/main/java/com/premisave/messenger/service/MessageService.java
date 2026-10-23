@@ -253,12 +253,13 @@ public class MessageService {
      * Get messages for a chat with pagination
      */
     @Transactional(readOnly = true)
-    public List<MessageResponse> getChatMessages(String chatId, int page, int size, String authToken) {
+    public List<MessageResponse> getChatMessages(String chatId, String userId, int page, int size, String authToken) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         List<Message> messages = messageRepository.findByChatIdOrderByCreatedAtDesc(chatId, pageable);
 
         return messages.stream()
             .filter(Message::isActive)
+            .filter(msg -> !msg.getDeletedForUsers().contains(userId))
             .map(msg -> convertToMessageResponse(msg, authToken))
             .toList();
     }

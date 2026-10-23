@@ -1,6 +1,7 @@
 package com.premisave.messenger.controller;
 
 import com.premisave.messenger.dto.response.UserSummaryResponse;
+import com.premisave.messenger.security.CurrentUserResolver;
 import com.premisave.messenger.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,13 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+    private final CurrentUserResolver currentUserResolver;
+
+    /** The caller's own profile, with the real user id (the JWT subject is an email). */
+    @GetMapping("/me")
+    public ResponseEntity<UserSummaryResponse> me(@RequestHeader("Authorization") String authHeader) {
+        return ResponseEntity.ok(currentUserResolver.resolve(authHeader));
+    }
 
     @GetMapping("/search")
     public ResponseEntity<List<UserSummaryResponse>> searchUsers(
