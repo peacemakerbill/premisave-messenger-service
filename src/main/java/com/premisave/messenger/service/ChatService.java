@@ -166,6 +166,16 @@ public class ChatService {
                     .ifPresent(msg -> {
                         MessageResponse lastMsg = new MessageResponse();
                         lastMsg.setId(msg.getId());
+                        lastMsg.setChatId(msg.getChatId());
+                        lastMsg.setStatus(msg.getStatus());
+                        // The client needs these to tell whether the last message is already read.
+                        lastMsg.setReadBy(msg.getReadBy());
+                        lastMsg.setMentionedUserIds(msg.getMentionedUserIds());
+                        lastMsg.setDeleted(msg.isDeletedForEveryone());
+                        lastMsg.setEditedAt(msg.getEditedAt());
+                        lastMsg.setFileName(msg.getFileName());
+                        lastMsg.setMimeType(msg.getMimeType());
+                        lastMsg.setAttachmentId(msg.getAttachmentId());
                         lastMsg.setContent(msg.isDeletedForEveryone() ? "This message was deleted" : msg.getContent());
                         lastMsg.setCreatedAt(msg.getCreatedAt());
                         lastMsg.setSenderId(msg.getSenderId());
