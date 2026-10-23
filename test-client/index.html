@@ -2364,17 +2364,55 @@ function openAddMembers(g) {
   openModal('Add members to ' + g.name, picker.nodes, [h('button', { class: 'btn ghost', type: 'button', onclick: () => back ? openGroupInfo(back) : closeModal() }, 'Back'), add], true);
 }
 
+function afterLeave(c) {
+  closeModal();
+  S.chats = S.chats.filter(x => x.id !== c.id);
+  if (S.active === c.id) closeChat(); else renderList();
+  toast('You left the group');
+  loadChats(true);
+}
+
 async function leaveGroup(c) {
   if (!c) return;
+  const url = '/api/groups/' + encodeURIComponent(c.groupId) + '/leave';
+  let g = null;
+  try { g = await api('/api/groups/' + encodeURIComponent(c.groupId)); } catch (e) { /* the server still decides below */ }
+  const meId = S.me && S.me.id;
+  const others = g ? (g.members || []).filter(u => u.id !== meId) : [];
+  if (g && g.adminId === meId && others.length) { chooseNewOwner(c, g, others, url); return; }
   if (!confirm('Leave "' + chatTitle(c) + '"? You will stop receiving its messages.')) return;
-  try {
-    await api('/api/groups/' + encodeURIComponent(c.groupId) + '/leave', { method: 'POST' });
-    closeModal();
-    S.chats = S.chats.filter(x => x.id !== c.id);
-    if (S.active === c.id) closeChat(); else renderList();
-    toast('You left the group');
-    loadChats(true);
-  } catch (e) { toast(e.message, true); }
+  try { await api(url, { method: 'POST' }); afterLeave(c); } catch (e) { toast(e.message, true); }
+}
+
+// The owner cannot leave a group that still has people in it without handing it to one of them.
+function chooseNewOwner(c, g, others, url) {
+  let picked = null;
+  const rank = u => (u.role === 'ADMIN' ? 0 : 1);
+  const sorted = others.slice().sort((a, b) => rank(a) - rank(b) || userName(a).localeCompare(userName(b)));
+  const go = h('button', { class: 'btn danger', type: 'button', disabled: true }, ico('logout'), 'Make owner and leave');
+  const rows = sorted.map(u => {
+    const row = h('button', { class: 'person', type: 'button', role: 'radio', 'aria-checked': 'false' },
+      avatar(userName(u), u.profilePictureUrl, u.id, 'sm'),
+      h('div', null, h('div', { class: 'n' }, userName(u)), h('div', { class: 'e' }, u.role === 'ADMIN' ? 'Admin' : (u.email || u.username || ''))),
+      h('span', { class: 'tick-box' }, ico('check')));
+    row.onclick = () => {
+      picked = u;
+      rows.forEach(r => { const on = r === row; r.classList.toggle('sel', on); r.setAttribute('aria-checked', on ? 'true' : 'false'); });
+      go.disabled = false;
+      go.lastChild.textContent = 'Make ' + userName(u) + ' owner and leave';
+    };
+    return row;
+  });
+  go.onclick = async () => {
+    if (!picked) return;
+    go.disabled = true;
+    try { await api(url + '?newOwnerId=' + encodeURIComponent(picked.id), { method: 'POST' }); afterLeave(c); }
+    catch (e) { go.disabled = false; toast(e.message, true); }
+  };
+  const back = h('button', { class: 'btn ghost', type: 'button', onclick: () => openGroupInfo(c) }, 'Back');
+  openModal('Choose a new owner', [
+    h('p', { class: 'hint' }, 'You own "' + chatTitle(c) + '". Pick who takes over before you leave. They become the owner and you are removed from the group.'),
+    h('div', { class: 'people', role: 'radiogroup', 'aria-label': 'New owner' }, rows)], [back, go], true);
 }
 
 // Pushed by the server when a group changes (added, removed, renamed, roles).
