@@ -42,6 +42,8 @@ import java.util.regex.Pattern;
 public class FileStorage {
 
     private static final Pattern SAFE_SEGMENT = Pattern.compile("^[A-Za-z0-9_-]{1,64}$");
+    private static final Pattern PUBLIC_FOLDER = Pattern.compile("^[a-z0-9-]{1,32}$");
+    private static final Pattern PUBLIC_EXTENSION = Pattern.compile("^[a-z0-9]{1,5}$");
     private static final long MOUNT_CHECK_CACHE_MS = 10_000L;
     private static final int HEAD_BYTES = 16;
 
@@ -70,17 +72,35 @@ public class FileStorage {
                 props.getMode(), baseDir, props.getMaxFileSize());
     }
 
+    /** Private chat attachment: random name, no extension, kept under chats/{chatId}/{yyyy-MM}/. */
     public StoredFile store(InputStream in, String chatId, long maxBytes) {
         if (chatId == null || !SAFE_SEGMENT.matcher(chatId).matches()) {
             throw new IllegalArgumentException("Invalid chat id");
         }
+        return write(in, "chats/" + chatId + "/" + YearMonth.now(), UUID.randomUUID().toString(), maxBytes);
+    }
+
+    /**
+     * Public media (group photos and the like): random name plus a safe
+     * extension, kept under public/{folder}/{yyyy-MM}/. Served without a
+     * signature, so callers must only pass types that are safe to show.
+     */
+    public StoredFile storePublic(InputStream in, String folder, String extension, long maxBytes) {
+        if (folder == null || !PUBLIC_FOLDER.matcher(folder).matches()) {
+            throw new IllegalArgumentException("Invalid media folder");
+        }
+        if (extension == null || !PUBLIC_EXTENSION.matcher(extension).matches()) {
+            throw new IllegalArgumentException("Invalid file extension");
+        }
+        return write(in, "public/" + folder + "/" + YearMonth.now(), UUID.randomUUID() + "." + extension, maxBytes);
+    }
+
+    private StoredFile write(InputStream in, String relativeDir, String fileName, long maxBytes) {
         ensureAvailable();
 
-        String id = UUID.randomUUID().toString();
-        String relativeDir = "chats/" + chatId + "/" + YearMonth.now();
         Path dir = resolve(relativeDir);
-        Path tmp = dir.resolve(".upload-" + id + ".tmp");
-        Path target = dir.resolve(id);
+        Path tmp = dir.resolve(".upload-" + UUID.randomUUID() + ".tmp");
+        Path target = dir.resolve(fileName);
 
         try {
             Files.createDirectories(dir);
@@ -113,10 +133,10 @@ public class FileStorage {
             } catch (AtomicMoveNotSupportedException e) {
                 Files.move(tmp, target);
             }
-            return new StoredFile(relativeDir + "/" + id, total, HexFormat.of().formatHex(digest.digest()), head);
+            return new StoredFile(relativeDir + "/" + fileName, total, HexFormat.of().formatHex(digest.digest()), head);
 
         } catch (IOException e) {
-            log.error("Failed to write attachment to {}: {}", dir, e.getMessage());
+            log.error("Failed to write file to {}: {}", dir, e.getMessage());
             throw HttpStatusException.storageUnavailable("File storage is not available right now");
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);

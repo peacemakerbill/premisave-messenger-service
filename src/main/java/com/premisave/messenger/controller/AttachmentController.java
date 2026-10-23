@@ -34,8 +34,8 @@ public class AttachmentController {
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<AttachmentResponse> upload(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("chatId") String chatId,
+            @RequestParam MultipartFile file,
+            @RequestParam String chatId,
             @RequestHeader("Authorization") String authHeader) {
 
         String userId = currentUserResolver.resolve(authHeader).getId();

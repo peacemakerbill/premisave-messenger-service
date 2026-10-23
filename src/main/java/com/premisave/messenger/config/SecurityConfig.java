@@ -23,7 +23,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -39,6 +39,9 @@ public class SecurityConfig {
                 // File downloads carry their own proof of access: a signed
                 // link or a Bearer token, checked in AttachmentController.
                 .requestMatchers(HttpMethod.GET, "/api/attachments/*/content").permitAll()
+
+                // Group photos and other public media returned by /api/media/upload.
+                .requestMatchers(HttpMethod.GET, "/api/media/files/**").permitAll()
 
                 // Auth-related (if needed)
                 .requestMatchers("/auth/**").permitAll()
@@ -59,7 +62,7 @@ public class SecurityConfig {
      * CORS Configuration - Open for development (adjust in production)
      */
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
         configuration.setAllowedOriginPatterns(List.of("*"));  // Change to specific domains in production

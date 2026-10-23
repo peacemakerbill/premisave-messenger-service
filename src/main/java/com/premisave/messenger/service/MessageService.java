@@ -511,7 +511,7 @@ public class MessageService {
 
     /**
      * Uploaded files get a fresh signed link on every read; older
-     * messages that carry a plain mediaUrl (Cloudinary) are untouched.
+     * messages that carry a plain mediaUrl (older uploads) are untouched.
      */
     private String resolveMediaUrl(Message message) {
         if (message.getAttachmentId() != null) {

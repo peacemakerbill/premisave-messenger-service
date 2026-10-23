@@ -104,7 +104,8 @@ It was built as a sibling service to `auth-service` (which owns user identity an
 | **New-vs-existing chat signaling** | `POST /api/chats/private` returns `201` with a "created" message for a new chat, `200` with an "already exists" message when reusing one — plus a `newlyCreated` boolean for programmatic checks. |
 | **Self-healing chat data** | If a chat's participant data was ever stored inconsistently (e.g. from an earlier bug), it's detected and corrected automatically the next time that chat is accessed. |
 | **Group chats** | Create, add/remove members (single or bulk), promote/demote admins, transfer ownership, group photo, leave group. |
-| **Media uploads** | Images, video, and documents via Cloudinary, organized by type. |
+| **File attachments** | Send images, video, audio, documents and any other file type in a chat. Upload first (`POST /api/attachments`), then send a message carrying the `attachmentId`, over REST or WebSocket. Stored on local disk or a mounted network share, downloaded through expiring signed links with range support. |
+| **Public media** | Group photos and `/api/media/upload` files use the same storage and are served without a token from `/api/media/files/...`. |
 | **Structured downstream error handling** | A dependency being unavailable (e.g. `auth-service` down) returns a clean `503` naming which service failed, in a structured `details` field — not a raw stack trace. |
 | **Production observability** | Prometheus metrics, Kubernetes-style health/liveness/readiness/startup probes, structured logging. |
 | **Redis-backed caching** | Chat access, user profiles, and group data cached with tuned per-purpose TTLs. |
@@ -116,7 +117,7 @@ It was built as a sibling service to `auth-service` (which owns user identity an
 ┌──────────────┐      JWT (Bearer)      ┌─────────────────────────┐
 │   End User   │ ────HTTP + WS────────► │                         │
 └──────────────┘                        │                         │      ┌──────────────┐
-                                         │   Premisave Messenger  │ ───► │  Cloudinary  │
+                                         │   Premisave Messenger  │ ───► │ File storage │
 ┌──────────────┐    Feign / JWT         │      Service             │      └──────────────┘
 │ auth-service │ ◄────────────────────► │  (this repository)     │
 └──────────────┘                        │                         │      ┌──────────────┐
@@ -187,7 +188,7 @@ Because the session counter lives in Redis rather than in-instance memory, this 
 - **MongoDB** running locally, in Docker, or on Atlas
 - **Redis** running locally or hosted (used for caching, the WebSocket relay, and presence session counters)
 - A running `auth-service` instance (this service depends on it for identity resolution — REST *and* WebSocket auth both call out to it)
-- Cloudinary credentials, if you intend to test media upload
+- A writable folder for file storage (`STORAGE_ROOT`), or a mounted network share
 
 ```bash
 # 1. Clone
@@ -217,10 +218,10 @@ AUTH_SERVICE_URL=http://localhost:8080
 ACTUATOR_USER=actuator
 ACTUATOR_PASSWORD=<a secure password>
 
-# Cloudinary (media uploads)
-CLOUDINARY_CLOUD_NAME=...
-CLOUDINARY_API_KEY=...
-CLOUDINARY_API_SECRET=...
+# File storage (see the environment table below for every option)
+STORAGE_MODE=LOCAL
+STORAGE_ROOT=/path/to/messenger-storage
+STORAGE_PUBLIC_BASE_URL=http://localhost:8081
 ```
 
 > **Important:** `JWT_SECRET` must be byte-identical to the one `auth-service` uses — tokens are verified with the same HMAC key across both services. If you see `JWT secret was truncated to 32 bytes` in the logs, that's expected: the key is padded or truncated to exactly 32 bytes before signing, deliberately, so both services derive the same effective key regardless of the raw secret's length.
@@ -242,7 +243,13 @@ Message <id> delivery completed. Success: 1/1, Failures: 0
 | `JWT_SECRET` | Yes | — | Must match `auth-service` exactly. Base64-encoded; padded/truncated to 32 bytes for HMAC-SHA256. |
 | `AUTH_SERVICE_URL` | No | `http://localhost:8080` | Feign client target for all identity/profile/social calls. |
 | `ACTUATOR_USER` / `ACTUATOR_PASSWORD` | No | `actuator` / `actuator123` | Basic Auth for `/actuator/**` (health details, metrics, Prometheus scrape). |
-| `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | For media upload | — | Cloudinary credentials for `/api/media/upload`. |
+| `STORAGE_MODE` | No | `LOCAL` | `LOCAL` writes under `STORAGE_ROOT`. `NETWORK` writes to a share already mounted at `STORAGE_NETWORK_MOUNT_PATH`. |
+| `STORAGE_ROOT` | LOCAL mode | `./data/messenger-storage` | Base folder for uploaded files. |
+| `STORAGE_PUBLIC_BASE_URL` | No | `http://localhost:8081` | Public address of this service, used in download and photo links. |
+| `STORAGE_MAX_FILE_SIZE` / `STORAGE_MAX_REQUEST_SIZE` | No | `50MB` / `60MB` | Largest single file, and the request limit (keep it a little higher). |
+| `STORAGE_URL_TTL` / `STORAGE_UNCLAIMED_TTL` | No | `6h` / `24h` | Lifetime of a signed link, and how long an unsent upload is kept. |
+| `STORAGE_SIGNING_SECRET` | No | `JWT_SECRET` | Key used to sign download links. |
+| `STORAGE_NETWORK_*` | NETWORK mode | blank | `PROTOCOL`, `HOST`, `SHARE`, `MOUNT_PATH`, `DIRECTORY`, `REQUIRE_MOUNT`. With `REQUIRE_MOUNT=true` the service refuses to start or write unless the path is on a mounted network share. |
 
 ## API reference
 
@@ -260,7 +267,10 @@ Message <id> delivery completed. Success: 1/1, Failures: 0
 | `POST` | `/api/groups/{groupId}/transfer-admin` | Transfer group ownership |
 | `POST` | `/api/groups/{groupId}/leave` | Leave a group |
 | `GET` | `/api/groups/my-groups` | List the caller's groups |
-| `POST` | `/api/media/upload` | Upload an image, video, or document via Cloudinary |
+| `POST` | `/api/attachments` | Upload a file for a chat (multipart `file`, `chatId`); returns an `attachmentId` |
+| `GET` | `/api/attachments/{attachmentId}/content` | Download or stream a file (Bearer token or the signed link from a message) |
+| `POST` | `/api/media/upload` | Upload a public file and get its URL back |
+| `GET` | `/api/media/files/{folder}/{month}/{name}` | Public read for group photos and other uploaded media |
 | `GET` | `/health`, `/health/ready`, `/health/live`, `/health/startup` | Kubernetes-style health probes (unauthenticated) |
 | `GET` | `/actuator/health`, `/actuator/metrics`, `/actuator/prometheus` | Actuator endpoints (Basic Auth) |
 
@@ -432,7 +442,7 @@ Found a bug or have a real-time messaging question? [Open an issue](https://gith
 <details>
 <summary>Search keywords</summary>
 
-Spring Boot microservice · Java real-time chat backend · WebSocket STOMP Java · real-time messaging API · horizontally scalable WebSocket · Redis pub/sub WebSocket relay · multi-instance WebSocket delivery · presence tracking system · online offline status API · typing indicator implementation · read receipts API · delivery confirmation messaging · MongoDB Spring Boot microservice · Redis caching Spring Boot · JWT authentication Spring Security 7 · Spring Cloud OpenFeign · microservice architecture Java · group chat API Java · Cloudinary media upload Java · fintech chat backend Kenya · Premisave · Spring Boot 4 WebSocket · STOMP over WebSocket without SockJS
+Spring Boot microservice · Java real-time chat backend · WebSocket STOMP Java · real-time messaging API · horizontally scalable WebSocket · Redis pub/sub WebSocket relay · multi-instance WebSocket delivery · presence tracking system · online offline status API · typing indicator implementation · read receipts API · delivery confirmation messaging · MongoDB Spring Boot microservice · Redis caching Spring Boot · JWT authentication Spring Security 7 · Spring Cloud OpenFeign · microservice architecture Java · group chat API Java · file upload Java · fintech chat backend Kenya · Premisave · Spring Boot 4 WebSocket · STOMP over WebSocket without SockJS
 
 </details>
 

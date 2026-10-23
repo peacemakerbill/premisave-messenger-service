@@ -50,6 +50,58 @@ public final class ContentTypes {
         return AttachmentCategory.DOCUMENT;
     }
 
+    /** Extension used for publicly served files. Anything not inline-safe becomes "bin". */
+    public static String extensionFor(String mimeType) {
+        if (mimeType == null) return "bin";
+        return switch (mimeType) {
+            case "image/png" -> "png";
+            case "image/jpeg" -> "jpg";
+            case "image/gif" -> "gif";
+            case "image/webp" -> "webp";
+            case "image/bmp" -> "bmp";
+            case "image/avif" -> "avif";
+            case "video/mp4" -> "mp4";
+            case "video/webm" -> "webm";
+            case "video/ogg" -> "ogv";
+            case "video/quicktime" -> "mov";
+            case "audio/mpeg" -> "mp3";
+            case "audio/mp4" -> "m4a";
+            case "audio/aac" -> "aac";
+            case "audio/ogg" -> "ogg";
+            case "audio/webm" -> "weba";
+            case "audio/wav", "audio/x-wav" -> "wav";
+            case "audio/flac" -> "flac";
+            case "application/pdf" -> "pdf";
+            default -> "bin";
+        };
+    }
+
+    /** Inverse of extensionFor, used when serving a public file. */
+    public static String mimeForExtension(String extension) {
+        if (extension == null) return OCTET_STREAM;
+        return switch (extension.toLowerCase(Locale.ROOT)) {
+            case "png" -> "image/png";
+            case "jpg" -> "image/jpeg";
+            case "gif" -> "image/gif";
+            case "webp" -> "image/webp";
+            case "bmp" -> "image/bmp";
+            case "avif" -> "image/avif";
+            case "mp4" -> "video/mp4";
+            case "webm" -> "video/webm";
+            case "ogv" -> "video/ogg";
+            case "mov" -> "video/quicktime";
+            case "mp3" -> "audio/mpeg";
+            case "m4a" -> "audio/mp4";
+            case "aac" -> "audio/aac";
+            case "ogg" -> "audio/ogg";
+            case "weba" -> "audio/webm";
+            case "wav" -> "audio/wav";
+            case "flac" -> "audio/flac";
+            case "pdf" -> "application/pdf";
+            default -> OCTET_STREAM;
+        };
+    }
+
     public static boolean isInlineSafe(String mimeType) {
         return mimeType != null && INLINE_SAFE.contains(mimeType);
     }

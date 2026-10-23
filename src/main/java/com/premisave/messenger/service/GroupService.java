@@ -251,11 +251,14 @@ public class GroupService {
             throw new RuntimeException("Only admin can update group photo");
         }
 
-        String photoUrl = mediaService.uploadMedia(file, "group-photos");
+        String oldPhotoUrl = group.getGroupPhotoUrl();
+        String photoUrl = mediaService.uploadImage(file, "group-photos");
         group.setGroupPhotoUrl(photoUrl);
         group.setUpdatedAt(LocalDateTime.now());
 
-        return groupRepository.save(group);
+        Group saved = groupRepository.save(group);
+        mediaService.deleteByUrl(oldPhotoUrl);
+        return saved;
     }
 
     /**
