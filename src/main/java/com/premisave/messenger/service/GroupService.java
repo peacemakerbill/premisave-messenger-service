@@ -41,7 +41,7 @@ public class GroupService {
 
     // ---------------------------------------------------------------- create
 
-    /** Creates a group and its chat. memberIds are optional extra members. */
+    /** Creates a group and its chat. The creator is always added as owner; memberIds are optional extra members. */
     public Group createGroup(String name, String description, String adminId, List<String> memberIds) {
         if (name == null || name.isBlank()) {
             throw HttpStatusException.badRequest("Group name is required");
@@ -67,10 +67,19 @@ public class GroupService {
         chat.getParticipantIds().addAll(members);
         chat.setCreatedAt(LocalDateTime.now());
         chat.setActive(true);
-        Chat savedChat = chatRepository.save(chat);
-
-        for (String userId : members) {
-            saveMember(saved.getId(), userId, userId.equals(adminId) ? "ADMIN" : "MEMBER");
+        Chat savedChat;
+        try {
+            savedChat = chatRepository.save(chat);
+            for (String userId : members) {
+                saveMember(saved.getId(), userId, userId.equals(adminId) ? "ADMIN" : "MEMBER");
+            }
+        } catch (RuntimeException e) {
+            // Do not leave a group without a chat behind.
+            for (String userId : members) {
+                groupMemberRepository.findByGroupIdAndUserId(saved.getId(), userId).ifPresent(groupMemberRepository::delete);
+            }
+            groupRepository.deleteById(saved.getId());
+            throw e;
         }
 
         log.info("Group '{}' created by {} with {} members (id {})", name, adminId, members.size(), saved.getId());

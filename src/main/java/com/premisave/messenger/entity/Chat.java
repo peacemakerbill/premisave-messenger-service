@@ -46,6 +46,15 @@ public class Chat {
     // Users who flagged this chat as unread ("mark as unread"). Cleared when they open or read it.
     private List<String> markedUnreadBy = new ArrayList<>();
 
+    // Explicit accessors so Spring Data can always read and write this property.
+    public List<String> getMarkedUnreadBy() {
+        return markedUnreadBy;
+    }
+
+    public void setMarkedUnreadBy(List<String> markedUnreadBy) {
+        this.markedUnreadBy = markedUnreadBy == null ? new ArrayList<>() : markedUnreadBy;
+    }
+
     // Group-specific metadata cached in chat
     private String groupName;
     private String groupPhotoUrl;

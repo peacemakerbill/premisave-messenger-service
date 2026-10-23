@@ -268,7 +268,7 @@ Message <id> delivery completed. Success: 1/1, Failures: 0
 | `DELETE` | `/api/messages/{messageId}/me` | Delete a message for yourself only |
 | `GET` | `/api/users/me` | The caller's own profile, including the real user id |
 | `GET` | `/api/users`, `/api/users/search?query=`, `/api/users/{userId}` | List, search and look up users |
-| `POST` | `/api/groups` | Create a group (`name`, optional `description`, optional repeated `memberIds`); the caller becomes the owner. Returns the group with its `chatId` and members |
+| `POST` | `/api/groups` | Create a group (`name`, optional `description`, optional repeated `memberIds`); the caller is added automatically as the owner, so do not list your own id. Returns the group with its `chatId` and members |
 | `GET` | `/api/groups/{groupId}` | One group with its chat id and members resolved to profiles (members only) |
 | `PUT` | `/api/groups/{groupId}/name`, `/description` | Rename or re-describe a group (owner only) |
 | `POST` | `/api/groups/{groupId}/photo` | Set the group photo (owner only, images only) |

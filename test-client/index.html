@@ -236,6 +236,7 @@ input, textarea { font: inherit; color: inherit; }
 .rec { flex: 1; display: flex; align-items: center; gap: 10px; background: var(--input-bg); border-radius: 22px; height: 44px; padding: 0 10px; }
 .rec .led { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); animation: pulse 1s ease-in-out infinite; }
 .rec .t { font-variant-numeric: tabular-nums; min-width: 42px; }
+.hint { color: var(--text-2); font-size: 13px; margin: 0 0 8px; }
 .rec .hint { color: var(--text-2); font-size: 13px; flex: 1; }
 
 .pop { position: absolute; z-index: 60; background: var(--panel); border-radius: 12px; box-shadow: var(--pop-shadow); padding: 6px 0; min-width: 190px; }
@@ -1873,7 +1874,9 @@ function openNewGroup() {
   openModal('New group', [
     h('label', { class: 'field-l' }, 'Name'), name,
     h('label', { class: 'field-l' }, 'Description'), desc,
-    h('label', { class: 'field-l' }, 'Add people'), ...picker.nodes
+    h('label', { class: 'field-l' }, 'Add people'),
+    h('p', { class: 'hint' }, 'You are added automatically as the group owner. Pick the other people.'),
+    ...picker.nodes
   ], create, true);
   name.focus();
 }
