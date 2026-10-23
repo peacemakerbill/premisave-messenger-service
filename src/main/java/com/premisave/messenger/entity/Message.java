@@ -17,7 +17,9 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @NoArgsConstructor
@@ -84,6 +86,9 @@ public class Message {
 
     // Users tagged with @ in the text. Always members of the chat, never the sender.
     private List<String> mentionedUserIds = new ArrayList<>();
+
+    // Emoji reactions: emoji -> ids of the users who reacted with it. Each user has at most one reaction.
+    private Map<String, List<String>> reactions = new LinkedHashMap<>();
 
     // Delete for Me support (per-user deletion)
     private List<String> deletedForUsers = new ArrayList<>();

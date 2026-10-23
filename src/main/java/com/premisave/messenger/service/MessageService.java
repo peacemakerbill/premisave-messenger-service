@@ -2,6 +2,7 @@ package com.premisave.messenger.service;
 
 import com.premisave.messenger.config.MessengerMetrics;
 import com.premisave.messenger.dto.response.MessageResponse;
+import com.premisave.messenger.dto.response.ReactionResponse;
 import com.premisave.messenger.dto.response.UserSummaryResponse;
 import com.premisave.messenger.dto.websocket.ChatMessage;
 import com.premisave.messenger.entity.Attachment;
@@ -564,6 +565,120 @@ public class MessageService {
         }
     }
 
+    // ===== REACTIONS =====
+
+    private static final int MAX_EMOJI_LENGTH = 16;
+    private static final int MAX_DISTINCT_REACTIONS = 50;
+
+    /**
+     * Reacts to a message with an emoji. A person has one reaction per message,
+     * so reacting again replaces the earlier one. Anyone in the chat can react,
+     * including to their own message. Everyone in the chat is told on
+     * /user/queue/reactions.
+     */
+    public ReactionResponse react(String messageId, String userId, String emoji) {
+        String clean = validEmoji(emoji);
+        return changeReaction(messageId, userId, clean);
+    }
+
+    /** Removes your reaction from a message. Does nothing if you had none. */
+    public ReactionResponse removeReaction(String messageId, String userId) {
+        return changeReaction(messageId, userId, null);
+    }
+
+    private ReactionResponse changeReaction(String messageId, String userId, String emoji) {
+        int attempt = 0;
+        while (true) {
+            try {
+                return doChangeReaction(messageId, userId, emoji);
+            } catch (org.springframework.dao.OptimisticLockingFailureException e) {
+                // Someone else reacted or read the message at the same moment. Load it again.
+                if (++attempt >= 5) {
+                    throw HttpStatusException.conflict("The message changed while you were reacting. Try again.");
+                }
+            }
+        }
+    }
+
+    private ReactionResponse doChangeReaction(String messageId, String userId, String emoji) {
+        Message message = messageRepository.findById(messageId)
+            .orElseThrow(() -> new MessageNotFoundException("Message not found: " + messageId));
+
+        if (!chatService.canAccessChat(message.getChatId(), userId)) {
+            throw HttpStatusException.forbidden("You are not a member of this chat");
+        }
+        if (message.isDeletedForEveryone() || !message.isActive()) {
+            throw HttpStatusException.badRequest("You cannot react to a deleted message");
+        }
+
+        Map<String, List<String>> reactions = message.getReactions() == null
+                ? new java.util.LinkedHashMap<>() : message.getReactions();
+        String before = emojiOf(reactions, userId);
+        if (java.util.Objects.equals(before, emoji)) {
+            return reactionResponse(message, userId, emoji);   // nothing to change
+        }
+
+        // One reaction per person: take the earlier one away first
+        reactions.values().forEach(users -> users.remove(userId));
+        reactions.values().removeIf(List::isEmpty);
+
+        if (emoji != null) {
+            if (!reactions.containsKey(emoji) && reactions.size() >= MAX_DISTINCT_REACTIONS) {
+                throw HttpStatusException.badRequest("This message already has " + MAX_DISTINCT_REACTIONS + " different reactions");
+            }
+            reactions.computeIfAbsent(emoji, k -> new ArrayList<>()).add(userId);
+        }
+        message.setReactions(reactions);
+        Message saved = messageRepository.save(message);
+
+        ReactionResponse response = reactionResponse(saved, userId, emoji);
+        notifyReaction(saved, response);
+        log.info("Reaction on message {} by {}: {}", messageId, userId, emoji);
+        return response;
+    }
+
+    private String emojiOf(Map<String, List<String>> reactions, String userId) {
+        for (Map.Entry<String, List<String>> entry : reactions.entrySet()) {
+            if (entry.getValue().contains(userId)) return entry.getKey();
+        }
+        return null;
+    }
+
+    private ReactionResponse reactionResponse(Message message, String userId, String emoji) {
+        Map<String, List<String>> reactions = message.getReactions() == null
+                ? new java.util.LinkedHashMap<>() : message.getReactions();
+        return new ReactionResponse(message.getId(), message.getChatId(), reactions, userId, emoji);
+    }
+
+    /**
+     * An emoji is short, has no spaces and is not plain text. It is also used as a
+     * database key, so it cannot contain a dot or a dollar sign.
+     */
+    private String validEmoji(String emoji) {
+        String value = emoji == null ? "" : emoji.trim();
+        boolean ok = !value.isEmpty()
+                && value.length() <= MAX_EMOJI_LENGTH
+                && value.chars().noneMatch(c -> Character.isWhitespace(c) || c == '.' || c == '$')
+                && value.codePoints().anyMatch(cp -> cp >= 0x2000);
+        if (!ok) {
+            throw HttpStatusException.badRequest("Reaction must be a single emoji");
+        }
+        return value;
+    }
+
+    /** Tells everyone in the chat. Best effort: a failed push never fails the reaction. */
+    private void notifyReaction(Message message, ReactionResponse response) {
+        Chat chat = chatRepository.findById(message.getChatId()).orElse(null);
+        if (chat == null) return;
+        for (String memberId : chat.getParticipantIds()) {
+            try {
+                redisMessagePublisher.convertAndSendToUser(memberId, "/queue/reactions", response);
+            } catch (Exception e) {
+                log.warn("Could not send reaction on {} to {}: {}", message.getId(), memberId, e.getMessage());
+            }
+        }
+    }
+
     // ===== HELPER METHODS =====
 
     private void broadcastMessage(Message message, MessageResponse response) {
@@ -631,6 +746,7 @@ public class MessageService {
         response.setDeleted(message.isDeletedForEveryone());
         response.setReplyToMessageId(message.getReplyToMessageId());
         response.setMentionedUserIds(message.getMentionedUserIds());
+        response.setReactions(message.getReactions() == null ? new java.util.LinkedHashMap<>() : message.getReactions());
 
         if (authToken == null || authToken.isBlank()) {
             // No real user token available - this happens for the

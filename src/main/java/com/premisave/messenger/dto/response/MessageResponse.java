@@ -6,6 +6,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Data
 public class MessageResponse {
@@ -38,6 +39,9 @@ public class MessageResponse {
 
     // Users tagged with @ in the text
     private List<String> mentionedUserIds;
+
+    // Emoji reactions: emoji -> ids of the users who reacted with it
+    private Map<String, List<String>> reactions;
 
     // Reply support
     private String replyToMessageId;

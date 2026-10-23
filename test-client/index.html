@@ -423,6 +423,29 @@ button.p-stat:hover { background: var(--row-hover); }
 .bubble .sender.hit { cursor: pointer; } .bubble .sender.hit:hover { text-decoration: underline; }
 .m-row.hit { cursor: pointer; }
 @media (max-width: 520px) { .p-stats, .p-views { grid-template-columns: repeat(2, 1fr); } }
+
+/* reactions */
+.bubble.has-reacts { margin-bottom: 15px; }
+.reacts { position: absolute; bottom: -14px; display: flex; align-items: center; gap: 3px; z-index: 1; }
+.msg.out .reacts { right: 8px; } .msg.in .reacts { left: 8px; }
+.react-chip, .react-who { display: inline-flex; align-items: center; gap: 3px; height: 22px; padding: 0 6px; border-radius: 11px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); font-size: 13px; line-height: 1; color: var(--text-2); }
+.react-chip .em { font-size: 14px; }
+.react-chip.mine { border-color: var(--accent); background: var(--row-hover); color: var(--text); }
+.react-chip:hover, .react-who:hover { border-color: var(--accent); }
+.react-who { padding: 0 7px; }
+.react-btn { align-self: center; width: 28px; height: 28px; margin: 0 4px; border-radius: 50%; display: none; place-items: center; color: var(--text-2); flex: none; }
+.react-btn .ico { width: 18px; height: 18px; }
+.react-btn:hover { background: var(--row-hover); }
+.msg:hover .react-btn, .react-btn:focus-visible { display: grid; }
+.react-pop { padding: 4px; min-width: 0; }
+.react-row, .react-grid { display: flex; align-items: center; gap: 2px; padding: 4px 6px; }
+.react-row button { width: 38px; height: 38px; padding: 0; justify-content: center; font-size: 24px; border-radius: 50%; flex: none; }
+.react-row button .ico { width: 20px; height: 20px; }
+.react-row button.on, .react-grid button.on { background: var(--row-hover); box-shadow: inset 0 0 0 2px var(--accent); }
+.react-grid { display: grid; grid-template-columns: repeat(8, 1fr); max-height: 220px; overflow-y: auto; width: 320px; max-width: 80vw; }
+.react-grid button { padding: 4px 0; justify-content: center; font-size: 22px; border-radius: 8px; }
+.pop > .react-row { border-bottom: 1px solid var(--line); margin-bottom: 4px; padding: 2px 10px 6px; }
+.big-em { font-size: 22px; margin-left: auto; }
 </style>
 </head>
 <body>
@@ -1164,7 +1187,9 @@ function buildMsg(m, prev) {
     bubble.append(h('button', { class: 'chev', type: 'button', 'aria-label': 'Message options', onclick: e => { e.stopPropagation(); openMsgMenu(e.currentTarget, m); } }, ico('chevron')));
   }
 
-  const el = h('div', { class: 'msg ' + (mine ? 'out' : 'in') + (first ? ' first' : ''), 'data-id': m.id || m._tmpId }, bubble);
+  applyReactions(bubble, m);
+  const reactBtn = canReact(m) ? h('button', { class: 'react-btn', type: 'button', 'aria-label': 'React', title: 'React', onclick: e => { e.stopPropagation(); openReactPopup(e.currentTarget, m); } }, ico('smile')) : null;
+  const el = h('div', { class: 'msg ' + (mine ? 'out' : 'in') + (first ? ' first' : ''), 'data-id': m.id || m._tmpId }, mine ? reactBtn : null, bubble, mine ? null : reactBtn);
   el._m = m;
   return el;
 }
@@ -1573,8 +1598,10 @@ function popItem(icon, label, onclick, danger) {
 function openMsgMenu(anchor, m) {
   const mine = S.me && m.senderId === S.me.id;
   const items = [];
+  if (canReact(m)) items.push(reactRow(m));
   if (!m.deleted) items.push(popItem('reply', 'Reply', () => setReply(m)));
   if (canEdit(m)) items.push(popItem('edit', 'Edit', () => startEdit(m)));
+  if (Object.keys(reactionsOf(m)).length && !m.deleted) items.push(popItem('smile', 'Reactions', () => showReactors(m)));
   if (m.content && !m.deleted) items.push(popItem('copy', 'Copy text', () => navigator.clipboard?.writeText(m.content).then(() => toast('Copied'), () => toast('Could not copy', true))));
   if ((m.mediaUrl) && !m.deleted) items.push(h('a', { class: 'pop-a', href: m.mediaUrl, target: '_blank', rel: 'noopener', download: m.fileName || true, style: 'display:flex;align-items:center;gap:12px;padding:10px 18px;color:inherit;text-decoration:none', onclick: closePop }, ico('download'), 'Download'));
   items.push(h('hr'));
@@ -2548,6 +2575,127 @@ async function saveEdit() {
     if (e.status === 403) cancelEdit();
   } finally { R.sendBtn.disabled = false; }
 }
+// ====================================================================
+// Emoji reactions
+// ====================================================================
+const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
+function reactionsOf(m) {
+  const out = {};
+  for (const [emoji, ids] of Object.entries(m.reactions || {})) {
+    if (Array.isArray(ids) && ids.length) out[emoji] = ids;
+  }
+  return out;
+}
+function myReaction(m) {
+  if (!S.me) return null;
+  for (const [emoji, ids] of Object.entries(reactionsOf(m))) if (ids.includes(S.me.id)) return emoji;
+  return null;
+}
+function canReact(m) { return !!(m && m.id && !m.deleted && !m._pending && S.me); }
+
+// Draws the reaction chips under a bubble. Called when the bubble is built and
+// whenever the reactions change, so the rest of the message is left alone.
+function applyReactions(bubble, m) {
+  const old = bubble.querySelector('.reacts'); if (old) old.remove();
+  const entries = m.deleted ? [] : Object.entries(reactionsOf(m));
+  bubble.classList.toggle('has-reacts', entries.length > 0);
+  if (!entries.length) return;
+  const mine = myReaction(m);
+  const total = entries.reduce((n, [, ids]) => n + ids.length, 0);
+  const chips = entries.map(([emoji, ids]) => h('button', {
+    type: 'button', class: 'react-chip' + (emoji === mine ? ' mine' : ''),
+    'aria-label': emoji + ' ' + ids.length + (emoji === mine ? ', your reaction. Tap to remove' : '. Tap to react with it'),
+    title: emoji === mine ? 'You reacted. Tap to remove' : 'Tap to react with ' + emoji,
+    onclick: e => { e.stopPropagation(); setMyReaction(m, emoji); }
+  }, h('span', { class: 'em' }, emoji), ids.length > 1 ? h('span', { class: 'ct' }, String(ids.length)) : null));
+  const who = h('button', { type: 'button', class: 'react-who', 'aria-label': 'See who reacted', title: 'See who reacted', onclick: e => { e.stopPropagation(); showReactors(m); } }, String(total));
+  bubble.append(h('div', { class: 'reacts' }, chips, entries.length > 1 || total > 1 ? who : null));
+}
+function refreshReactions(m) {
+  const el = m.chatId === S.active ? msgEl(m) : null;
+  if (!el) return;
+  const bubble = $('.bubble', el); if (!bubble) return;
+  const stick = S.nearBottom;
+  applyReactions(bubble, m);
+  if (stick) scrollBottom();
+}
+
+// Sets or clears your reaction. Choosing the one you already have removes it.
+async function setMyReaction(m, emoji) {
+  if (!canReact(m)) return;
+  const before = m.reactions || {};
+  const next = emoji === myReaction(m) ? null : emoji;
+  const draft = {};
+  for (const [e, ids] of Object.entries(reactionsOf(m))) {
+    const rest = ids.filter(id => id !== S.me.id);
+    if (rest.length) draft[e] = rest;
+  }
+  if (next) draft[next] = [...(draft[next] || []), S.me.id];
+  m.reactions = draft; refreshReactions(m);
+  const url = '/api/messages/' + encodeURIComponent(m.id) + '/reaction';
+  try {
+    const r = next ? await api(url, { method: 'PUT', json: { emoji: next } }) : await api(url, { method: 'DELETE' });
+    if (r && r.reactions) { m.reactions = r.reactions; refreshReactions(m); }
+  } catch (e) {
+    m.reactions = before; refreshReactions(m);
+    toast(e.message, true);
+  }
+}
+
+// Pushed to everyone in the chat when anyone reacts.
+function onReaction(d) {
+  if (!d || !d.messageId) return;
+  const b = S.msgs[d.chatId]; if (!b) return;
+  const m = b.list.find(x => x.id === d.messageId);
+  if (!m) return;
+  m.reactions = d.reactions || {};
+  refreshReactions(m);
+}
+
+// The quick row: six common reactions and a button for the full emoji list.
+function reactRow(m, after) {
+  const mine = myReaction(m);
+  const pick = emoji => { closePop(); if (after) after(); setMyReaction(m, emoji); };
+  const row = h('div', { class: 'react-row', role: 'group', 'aria-label': 'React to message' },
+    QUICK_REACTIONS.map(e => h('button', { type: 'button', class: e === mine ? 'on' : '', 'aria-label': 'React ' + e, onclick: () => pick(e) }, e)),
+    h('button', { type: 'button', class: 'more', 'aria-label': 'More emoji', title: 'More emoji', onclick: ev => { ev.stopPropagation(); row.replaceWith(reactGrid(m, pick)); } }, ico('plus')));
+  return row;
+}
+function reactGrid(m, pick) {
+  const mine = myReaction(m);
+  return h('div', { class: 'react-grid', role: 'group', 'aria-label': 'Choose an emoji' },
+    EMOJI.map(e => h('button', { type: 'button', class: e === mine ? 'on' : '', 'aria-label': e, onclick: () => pick(e) }, e)));
+}
+// The small smiley beside a bubble, shown on hover.
+function openReactPopup(anchor, m) {
+  if (!canReact(m)) return;
+  const pop = h('div', { class: 'pop react-pop' }, reactRow(m));
+  showPop(pop, anchor); placePop(pop, anchor);
+}
+
+async function showReactors(m) {
+  const groups = Object.entries(reactionsOf(m));
+  const list = h('div', { class: 'people' });
+  const rows = [];
+  for (const [emoji, ids] of groups) for (const id of ids) rows.push({ emoji, id });
+  openModal(rows.length + (rows.length === 1 ? ' reaction' : ' reactions'), list);
+  const row = (who, emoji, id) => {
+    const me = S.me && id === S.me.id;
+    return h('button', { class: 'person', type: 'button', onclick: () => { if (me) { closeModal(); setMyReaction(m, emoji); } else { closeModal(); openProfile(id); } } },
+      avatar(userName(who), who.profilePictureUrl, id, 'sm'),
+      h('div', { style: 'flex:1;min-width:0' }, h('div', { class: 'n' }, me ? 'You' : userName(who)), h('div', { class: 'e' }, me ? 'Tap to remove' : (who.email || ''))),
+      h('span', { class: 'big-em' }, emoji));
+  };
+  list.replaceChildren(...rows.map(r => row(S.me && r.id === S.me.id ? S.me : { id: r.id, displayName: '...' }, r.emoji, r.id)));
+  const mine = modal;
+  await Promise.all(rows.map(async (r, i) => {
+    if (S.me && r.id === S.me.id) return;
+    const who = await getUser(r.id);
+    if (modal !== mine) return;
+    list.children[i] && list.children[i].replaceWith(row(who, r.emoji, r.id));
+  }));
+}
 
 // ====================================================================
 // Boot and session
@@ -2640,6 +2788,7 @@ function subscribeAll(client) {
   client.subscribe('/user/queue/read-receipts', f => { const d = parse(f); if (d) onReadReceipt(d); });
   client.subscribe('/user/queue/typing', f => { const d = parse(f); if (d) onTyping(d); });
   client.subscribe('/user/queue/errors', f => { const d = parse(f); if (d) toast(d.message || 'Something went wrong', true); });
+  client.subscribe('/user/queue/reactions', f => { const d = parse(f); if (d) onReaction(d); });
   client.subscribe('/user/queue/groups', f => { const d = parse(f); if (d) onGroupEvent(d); });
   client.subscribe('/topic/presence', f => { const d = parse(f); if (d) onPresence(d); });
 }

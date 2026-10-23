@@ -1,9 +1,11 @@
 package com.premisave.messenger.controller;
 
 import com.premisave.messenger.dto.request.EditMessageRequest;
+import com.premisave.messenger.dto.request.ReactionRequest;
 import com.premisave.messenger.dto.request.SendMessageRequest;
 import com.premisave.messenger.dto.response.AttachmentResponse;
 import com.premisave.messenger.dto.response.MessageResponse;
+import com.premisave.messenger.dto.response.ReactionResponse;
 import com.premisave.messenger.dto.websocket.ChatMessage;
 import com.premisave.messenger.exception.HttpStatusException;
 import com.premisave.messenger.security.CurrentUserResolver;
@@ -141,6 +143,25 @@ public class MessageController {
         String userId = currentUserResolver.resolve(authHeader).getId();
         return ResponseEntity.ok(messageService.editMessage(
                 messageId, userId, request.getContent(), request.getMentionedUserIds(), authHeader));
+    }
+
+    /** React to a message with an emoji. Replaces your earlier reaction on it. */
+    @PutMapping("/{messageId}/reaction")
+    public ResponseEntity<ReactionResponse> react(
+            @PathVariable String messageId,
+            @RequestBody ReactionRequest request,
+            @RequestHeader("Authorization") String authHeader) {
+        String userId = currentUserResolver.resolve(authHeader).getId();
+        return ResponseEntity.ok(messageService.react(messageId, userId, request.getEmoji()));
+    }
+
+    /** Remove your reaction from a message. */
+    @DeleteMapping("/{messageId}/reaction")
+    public ResponseEntity<ReactionResponse> removeReaction(
+            @PathVariable String messageId,
+            @RequestHeader("Authorization") String authHeader) {
+        String userId = currentUserResolver.resolve(authHeader).getId();
+        return ResponseEntity.ok(messageService.removeReaction(messageId, userId));
     }
 
     @DeleteMapping("/{messageId}")
