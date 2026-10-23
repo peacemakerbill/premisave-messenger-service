@@ -42,6 +42,12 @@ public class Message {
     private String fileName;
     private Long fileSize;
 
+    // Set when the message carries an uploaded file (see Attachment).
+    // The download link is built from this id on every read, so the
+    // stored message never holds an expiring URL.
+    private String attachmentId;
+    private String mimeType;
+
     private MessageStatus status = MessageStatus.SENT;
 
     private List<String> readBy = new ArrayList<>();

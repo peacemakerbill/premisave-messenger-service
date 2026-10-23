@@ -20,6 +20,11 @@ public class ChatMessage {
     private String content;
     private MessageType messageType;
     private String mediaUrl;
+
+    // Id returned by POST /api/attachments. The server fills in the type,
+    // name, size and link from the stored upload, so the client only sends this.
+    private String attachmentId;
+
     private LocalDateTime timestamp;
     private String status;
 

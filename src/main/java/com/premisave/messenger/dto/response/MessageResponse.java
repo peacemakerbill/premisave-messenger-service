@@ -20,6 +20,9 @@ public class MessageResponse {
     private String content;
     private String mediaUrl;
     private String fileName;
+    private Long fileSize;
+    private String mimeType;
+    private String attachmentId;
 
     private MessageStatus status;
     private List<String> readBy;

@@ -4,6 +4,7 @@ import com.premisave.messenger.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
@@ -22,7 +23,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -35,6 +36,10 @@ public class SecurityConfig {
                                "/health/**",
                                "/info").permitAll()
                 
+                // File downloads carry their own proof of access: a signed
+                // link or a Bearer token, checked in AttachmentController.
+                .requestMatchers(HttpMethod.GET, "/api/attachments/*/content").permitAll()
+
                 // Auth-related (if needed)
                 .requestMatchers("/auth/**").permitAll()
                 
@@ -54,7 +59,7 @@ public class SecurityConfig {
      * CORS Configuration - Open for development (adjust in production)
      */
     @Bean
-    CorsConfigurationSource corsConfigurationSource() {
+    public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
         configuration.setAllowedOriginPatterns(List.of("*"));  // Change to specific domains in production

@@ -13,6 +13,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.stereotype.Controller;
 
 import java.security.Principal;
+import java.util.HashMap;
+import java.util.Map;
 
 @Slf4j
 @Controller
@@ -51,8 +53,26 @@ public class WebSocketController {
         try {
             messageService.sendMessage(chatMessage, token);
             log.info("WebSocket message sent by {} in chat {}", senderId, chatMessage.getChatId());
+        } catch (IllegalArgumentException e) {
+            // Bad request from the client (empty message, attachment already
+            // sent or not theirs). Tell the sender instead of dropping it.
+            log.warn("WebSocket message rejected for {}: {}", senderId, e.getMessage());
+            notifySendFailure(senderId, chatMessage.getChatId(), "INVALID_REQUEST", e.getMessage());
         } catch (Exception e) {
             log.error("Failed to process WebSocket message", e);
+            notifySendFailure(senderId, chatMessage.getChatId(), "SEND_FAILED", "The message could not be sent");
+        }
+    }
+
+    private void notifySendFailure(String userId, String chatId, String code, String message) {
+        try {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("code", code);
+            payload.put("message", message);
+            payload.put("chatId", chatId);
+            redisMessagePublisher.convertAndSendToUser(userId, "/queue/errors", payload);
+        } catch (Exception e) {
+            log.warn("Could not report send failure to {}: {}", userId, e.getMessage());
         }
     }
 

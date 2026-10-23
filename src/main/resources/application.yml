@@ -7,6 +7,8 @@ spring:
     uri: ${MONGODB_URI:mongodb://localhost:27017/premisave-messenger}
 
   data:
+    mongodb:
+      auto-index-creation: true
     redis:
       url: ${REDIS_URL:redis://localhost:6379}
       timeout: 2000ms
@@ -19,8 +21,8 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 50MB
-      max-request-size: 50MB
+      max-file-size: ${STORAGE_MAX_FILE_SIZE:50MB}
+      max-request-size: ${STORAGE_MAX_REQUEST_SIZE:60MB}
 
   cache:
     type: redis
@@ -35,8 +37,8 @@ spring:
 
   security:
     user:
-      name: ${ACTUATOR_USER}
-      password: ${ACTUATOR_PASSWORD}
+      name: ${ACTUATOR_USER:actuator}
+      password: ${ACTUATOR_PASSWORD:actuator123}
 
   jackson:
     deserialization:
@@ -72,7 +74,7 @@ server:
     connection-timeout: 20000ms
 
 jwt:
-  secret: ${JWT_SECRET}
+  secret: ${JWT_SECRET:eW91ci12ZXJ5LXNlY3VyZS1qd3Qtc2VjcmV0LWtleS0zMi1ieXRlcyE=}
   expiration: 86400000
   refresh-expiration: 604800000
 
@@ -81,9 +83,9 @@ auth:
     url: ${AUTH_SERVICE_URL:http://localhost:8080}
 
 cloudinary:
-  cloud-name: ${CLOUDINARY_CLOUD_NAME}
-  api-key: ${CLOUDINARY_API_KEY}
-  api-secret: ${CLOUDINARY_API_SECRET}
+  cloud-name: ${CLOUDINARY_CLOUD_NAME:your-cloud-name}
+  api-key: ${CLOUDINARY_API_KEY:your-api-key}
+  api-secret: ${CLOUDINARY_API_SECRET:your-api-secret}
 
 feign:
   client:
@@ -156,6 +158,25 @@ websocket:
     heartbeat:
       client: 10000
       server: 10000
+
+# File attachments (images, video, audio, documents, any file type).
+# LOCAL stores under STORAGE_ROOT. NETWORK uses a share the OS has already
+# mounted at STORAGE_NETWORK_MOUNT_PATH; the service never mounts anything.
+storage:
+  mode: ${STORAGE_MODE:LOCAL}
+  root: ${STORAGE_ROOT:./data/messenger-storage}
+  public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:8081}
+  max-file-size: ${STORAGE_MAX_FILE_SIZE:50MB}
+  url-ttl: ${STORAGE_URL_TTL:6h}
+  unclaimed-ttl: ${STORAGE_UNCLAIMED_TTL:24h}
+  signing-secret: ${STORAGE_SIGNING_SECRET:}
+  network:
+    protocol: ${STORAGE_NETWORK_PROTOCOL:SMB}
+    host: ${STORAGE_NETWORK_HOST:}
+    share: ${STORAGE_NETWORK_SHARE:}
+    mount-path: ${STORAGE_NETWORK_MOUNT_PATH:}
+    directory: ${STORAGE_NETWORK_DIRECTORY:premisave-messenger}
+    require-mount: ${STORAGE_NETWORK_REQUIRE_MOUNT:true}
 
 ---
 spring:

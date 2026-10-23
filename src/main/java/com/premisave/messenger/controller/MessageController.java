@@ -1,21 +1,27 @@
 package com.premisave.messenger.controller;
 
 import com.premisave.messenger.dto.request.SendMessageRequest;
+import com.premisave.messenger.dto.response.AttachmentResponse;
 import com.premisave.messenger.dto.response.MessageResponse;
 import com.premisave.messenger.dto.websocket.ChatMessage;
-import com.premisave.messenger.enums.MessageType;
+import com.premisave.messenger.exception.HttpStatusException;
+import com.premisave.messenger.security.CurrentUserResolver;
+import com.premisave.messenger.service.AttachmentService;
 import com.premisave.messenger.service.ChatService;
-import com.premisave.messenger.service.MediaService;
 import com.premisave.messenger.service.MessageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
+/**
+ * Every endpoint resolves the caller through auth-service first. The JWT
+ * subject is an email, so Authentication.getName() can never be compared
+ * with chat participant ids.
+ */
 @Slf4j
 @RestController
 @RequestMapping("/api/messages")
@@ -23,63 +29,63 @@ import java.util.List;
 public class MessageController {
 
     private final MessageService messageService;
-    private final MediaService mediaService;
+    private final AttachmentService attachmentService;
     private final ChatService chatService;
-    
-    @PostMapping(consumes = {"multipart/form-data"})
-    public ResponseEntity<MessageResponse> sendMessage(
-            @ModelAttribute SendMessageRequest request,
-            Authentication authentication) {
+    private final CurrentUserResolver currentUserResolver;
 
-        return sendMessageInternal(request, authentication, false);
+    /**
+     * Send text, or text plus a file in one request (multipart).
+     * For big files prefer POST /api/attachments, then send the attachmentId.
+     */
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<MessageResponse> sendMultipart(
+            @ModelAttribute SendMessageRequest request,
+            @RequestHeader("Authorization") String authHeader) {
+        return ResponseEntity.ok(send(request, authHeader));
     }
 
-    @PostMapping(value = "/{messageId}/reply", consumes = {"multipart/form-data"})
-    public ResponseEntity<MessageResponse> replyToMessage(
+    /** Send text, or an already uploaded file by attachmentId (JSON). */
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<MessageResponse> sendJson(
+            @RequestBody SendMessageRequest request,
+            @RequestHeader("Authorization") String authHeader) {
+        return ResponseEntity.ok(send(request, authHeader));
+    }
+
+    @PostMapping(value = "/{messageId}/reply", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<MessageResponse> replyMultipart(
             @PathVariable String messageId,
             @ModelAttribute SendMessageRequest request,
-            Authentication authentication) {
-
+            @RequestHeader("Authorization") String authHeader) {
         request.setReplyToMessageId(messageId);
-        return sendMessageInternal(request, authentication, true);
+        return ResponseEntity.ok(send(request, authHeader));
     }
 
-    private ResponseEntity<MessageResponse> sendMessageInternal(
-            SendMessageRequest request,
-            Authentication authentication,
-            boolean isReply) {
+    @PostMapping(value = "/{messageId}/reply", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<MessageResponse> replyJson(
+            @PathVariable String messageId,
+            @RequestBody SendMessageRequest request,
+            @RequestHeader("Authorization") String authHeader) {
+        request.setReplyToMessageId(messageId);
+        return ResponseEntity.ok(send(request, authHeader));
+    }
 
-        if (authentication == null || authentication.getName() == null) {
-            log.warn("Unauthorized attempt");
-            return ResponseEntity.status(401).build();
+    private MessageResponse send(SendMessageRequest request, String authHeader) {
+        String senderId = currentUserResolver.resolve(authHeader).getId();
+
+        if (request.getChatId() == null || request.getChatId().isBlank()) {
+            throw new IllegalArgumentException("chatId is required");
+        }
+        if (!chatService.canAccessChat(request.getChatId(), senderId)) {
+            log.warn("User {} tried to send to unauthorized chat {}", senderId, request.getChatId());
+            throw HttpStatusException.forbidden("You are not a member of this chat");
         }
 
-        String senderId = authentication.getName();
-
-        // Security: Check if user can access the chat (private or group)
-        if (request.getChatId() != null) {
-            if (!chatService.canAccessChat(request.getChatId(), senderId)) {
-                log.warn("User {} tried to send message to unauthorized chat {}", senderId, request.getChatId());
-                return ResponseEntity.status(403).build();
-            }
-        }
-
+        // Direct file: store it first, then send exactly like any other attachment.
+        String attachmentId = request.getAttachmentId();
         if (request.getFile() != null && !request.getFile().isEmpty()) {
-            try {
-                String folder = determineMediaFolder(request.getFile());
-                String uploadedUrl = mediaService.uploadMedia(request.getFile(), folder);
-
-                request.setMediaUrl(uploadedUrl);
-                request.setFileName(request.getFile().getOriginalFilename());
-                request.setFileSize(request.getFile().getSize());
-
-                if (request.getMessageType() == MessageType.TEXT || request.getMessageType() == null) {
-                    request.setMessageType(detectMessageType(request.getFile()));
-                }
-            } catch (Exception e) {
-                log.error("File upload failed", e);
-                return ResponseEntity.internalServerError().build();
-            }
+            AttachmentResponse uploaded = attachmentService.upload(request.getFile(), request.getChatId(), senderId);
+            attachmentId = uploaded.getAttachmentId();
         }
 
         ChatMessage chatMessage = new ChatMessage();
@@ -87,13 +93,12 @@ public class MessageController {
         chatMessage.setSenderId(senderId);
         chatMessage.setContent(request.getContent());
         chatMessage.setMessageType(request.getMessageType());
-        chatMessage.setMediaUrl(request.getMediaUrl());
+        chatMessage.setAttachmentId(attachmentId);
         chatMessage.setReplyToMessageId(request.getReplyToMessageId());
 
-        MessageResponse response = messageService.sendMessage(chatMessage, "Bearer " + senderId);
-
-        log.info("{} sent successfully in chat {}", isReply ? "Reply" : "Message", request.getChatId());
-        return ResponseEntity.ok(response);
+        MessageResponse response = messageService.sendMessage(chatMessage, authHeader);
+        log.info("Message {} sent in chat {} (attachment: {})", response.getId(), request.getChatId(), attachmentId != null);
+        return response;
     }
 
     @GetMapping("/chat/{chatId}")
@@ -101,68 +106,37 @@ public class MessageController {
             @PathVariable String chatId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
-            Authentication authentication) {
+            @RequestHeader("Authorization") String authHeader) {
 
-        if (authentication == null || authentication.getName() == null) {
-            return ResponseEntity.status(401).build();
-        }
-
-        String userId = authentication.getName();
-
-        // Security: Check chat access
+        String userId = currentUserResolver.resolve(authHeader).getId();
         if (!chatService.canAccessChat(chatId, userId)) {
-            log.warn("User {} tried to access unauthorized chat {}", userId, chatId);
-            return ResponseEntity.status(403).build();
+            log.warn("User {} tried to read unauthorized chat {}", userId, chatId);
+            throw HttpStatusException.forbidden("You are not a member of this chat");
         }
-
-        String token = "Bearer " + userId;
-        List<MessageResponse> messages = messageService.getChatMessages(chatId, page, size, token);
-        return ResponseEntity.ok(messages);
+        return ResponseEntity.ok(messageService.getChatMessages(chatId, page, Math.min(size, 100), authHeader));
     }
 
     @PostMapping("/read/{messageId}")
-    public ResponseEntity<Void> markAsRead(@PathVariable String messageId, Authentication authentication) {
-        if (authentication == null || authentication.getName() == null) {
-            return ResponseEntity.status(401).build();
-        }
-        messageService.markMessageAsRead(messageId, authentication.getName());
+    public ResponseEntity<Void> markAsRead(
+            @PathVariable String messageId,
+            @RequestHeader("Authorization") String authHeader) {
+        messageService.markMessageAsRead(messageId, currentUserResolver.resolve(authHeader).getId());
         return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/{messageId}")
-    public ResponseEntity<Void> deleteForEveryone(@PathVariable String messageId, Authentication authentication) {
-        if (authentication == null || authentication.getName() == null) {
-            return ResponseEntity.status(401).build();
-        }
-        messageService.deleteMessageForEveryone(messageId, authentication.getName());
+    public ResponseEntity<Void> deleteForEveryone(
+            @PathVariable String messageId,
+            @RequestHeader("Authorization") String authHeader) {
+        messageService.deleteMessageForEveryone(messageId, currentUserResolver.resolve(authHeader).getId(), authHeader);
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{messageId}/me")
-    public ResponseEntity<Void> deleteForMe(@PathVariable String messageId, Authentication authentication) {
-        if (authentication == null || authentication.getName() == null) {
-            return ResponseEntity.status(401).build();
-        }
-        messageService.deleteMessageForMe(messageId, authentication.getName());
+    public ResponseEntity<Void> deleteForMe(
+            @PathVariable String messageId,
+            @RequestHeader("Authorization") String authHeader) {
+        messageService.deleteMessageForMe(messageId, currentUserResolver.resolve(authHeader).getId());
         return ResponseEntity.noContent().build();
-    }
-
-    private String determineMediaFolder(MultipartFile file) {
-        String ct = file.getContentType();
-        if (ct != null) {
-            if (ct.startsWith("image/")) return "images";
-            if (ct.startsWith("video/")) return "videos";
-            if (ct.startsWith("audio/")) return "voice";
-        }
-        return "documents";
-    }
-
-    private MessageType detectMessageType(MultipartFile file) {
-        String ct = file.getContentType();
-        if (ct == null) return MessageType.DOCUMENT;
-        if (ct.startsWith("image/")) return MessageType.IMAGE;
-        if (ct.startsWith("video/")) return MessageType.VIDEO;
-        if (ct.startsWith("audio/")) return MessageType.VOICE;
-        return MessageType.DOCUMENT;
     }
 }

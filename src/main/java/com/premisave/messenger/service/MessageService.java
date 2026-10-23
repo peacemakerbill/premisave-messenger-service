@@ -4,6 +4,7 @@ import com.premisave.messenger.config.MessengerMetrics;
 import com.premisave.messenger.dto.response.MessageResponse;
 import com.premisave.messenger.dto.response.UserSummaryResponse;
 import com.premisave.messenger.dto.websocket.ChatMessage;
+import com.premisave.messenger.entity.Attachment;
 import com.premisave.messenger.entity.Chat;
 import com.premisave.messenger.entity.Message;
 import com.premisave.messenger.enums.ChatType;
@@ -39,12 +40,40 @@ public class MessageService {
     private final UserService userService;
     private final RedisMessagePublisher redisMessagePublisher;
     private final MessengerMetrics metrics;
+    private final AttachmentService attachmentService;
 
     /**
-     * Send message with idempotency guarantee and delivery tracking
+     * Send message with idempotency guarantee and delivery tracking.
+     *
+     * A message may carry a file by naming an attachmentId from
+     * POST /api/attachments. The upload is claimed atomically (only the
+     * uploader, only for the chat it was uploaded to, only once), and the
+     * message takes its type, file name, size and link from the stored
+     * upload rather than from anything the client says about it.
      */
     @Transactional
     public MessageResponse sendMessage(ChatMessage chatMessage, String authToken) {
+        boolean hasAttachment = chatMessage.getAttachmentId() != null && !chatMessage.getAttachmentId().isBlank();
+        boolean hasText = chatMessage.getContent() != null && !chatMessage.getContent().isBlank();
+        if (!hasAttachment && !hasText && chatMessage.getMediaUrl() == null) {
+            throw new IllegalArgumentException("A message needs text or an attachment");
+        }
+
+        Attachment attachment = hasAttachment
+                ? attachmentService.claim(chatMessage.getAttachmentId(), chatMessage.getSenderId(), chatMessage.getChatId())
+                : null;
+
+        try {
+            return doSend(chatMessage, authToken, attachment);
+        } catch (RuntimeException e) {
+            if (attachment != null) {
+                attachmentService.release(attachment.getId());
+            }
+            throw e;
+        }
+    }
+
+    private MessageResponse doSend(ChatMessage chatMessage, String authToken, Attachment attachment) {
         // Generate idempotency key
         String idempotencyKey = UUID.randomUUID().toString();
         
@@ -65,6 +94,14 @@ public class MessageService {
             ? chatMessage.getMessageType() 
             : MessageType.TEXT);
         message.setMediaUrl(chatMessage.getMediaUrl());
+        if (attachment != null) {
+            message.setMessageType(attachment.getCategory().toMessageType());
+            message.setMediaUrl(null);
+            message.setAttachmentId(attachment.getId());
+            message.setFileName(attachment.getFileName());
+            message.setFileSize(attachment.getSize());
+            message.setMimeType(attachment.getMimeType());
+        }
         message.setStatus(MessageStatus.SENT);
         message.setCreatedAt(LocalDateTime.now());
         message.setActive(true);
@@ -77,6 +114,10 @@ public class MessageService {
         Message savedMessage = messageRepository.save(message);
         log.debug("Message persisted to DB: {} | Idempotency Key: {} | Chat: {}", 
             savedMessage.getId(), idempotencyKey, savedMessage.getChatId());
+
+        if (attachment != null) {
+            attachmentService.linkMessage(attachment.getId(), savedMessage.getId());
+        }
 
         // STEP 2: Update delivery state
         savedMessage.setDeliveryState(MessageDeliveryState.DELIVERED_TO_DB);
@@ -278,7 +319,7 @@ public class MessageService {
      * Delete message for everyone
      */
     @Transactional
-    public void deleteMessageForEveryone(String messageId, String userId) {
+    public void deleteMessageForEveryone(String messageId, String userId, String authToken) {
         Message message = messageRepository.findById(messageId)
             .orElseThrow(() -> new MessageNotFoundException("Message not found: " + messageId));
 
@@ -290,10 +331,16 @@ public class MessageService {
         message.setContent("This message was deleted");
         message.setEditedAt(LocalDateTime.now());
         message.setActive(false);
+
+        // The file goes with the message, like WhatsApp's "delete for everyone".
+        String attachmentId = message.getAttachmentId();
+        message.setAttachmentId(null);
+        message.setMediaUrl(null);
         messageRepository.save(message);
+        attachmentService.deleteForMessage(attachmentId);
 
         // Notify all participants
-        MessageResponse deletedResponse = convertToMessageResponse(message, "Bearer " + userId);
+        MessageResponse deletedResponse = convertToMessageResponse(message, authToken);
         broadcastMessage(message, deletedResponse);
 
         log.info("Message {} deleted for everyone by {}", messageId, userId);
@@ -404,7 +451,11 @@ public class MessageService {
         response.setSenderId(message.getSenderId());
         response.setMessageType(message.getMessageType());
         response.setContent(message.isDeletedForEveryone() ? "This message was deleted" : message.getContent());
-        response.setMediaUrl(message.getMediaUrl());
+        response.setMediaUrl(resolveMediaUrl(message));
+        response.setFileName(message.getFileName());
+        response.setFileSize(message.getFileSize());
+        response.setMimeType(message.getMimeType());
+        response.setAttachmentId(message.getAttachmentId());
         response.setStatus(message.getStatus());
         response.setReadBy(message.getReadBy());
         response.setCreatedAt(message.getCreatedAt());
@@ -445,7 +496,7 @@ public class MessageService {
                 preview.setSenderId(original.getSenderId());
                 preview.setContent(truncateForPreview(original.getContent()));
                 preview.setMessageType(original.getMessageType());
-                preview.setMediaUrl(original.getMediaUrl());
+                preview.setMediaUrl(resolveMediaUrl(original));
 
                 try {
                     UserSummaryResponse sender = userService.getUserSummary(original.getSenderId(), authToken);
@@ -456,6 +507,17 @@ public class MessageService {
                 return preview;
             })
             .orElse(null);
+    }
+
+    /**
+     * Uploaded files get a fresh signed link on every read; older
+     * messages that carry a plain mediaUrl (Cloudinary) are untouched.
+     */
+    private String resolveMediaUrl(Message message) {
+        if (message.getAttachmentId() != null) {
+            return attachmentService.signedUrl(message.getAttachmentId());
+        }
+        return message.getMediaUrl();
     }
 
     private String truncateForPreview(String content) {
