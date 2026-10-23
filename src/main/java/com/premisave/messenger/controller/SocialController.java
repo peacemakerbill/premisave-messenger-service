@@ -192,58 +192,50 @@ public class SocialController {
         return ResponseEntity.ok(withReviewers(authServiceClient.getMyWrittenReviews(token), token));
     }
 
-    // ── Reviewer lookup ──────────────────────────────────────────────────────
+    // ── Reviewer details ──────────────────────────────────────────────────────
 
     /**
-     * Attaches the reviewer's profile to each review. The review stores whatever
-     * the auth-service saved for the reviewer, which can be an email rather than
-     * an id, so a failed id lookup falls back to a search on that value.
+     * Builds the reviewer of each review from the fields the auth-service sends
+     * (reviewerName, reviewerEmail, reviewerProfilePicture). The profile lookup
+     * runs only for reviews where those fields are missing, once per reviewer.
      */
     private List<ReviewResponse> withReviewers(List<ReviewResponse> reviews, String token) {
         if (reviews == null) return List.of();
-        Map<String, UserSummaryResponse> found = new HashMap<>();
-        List<List<UserSummaryResponse>> everyone = new java.util.ArrayList<>();   // loaded once, only if needed
+        Map<String, UserSummaryResponse> lookedUp = new HashMap<>();
         for (ReviewResponse review : reviews) {
-            String ref = review.getUserId();
-            if (ref == null || ref.isBlank()) continue;
-            if (!found.containsKey(ref)) found.put(ref, resolveUser(ref, token, everyone));
-            review.setReviewer(found.get(ref));
+            UserSummaryResponse reviewer = fromReview(review);
+            if (reviewer == null && review.getUserId() != null && !review.getUserId().isBlank()) {
+                String id = review.getUserId();
+                if (!lookedUp.containsKey(id)) lookedUp.put(id, lookup(id, token));
+                reviewer = lookedUp.get(id);
+            }
+            review.setReviewer(reviewer);
         }
         return reviews;
     }
 
-    private UserSummaryResponse resolveUser(String ref, String token, List<List<UserSummaryResponse>> everyone) {
-        try {
-            UserSummaryResponse user = userService.getUserSummary(ref, token);
-            boolean fallback = user == null || "Unknown User".equals(user.getDisplayName());
-            if (!fallback) return user;
+    private UserSummaryResponse fromReview(ReviewResponse review) {
+        boolean hasName = review.getReviewerName() != null && !review.getReviewerName().isBlank();
+        boolean hasEmail = review.getReviewerEmail() != null && !review.getReviewerEmail().isBlank();
+        if (!hasName && !hasEmail) return null;
 
-            // 1. A search on the value (name, username or email, depending on auth-service).
-            UserSummaryResponse hit = matching(userService.searchUsers(ref, token), ref);
-            if (hit != null) return hit;
-
-            // 2. The full user list, matched on id, email or username.
-            if (everyone.isEmpty()) everyone.add(userService.getAllUsers(0, 1000, token));
-            hit = matching(everyone.get(0), ref);
-            if (hit != null) return hit;
-        } catch (Exception e) {
-            log.warn("Could not resolve reviewer {}: {}", ref, e.getMessage());
-            return null;
-        }
-        log.warn("Reviewer '{}' matches no user by id, email or username", ref);
-        return null;
+        UserSummaryResponse user = new UserSummaryResponse();
+        user.setId(review.getUserId());
+        user.setEmail(review.getReviewerEmail());
+        user.setDisplayName(hasName ? review.getReviewerName() : review.getReviewerEmail());
+        user.setProfilePictureUrl(review.getReviewerProfilePicture());
+        return user;
     }
 
-    private UserSummaryResponse matching(List<UserSummaryResponse> users, String ref) {
-        if (users == null) return null;
-        for (UserSummaryResponse candidate : users) {
-            if (candidate != null && (ref.equalsIgnoreCase(candidate.getId())
-                    || ref.equalsIgnoreCase(candidate.getEmail())
-                    || ref.equalsIgnoreCase(candidate.getUsername()))) {
-                return candidate;
-            }
+    private UserSummaryResponse lookup(String userId, String token) {
+        try {
+            UserSummaryResponse user = userService.getUserSummary(userId, token);
+            if (user == null || "Unknown User".equals(user.getDisplayName())) return null;
+            return user;
+        } catch (Exception e) {
+            log.warn("Could not load reviewer {}: {}", userId, e.getMessage());
+            return null;
         }
-        return null;
     }
 
     // ── Relationship status checks ────────────────────────────────────────────

@@ -409,10 +409,10 @@ button.p-stat:hover { background: var(--row-hover); }
 .p-views { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 8px 0 10px; text-align: center; }
 .p-views b { display: block; font-size: 17px; } .p-views span { font-size: 12.5px; color: var(--text-2); }
 .stars { display: inline-flex; gap: 2px; }
-.stars button, .stars.ro span { display: inline-grid; place-items: center; color: var(--line); }
+.stars button, .stars.ro > span { display: inline-grid; place-items: center; color: var(--line); }
 .stars button { width: 36px; height: 36px; border-radius: 50%; }
 .stars button:hover { background: var(--panel-2); }
-.stars .on, .stars.ro span.on { color: #f5a623; }
+.stars .on, .stars.ro > span.on { color: #f5a623; }
 .stars .ico { width: 24px; height: 24px; } .stars.ro .ico { width: 16px; height: 16px; }
 .review-form { padding: 6px 0 14px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
 .review-form .field-l { margin: 4px 0 4px; }
@@ -2312,16 +2312,20 @@ async function paintTab(pane, cur, me, reviews, views, user, rerun) {
   nodes.push(list);
   pane.replaceChildren(...nodes);
   for (const r of reviews.slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))) {
-    const who = await resolveRef(r.userId, r.reviewer);
+    // The auth-service sends the reviewer's name, email and picture with each
+    // review; the profile lookup only runs when those are missing.
+    const given = r.reviewer || ((r.reviewerName || r.reviewerEmail) ? { id: r.userId, displayName: r.reviewerName || r.reviewerEmail, email: r.reviewerEmail, profilePictureUrl: r.reviewerProfilePicture } : null);
+    const who = await resolveRef(r.userId, given);
     if (prof !== cur || cur.tab !== tab) return;
     const when = toDate(r.createdAt);
     const own = byMe(r);
     const known = !!who.id;
-    const sub = [own ? '' : who.email || '', when ? when.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : ''].filter(Boolean).join('  ');
+    const edited = r.updatedAt && r.createdAt && String(r.updatedAt) !== String(r.createdAt);
+    const sub = [own ? '' : who.email || '', when ? when.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : '', edited ? 'edited' : ''].filter(Boolean).join('  ');
     list.append(h('div', { class: 'review' },
       h('button', { class: 'person', type: 'button', style: 'padding:0 0 6px', disabled: known ? null : true, title: known ? 'View profile' : '', onclick: () => known && openProfile(who.id) },
         avatar(userName(who), who.profilePictureUrl, who.id || r.userId, 'sm'),
-        h('div', null, h('div', { class: 'n' }, own ? 'You' : known ? userName(who) : (/@/.test(r.userId || '') ? r.userId : 'Unknown user')), h('div', { class: 'e' }, sub))),
+        h('div', null, h('div', { class: 'n' }, own ? 'You' : known ? userName(who) : 'Unknown user'), h('div', { class: 'e' }, sub))),
       stars(r.rating),
       r.comment ? h('p', null, r.comment) : null));
   }
