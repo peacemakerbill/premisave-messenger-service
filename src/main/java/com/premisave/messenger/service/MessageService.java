@@ -18,6 +18,7 @@ import com.premisave.messenger.repository.ChatRepository;
 import com.premisave.messenger.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -42,6 +43,10 @@ public class MessageService {
     private final RedisMessagePublisher redisMessagePublisher;
     private final MessengerMetrics metrics;
     private final AttachmentService attachmentService;
+
+    /** Hours a sender may edit a message after sending it. 0 turns editing off. */
+    @Value("${message.edit-window-hours:1}")
+    private long editWindowHours;
 
     /**
      * Send message with idempotency guarantee and delivery tracking.
@@ -109,12 +114,15 @@ public class MessageService {
             }
         }
 
-        // Only people who are in this chat can be tagged, and never the sender.
-        List<String> mentions = chatMessage.getMentionedUserIds() == null ? List.of()
-                : chatMessage.getMentionedUserIds().stream()
-                    .filter(id -> id != null && !id.equals(senderId) && chat.getParticipantIds().contains(id))
-                    .distinct().limit(20).toList();
-        chatMessage.setMentionedUserIds(mentions);
+        chatMessage.setMentionedUserIds(validMentions(chat, senderId, chatMessage.getMentionedUserIds()));
+    }
+
+    /** Only people who are in the chat can be tagged, never the sender, at most 20. */
+    private List<String> validMentions(Chat chat, String senderId, List<String> requested) {
+        if (requested == null) return List.of();
+        return requested.stream()
+                .filter(id -> id != null && !id.equals(senderId) && chat.getParticipantIds().contains(id))
+                .distinct().limit(20).toList();
     }
 
     private MessageResponse doSend(ChatMessage chatMessage, String authToken, Attachment attachment) {
@@ -389,6 +397,86 @@ public class MessageService {
         return marked;
     }
 
+    public long getEditWindowHours() {
+        return editWindowHours;
+    }
+
+    /** When a message can last be edited, or null if it cannot be edited at all. */
+    private LocalDateTime editDeadline(Message message) {
+        if (editWindowHours <= 0 || message.isDeletedForEveryone() || message.getCreatedAt() == null) {
+            return null;
+        }
+        return message.getCreatedAt().plusHours(editWindowHours);
+    }
+
+    /**
+     * Change the text of your own message, within the edit window
+     * (message.edit-window-hours). The change goes out to everyone in the chat
+     * as an update to the same message id, with editedAt set.
+     */
+    public MessageResponse editMessage(String messageId, String userId, String newContent,
+                                       List<String> mentionedUserIds, String authToken) {
+        int attempt = 0;
+        while (true) {
+            try {
+                return doEdit(messageId, userId, newContent, mentionedUserIds, authToken);
+            } catch (org.springframework.dao.OptimisticLockingFailureException e) {
+                // A read receipt landed at the same moment. Read the message again and retry.
+                if (++attempt >= 3) {
+                    throw HttpStatusException.conflict("The message changed while you were editing it. Try again.");
+                }
+            }
+        }
+    }
+
+    private MessageResponse doEdit(String messageId, String userId, String newContent,
+                                   List<String> mentionedUserIds, String authToken) {
+        Message message = messageRepository.findById(messageId)
+            .orElseThrow(() -> new MessageNotFoundException("Message not found: " + messageId));
+
+        if (!message.getSenderId().equals(userId)) {
+            throw HttpStatusException.forbidden("You can only edit your own messages");
+        }
+        if (!chatService.canAccessChat(message.getChatId(), userId)) {
+            throw HttpStatusException.forbidden("You are not a member of this chat");
+        }
+        if (message.isDeletedForEveryone() || !message.isActive()) {
+            throw HttpStatusException.badRequest("A deleted message cannot be edited");
+        }
+        if (editWindowHours <= 0) {
+            throw new HttpStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "EDITING_DISABLED",
+                    "Editing messages is turned off");
+        }
+        LocalDateTime deadline = editDeadline(message);
+        if (deadline == null || LocalDateTime.now().isAfter(deadline)) {
+            throw new HttpStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "EDIT_WINDOW_EXPIRED",
+                    "Messages can only be edited for " + editWindowHours + (editWindowHours == 1 ? " hour" : " hours") + " after they are sent");
+        }
+
+        String text = newContent == null ? "" : newContent.trim();
+        boolean hasFile = message.getAttachmentId() != null || message.getMediaUrl() != null;
+        if (text.isEmpty() && !hasFile) {
+            throw HttpStatusException.badRequest("A message cannot be empty");
+        }
+        if (text.equals(message.getContent())) {
+            return convertToMessageResponse(message, authToken);   // nothing changed
+        }
+
+        message.setContent(text);
+        message.setEditedAt(LocalDateTime.now());
+        if (mentionedUserIds != null) {
+            Chat chat = chatRepository.findById(message.getChatId()).orElse(null);
+            message.setMentionedUserIds(chat == null ? new ArrayList<>()
+                    : new ArrayList<>(validMentions(chat, userId, mentionedUserIds)));
+        }
+        Message saved = messageRepository.save(message);
+
+        MessageResponse response = convertToMessageResponse(saved, authToken);
+        broadcastMessage(saved, response);
+        log.info("Message {} edited by {}", messageId, userId);
+        return response;
+    }
+
     /**
      * Delete message for everyone
      */
@@ -538,6 +626,7 @@ public class MessageService {
         response.setReadBy(message.getReadBy());
         response.setCreatedAt(message.getCreatedAt());
         response.setEditedAt(message.getEditedAt());
+        response.setEditableUntil(editDeadline(message));
         response.setDeleted(message.isDeletedForEveryone());
         response.setReplyToMessageId(message.getReplyToMessageId());
         response.setMentionedUserIds(message.getMentionedUserIds());

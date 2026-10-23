@@ -30,6 +30,9 @@ public class MessageResponse {
     private LocalDateTime createdAt;
     private LocalDateTime editedAt;
 
+    // Until when the sender can still edit this message (null once it cannot be edited).
+    private LocalDateTime editableUntil;
+
     private boolean isDeleted;
     private boolean isDeletedForEveryone;
 

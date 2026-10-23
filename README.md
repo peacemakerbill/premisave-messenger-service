@@ -247,6 +247,7 @@ Message <id> delivery completed. Success: 1/1, Failures: 0
 | `STORAGE_ROOT` | LOCAL mode | `./data/messenger-storage` | Base folder for uploaded files. |
 | `STORAGE_PUBLIC_BASE_URL` | No | `http://localhost:8081` | Public address of this service, used in download and photo links. |
 | `STORAGE_MAX_FILE_SIZE` / `STORAGE_MAX_REQUEST_SIZE` | No | `50MB` / `60MB` | Largest single file, and the request limit (keep it a little higher). |
+| `MESSAGE_EDIT_WINDOW_HOURS` | No | `1` | How long after sending a person can edit their own message (`message.edit-window-hours` in `application.yml`). `0` turns editing off. Past the window the edit is refused with `EDIT_WINDOW_EXPIRED`. |
 | `STORAGE_URL_TTL` / `STORAGE_UNCLAIMED_TTL` | No | `6h` / `24h` | Lifetime of a signed link, and how long an unsent upload is kept. |
 | `STORAGE_SIGNING_SECRET` | No | `JWT_SECRET` | Key used to sign download links. |
 | `STORAGE_NETWORK_*` | NETWORK mode | blank | `PROTOCOL`, `HOST`, `SHARE`, `MOUNT_PATH`, `DIRECTORY`, `REQUIRE_MOUNT`. With `REQUIRE_MOUNT=true` the service refuses to start or write unless the path is on a mounted network share. |
@@ -264,6 +265,8 @@ Message <id> delivery completed. Success: 1/1, Failures: 0
 | `POST` | `/api/messages/{messageId}/reply` | Reply to a message (JSON or multipart) |
 | `GET` | `/api/messages/chat/{chatId}` | Paginated message history (`page`, `size`, newest first); hides messages you deleted for yourself |
 | `POST` | `/api/messages/read/{messageId}` | Mark a message as read |
+| `PUT` | `/api/messages/{messageId}` | Edit your own message (`content`, optional `mentionedUserIds`) within the edit window; everyone in the chat gets the update live and the message shows `editedAt` |
+| `GET` | `/api/messages/settings` | Message settings for clients, currently `editWindowHours` |
 | `DELETE` | `/api/messages/{messageId}` | Delete a message for everyone (sender only; also removes the stored file) |
 | `DELETE` | `/api/messages/{messageId}/me` | Delete a message for yourself only |
 | `GET` | `/api/users/me` | The caller's own profile, including the real user id |
@@ -319,11 +322,12 @@ Connect with a STOMP client to `ws://<host>:8081/ws-messenger`, sending `Authori
 3. Sign in with an auth-service account. The service addresses can be changed under "Connection and token", and a token can be pasted instead of a password.
 4. Open a second tab in a private window and sign in as another user to chat with yourself from both sides. A private window keeps its own session, so the two users do not log each other out.
 
-What it covers: private chats, group chats, replies, emoji, photos, videos, audio, documents and voice notes (upload progress, captions, drag and drop, paste), live delivery and read ticks, typing and online status, unread counters, mark as read and unread, in-chat search, delete for me and for everyone, automatic reconnect with a polling fallback, and a mobile layout.
+What it covers: private chats, group chats, replies, emoji, photos, videos, audio, documents and voice notes (upload progress, captions, drag and drop, paste), live delivery and read ticks, typing and online status, unread counters, mark as read and unread, editing your own messages, in-chat search, delete for me and for everyone, automatic reconnect with a polling fallback, and a mobile layout.
 
 Notes:
 - Groups: create a group with members, edit its name, description and photo, add and remove members, promote admins, transfer ownership and leave, all from the client. Members are added to the group chat on the server, so they see the group and get its messages straight away. Typing indicators and per-member read receipts are not available in groups.
 - Read state: opening a chat marks its unread messages as read automatically (also when the tab becomes visible again and after a reconnect). Use the chat menu or a right click on a chat row for "Mark as unread" and "Mark as read". Your own messages never count as unread.
+- Editing: open the message menu on one of your own messages and choose Edit, change the text in the message box and press Enter (Escape cancels). The menu only offers Edit while the edit window is open, and the edited message shows "edited" for everyone. The window comes from `MESSAGE_EDIT_WINDOW_HOURS` (default 1 hour).
 - Tagging: type `@` in the message box to pick someone from the chat (the other person in a private chat, the members in a group). The tag is stored as `mentionedUserIds`, shown highlighted in the message, and a chat row shows `@` when you were tagged in an unread message. The server keeps only people who are in the chat.
 - Search: the box above the chat list matches chat names and emails, and lists matching people below your chats with their email and a profile button. You never appear in people lists.
 - Profiles: click a contact's name or avatar (or a group member) to see their profile, followers, following, likes and reviews, then follow, like, or review them, or start a chat. Your own profile, with who follows you and who viewed it, is under the person icon on the left rail. Reviews show the reviewer's picture, name and email, and clicking one opens their profile. The server attaches a `reviewer` profile to each review (`GET /api/social/reviews/{id}`, `my-reviews`, `my-written-reviews`), looking the reviewer up by id and then by email, because the auth-service may store either. Profile editing is not part of the client.

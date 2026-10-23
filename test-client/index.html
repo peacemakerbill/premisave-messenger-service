@@ -529,6 +529,8 @@ const S = {
   presence: {},        // userId -> { online, lastSeen }
   drafts: {},
   replyTo: null,
+  editing: null,       // the message being edited in the composer
+  editWindow: 1,       // hours a sender may edit a message, from /api/messages/settings
   filter: '',
   ws: null, wsState: 'down', retry: 0, retryTimer: null, wasDown: false,
   deliveredIds: new Set(),
@@ -1282,6 +1284,7 @@ async function loadChats(silent) {
 
 async function openChat(id) {
   if (S.active) S.drafts[S.active] = R.ta.value;
+  cancelEdit(true);
   S.active = id;
   S.unread[id] = 0;
   clearReply();
@@ -1304,6 +1307,7 @@ async function openChat(id) {
   if (matchMedia('(min-width: 861px)').matches) R.ta.focus();
 }
 function closeChat() {
+  cancelEdit(true);
   if (S.active) S.drafts[S.active] = R.ta.value;
   S.active = null;
   R.app.classList.remove('has-chat');
@@ -1419,6 +1423,7 @@ function retrySend(m) {
 }
 
 function sendText() {
+  if (S.editing) { saveEdit(); return; }
   const c = chatById(S.active); if (!c) return;
   const text = R.ta.value.trim();
   if (!text) return;
@@ -1488,7 +1493,7 @@ function buildComposer() {
 }
 function autoGrow() { R.ta.style.height = 'auto'; R.ta.style.height = Math.min(R.ta.scrollHeight, 140) + 'px'; }
 function syncSendButton() {
-  const has = R.ta.value.trim().length > 0;
+  const has = R.ta.value.trim().length > 0 || !!S.editing;
   R.sendBtn.replaceChildren(ico(has ? 'send' : 'mic'));
   R.sendBtn.setAttribute('aria-label', has ? 'Send' : 'Record voice message');
   R.sendBtn.title = has ? 'Send' : 'Record voice message';
@@ -1506,9 +1511,11 @@ function onType() {
 }
 function onComposerKey(e) {
   if (mentionKey(e)) return;
+  if (e.key === 'Escape' && S.editing) { e.preventDefault(); cancelEdit(); return; }
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendText(); }
 }
 function onSendOrMic() {
+  if (S.editing) { saveEdit(); return; }
   if (R.ta.value.trim()) sendText(); else startRecording();
 }
 function onPaste(e) {
@@ -1564,6 +1571,7 @@ function openMsgMenu(anchor, m) {
   const mine = S.me && m.senderId === S.me.id;
   const items = [];
   if (!m.deleted) items.push(popItem('reply', 'Reply', () => setReply(m)));
+  if (canEdit(m)) items.push(popItem('edit', 'Edit', () => startEdit(m)));
   if (m.content && !m.deleted) items.push(popItem('copy', 'Copy text', () => navigator.clipboard?.writeText(m.content).then(() => toast('Copied'), () => toast('Could not copy', true))));
   if ((m.mediaUrl) && !m.deleted) items.push(h('a', { class: 'pop-a', href: m.mediaUrl, target: '_blank', rel: 'noopener', download: m.fileName || true, style: 'display:flex;align-items:center;gap:12px;padding:10px 18px;color:inherit;text-decoration:none', onclick: closePop }, ico('download'), 'Download'));
   items.push(h('hr'));
@@ -2467,6 +2475,74 @@ function peopleRows(chats) {
 }
 
 // ====================================================================
+// Editing your own messages
+// ====================================================================
+function editDeadline(m) {
+  if (m.editableUntil) return toDate(m.editableUntil);
+  const t = toDate(m.createdAt);
+  return t && S.editWindow > 0 ? new Date(t.getTime() + S.editWindow * 3600000) : null;
+}
+function canEdit(m) {
+  if (!m || m.deleted || m._pending || m._failed || !m.id || !S.me || m.senderId !== S.me.id) return false;
+  if (S.editWindow <= 0 && !m.editableUntil) return false;
+  const k = kindOf(m);
+  if ((k === 'audio') && !m.content) return false;          // voice notes have no text to change
+  const until = editDeadline(m);
+  return !!until && Date.now() < until.getTime();
+}
+function startEdit(m) {
+  closePop();
+  const c = chatById(m.chatId); if (!c) return;
+  if (!S.editing) S.editDraft = R.ta.value;
+  clearReply();
+  S.editing = m;
+  const until = editDeadline(m);
+  R.replyBar.replaceChildren(
+    h('div', { class: 'quote' }, h('div', { class: 'q' },
+      h('div', { class: 'qn' }, 'Edit message'),
+      h('div', { class: 'qt' }, until ? 'You can edit until ' + fmtTime(until) : (m.content || '')))),
+    btn('icon-btn', 'Cancel edit', 'x', () => cancelEdit()));
+  R.replyBar.classList.remove('hidden');
+  R.ta.value = m.content || '';
+  // tags already in the message stay tags unless the text for them is removed
+  tagged[m.chatId] = {};
+  mentionsOf(m).forEach(x => { tagged[m.chatId][x.id] = x.name; });
+  autoGrow(); syncSendButton(); R.ta.focus();
+  R.ta.setSelectionRange(R.ta.value.length, R.ta.value.length);
+}
+function cancelEdit(silent) {
+  if (!S.editing) return;
+  S.editing = null;
+  if (R.replyBar) { R.replyBar.classList.add('hidden'); R.replyBar.replaceChildren(); }
+  if (R.ta) {
+    R.ta.value = silent ? '' : (S.editDraft || '');
+    autoGrow(); syncSendButton();
+  }
+  S.editDraft = '';
+}
+async function saveEdit() {
+  const m = S.editing; if (!m) return;
+  const text = R.ta.value.trim();
+  const hasFile = !!(m.attachmentId || m.mediaUrl);
+  if (!text && !hasFile) { toast('A message cannot be empty.', true); return; }
+  if (text === (m.content || '')) { cancelEdit(); return; }
+  const ids = mentionIdsFor(m.chatId, text);
+  R.sendBtn.disabled = true;
+  try {
+    const r = await api('/api/messages/' + encodeURIComponent(m.id), { method: 'PUT', json: { content: text, mentionedUserIds: ids } });
+    S.editing = null;
+    if (R.replyBar) { R.replyBar.classList.add('hidden'); R.replyBar.replaceChildren(); }
+    R.ta.value = S.editDraft || ''; S.editDraft = '';
+    autoGrow(); syncSendButton();
+    if (r && r.id) addIncoming(r);
+    toast('Message edited');
+  } catch (e) {
+    toast(e.message, true);
+    if (e.status === 403) cancelEdit();
+  } finally { R.sendBtn.disabled = false; }
+}
+
+// ====================================================================
 // Boot and session
 // ====================================================================
 async function boot() {
@@ -2482,6 +2558,7 @@ async function boot() {
     renderShell();
     S.chats.forEach(c => { const id = otherId(c); if (id) { const p = presenceOf(c); S.presence[id] = { online: p.online, lastSeen: p.lastSeen }; } });
     renderList(); renderHeader();
+    api('/api/messages/settings').then(s => { if (s && s.editWindowHours != null) S.editWindow = Number(s.editWindowHours); }).catch(() => {});
     connectWS();
     startPolling();
   } catch (e) {

@@ -1,24 +1,10 @@
 {
   "properties": [
     {
-      "name": "cloudinary.cloud-name",
-      "type": "java.lang.String",
-      "description": "Cloudinary account cloud name for media storage."
-    },
-    {
-      "name": "cloudinary.api-key",
-      "type": "java.lang.String",
-      "description": "Cloudinary API key for authentication."
-    },
-    {
-      "name": "cloudinary.api-secret",
-      "type": "java.lang.String",
-      "description": "Cloudinary API secret for authentication."
-    },
-    {
       "name": "auth.service.url",
       "type": "java.lang.String",
-      "description": "Base URL of the authentication service (used for JWT validation and inter-service communication)."
+      "description": "Base URL of the authentication service (used for JWT validation and inter-service communication). Set with AUTH_SERVICE_URL.",
+      "defaultValue": "http://localhost:8080"
     },
     {
       "name": "jwt.secret",
@@ -56,10 +42,10 @@
       "defaultValue": 24
     },
     {
-      "name": "profile-views.max-history-size",
-      "type": "java.lang.Integer",
-      "description": "Maximum number of profile view history entries to retain per user.",
-      "defaultValue": 20
+      "name": "message.edit-window-hours",
+      "type": "java.lang.Long",
+      "description": "How many hours after sending a person can edit their own message. 0 turns editing off. Set with MESSAGE_EDIT_WINDOW_HOURS.",
+      "defaultValue": 1
     },
     {
       "name": "rate-limit.requests-per-minute",
@@ -206,9 +192,10 @@
       "defaultValue": "/"
     },
     {
-      "name": "spring.data.mongodb.connection-string",
+      "name": "spring.mongodb.uri",
       "type": "java.lang.String",
-      "description": "MongoDB connection string URI (replaces deprecated uri property)."
+      "description": "MongoDB connection string URI. Set with MONGODB_URI.",
+      "defaultValue": "mongodb://localhost:27017/premisave-messenger"
     },
     {
       "name": "spring.data.mongodb.auto-index-creation",
@@ -290,25 +277,25 @@
     {
       "name": "spring.servlet.multipart.max-file-size",
       "type": "java.lang.String",
-      "description": "Maximum allowed file size per upload.",
+      "description": "Maximum allowed file size per upload. Set with STORAGE_MAX_FILE_SIZE.",
       "defaultValue": "50MB"
     },
     {
       "name": "spring.servlet.multipart.max-request-size",
       "type": "java.lang.String",
-      "description": "Maximum allowed request size for multipart uploads.",
-      "defaultValue": "50MB"
+      "description": "Maximum allowed request size for multipart uploads. Set with STORAGE_MAX_REQUEST_SIZE and keep it a little above the largest file.",
+      "defaultValue": "60MB"
     },
     {
       "name": "spring.security.user.name",
       "type": "java.lang.String",
-      "description": "Default user name for basic authentication.",
+      "description": "User name for the actuator basic authentication. Set with ACTUATOR_USER.",
       "defaultValue": "actuator"
     },
     {
       "name": "spring.security.user.password",
       "type": "java.lang.String",
-      "description": "Default user password for basic authentication."
+      "description": "Password for the actuator basic authentication. Set with ACTUATOR_PASSWORD."
     },
     {
       "name": "logging.level.root",
@@ -409,6 +396,80 @@
       "type": "java.lang.String",
       "description": "Application name tag for metrics.",
       "defaultValue": "premisave-messenger"
+    },
+    {
+      "name": "storage.mode",
+      "type": "java.lang.String",
+      "description": "Where attachments are stored: LOCAL (under storage.root) or NETWORK (a share already mounted by the operating system). Set with STORAGE_MODE.",
+      "defaultValue": "LOCAL"
+    },
+    {
+      "name": "storage.root",
+      "type": "java.lang.String",
+      "description": "Base directory for attachments in LOCAL mode. Set with STORAGE_ROOT.",
+      "defaultValue": "./data/messenger-storage"
+    },
+    {
+      "name": "storage.public-base-url",
+      "type": "java.lang.String",
+      "description": "Public address of this service, used to build attachment download links. Set with STORAGE_PUBLIC_BASE_URL.",
+      "defaultValue": "http://localhost:8081"
+    },
+    {
+      "name": "storage.max-file-size",
+      "type": "org.springframework.util.unit.DataSize",
+      "description": "Largest single attachment. Keep spring.servlet.multipart.max-file-size in step with it. Set with STORAGE_MAX_FILE_SIZE.",
+      "defaultValue": "50MB"
+    },
+    {
+      "name": "storage.url-ttl",
+      "type": "java.time.Duration",
+      "description": "How long a signed attachment download link stays valid. Set with STORAGE_URL_TTL.",
+      "defaultValue": "6h"
+    },
+    {
+      "name": "storage.unclaimed-ttl",
+      "type": "java.time.Duration",
+      "description": "How long an uploaded file that was never attached to a message is kept. Set with STORAGE_UNCLAIMED_TTL.",
+      "defaultValue": "24h"
+    },
+    {
+      "name": "storage.signing-secret",
+      "type": "java.lang.String",
+      "description": "Key used to sign download links. Leave blank to sign with jwt.secret. Set with STORAGE_SIGNING_SECRET."
+    },
+    {
+      "name": "storage.network.protocol",
+      "type": "java.lang.String",
+      "description": "Protocol of the network share (informational). Set with STORAGE_NETWORK_PROTOCOL.",
+      "defaultValue": "SMB"
+    },
+    {
+      "name": "storage.network.host",
+      "type": "java.lang.String",
+      "description": "Host of the network share (informational). Set with STORAGE_NETWORK_HOST."
+    },
+    {
+      "name": "storage.network.share",
+      "type": "java.lang.String",
+      "description": "Name of the network share (informational). Set with STORAGE_NETWORK_SHARE."
+    },
+    {
+      "name": "storage.network.mount-path",
+      "type": "java.lang.String",
+      "description": "Local path where the operating system has mounted the share. Used in NETWORK mode. Set with STORAGE_NETWORK_MOUNT_PATH."
+    },
+    {
+      "name": "storage.network.directory",
+      "type": "java.lang.String",
+      "description": "Directory inside the mounted share that holds attachments. Set with STORAGE_NETWORK_DIRECTORY.",
+      "defaultValue": "premisave-messenger"
+    },
+    {
+      "name": "storage.network.require-mount",
+      "type": "java.lang.Boolean",
+      "description": "Refuse to start or write unless the mount path is on a mounted network share. Set with STORAGE_NETWORK_REQUIRE_MOUNT.",
+      "defaultValue": true
     }
   ],
   "hints": [
@@ -532,6 +593,19 @@
         {
           "value": "test",
           "description": "Test profile - local MongoDB/Redis, DEBUG logging for testing."
+        }
+      ]
+    },
+    {
+      "name": "storage.mode",
+      "values": [
+        {
+          "value": "LOCAL",
+          "description": "Store files under storage.root on this machine."
+        },
+        {
+          "value": "NETWORK",
+          "description": "Store files on a network share already mounted at storage.network.mount-path."
         }
       ]
     }

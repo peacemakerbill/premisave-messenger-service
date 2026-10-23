@@ -143,6 +143,9 @@ message:
     retry-attempts: 3
     retry-delay-ms: 1000
   idempotency-timeout-hours: 24
+  # How long after sending a person may edit their own message, in hours.
+  # 0 turns editing off. Set MESSAGE_EDIT_WINDOW_HOURS in .env to change it.
+  edit-window-hours: ${MESSAGE_EDIT_WINDOW_HOURS:1}
 
 rate-limit:
   requests-per-minute: 60

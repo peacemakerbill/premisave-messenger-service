@@ -1,5 +1,6 @@
 package com.premisave.messenger.controller;
 
+import com.premisave.messenger.dto.request.EditMessageRequest;
 import com.premisave.messenger.dto.request.SendMessageRequest;
 import com.premisave.messenger.dto.response.AttachmentResponse;
 import com.premisave.messenger.dto.response.MessageResponse;
@@ -123,6 +124,23 @@ public class MessageController {
             @RequestHeader("Authorization") String authHeader) {
         messageService.markMessageAsRead(messageId, currentUserResolver.resolve(authHeader).getId());
         return ResponseEntity.ok().build();
+    }
+
+    /** Message settings the client needs, such as how long a sent message can be edited. */
+    @GetMapping("/settings")
+    public ResponseEntity<java.util.Map<String, Object>> settings() {
+        return ResponseEntity.ok(java.util.Map.of("editWindowHours", messageService.getEditWindowHours()));
+    }
+
+    /** Edit your own message within the edit window. */
+    @PutMapping("/{messageId}")
+    public ResponseEntity<MessageResponse> edit(
+            @PathVariable String messageId,
+            @RequestBody EditMessageRequest request,
+            @RequestHeader("Authorization") String authHeader) {
+        String userId = currentUserResolver.resolve(authHeader).getId();
+        return ResponseEntity.ok(messageService.editMessage(
+                messageId, userId, request.getContent(), request.getMentionedUserIds(), authHeader));
     }
 
     @DeleteMapping("/{messageId}")
