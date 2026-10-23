@@ -108,6 +108,13 @@ public class MessageService {
                 throw HttpStatusException.forbidden("You can only reply to messages in the same chat");
             }
         }
+
+        // Only people who are in this chat can be tagged, and never the sender.
+        List<String> mentions = chatMessage.getMentionedUserIds() == null ? List.of()
+                : chatMessage.getMentionedUserIds().stream()
+                    .filter(id -> id != null && !id.equals(senderId) && chat.getParticipantIds().contains(id))
+                    .distinct().limit(20).toList();
+        chatMessage.setMentionedUserIds(mentions);
     }
 
     private MessageResponse doSend(ChatMessage chatMessage, String authToken, Attachment attachment) {
@@ -144,6 +151,7 @@ public class MessageService {
         message.setCreatedAt(LocalDateTime.now());
         message.setActive(true);
         message.setReplyToMessageId(chatMessage.getReplyToMessageId());
+        message.setMentionedUserIds(new ArrayList<>(chatMessage.getMentionedUserIds() == null ? List.of() : chatMessage.getMentionedUserIds()));
         
         // Mark as pending for delivery
         message.setDeliveryState(MessageDeliveryState.PENDING);
@@ -532,6 +540,7 @@ public class MessageService {
         response.setEditedAt(message.getEditedAt());
         response.setDeleted(message.isDeletedForEveryone());
         response.setReplyToMessageId(message.getReplyToMessageId());
+        response.setMentionedUserIds(message.getMentionedUserIds());
 
         if (authToken == null || authToken.isBlank()) {
             // No real user token available - this happens for the

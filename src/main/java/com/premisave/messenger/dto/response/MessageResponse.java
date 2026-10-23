@@ -33,6 +33,9 @@ public class MessageResponse {
     private boolean isDeleted;
     private boolean isDeletedForEveryone;
 
+    // Users tagged with @ in the text
+    private List<String> mentionedUserIds;
+
     // Reply support
     private String replyToMessageId;
 

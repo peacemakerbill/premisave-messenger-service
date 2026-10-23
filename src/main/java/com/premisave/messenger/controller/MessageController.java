@@ -95,6 +95,7 @@ public class MessageController {
         chatMessage.setMessageType(request.getMessageType());
         chatMessage.setAttachmentId(attachmentId);
         chatMessage.setReplyToMessageId(request.getReplyToMessageId());
+        chatMessage.setMentionedUserIds(request.getMentionedUserIds());
 
         MessageResponse response = messageService.sendMessage(chatMessage, authHeader);
         log.info("Message {} sent in chat {} (attachment: {})", response.getId(), request.getChatId(), attachmentId != null);

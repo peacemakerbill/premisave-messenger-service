@@ -82,6 +82,9 @@ public class Message {
     // Reply support
     private String replyToMessageId;
 
+    // Users tagged with @ in the text. Always members of the chat, never the sender.
+    private List<String> mentionedUserIds = new ArrayList<>();
+
     // Delete for Me support (per-user deletion)
     private List<String> deletedForUsers = new ArrayList<>();
 

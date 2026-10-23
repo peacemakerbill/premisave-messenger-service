@@ -27,9 +27,28 @@ public class UserController {
         return ResponseEntity.ok(currentUserResolver.resolve(authHeader));
     }
 
+    /** People lists never include the caller. Pass includeSelf=true to get them anyway. */
+    private List<UserSummaryResponse> withoutCaller(List<UserSummaryResponse> users, Authentication authentication, String token) {
+        if (users == null) return List.of();
+        String email = authentication.getName();
+        String id = null;
+        try {
+            id = currentUserResolver.resolve(token).getId();
+        } catch (Exception e) {
+            log.debug("Could not resolve the caller id, filtering by email only");
+        }
+        final String callerId = id;
+        return users.stream()
+                .filter(u -> u != null
+                        && (callerId == null || !callerId.equals(u.getId()))
+                        && (email == null || u.getEmail() == null || !email.equalsIgnoreCase(u.getEmail())))
+                .toList();
+    }
+
     @GetMapping("/search")
     public ResponseEntity<List<UserSummaryResponse>> searchUsers(
             @RequestParam String query,
+            @RequestParam(defaultValue = "false") boolean includeSelf,
             Authentication authentication,
             HttpServletRequest request) {
 
@@ -41,13 +60,14 @@ public class UserController {
         log.info("SEARCH REQUEST - User: {} | Query: {}", authentication.getName(), query);
 
         List<UserSummaryResponse> users = userService.searchUsers(query, token);
-        return ResponseEntity.ok(users);
+        return ResponseEntity.ok(includeSelf ? users : withoutCaller(users, authentication, token));
     }
 
     @GetMapping
     public ResponseEntity<List<UserSummaryResponse>> getAllUsers(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
+            @RequestParam(defaultValue = "false") boolean includeSelf,
             Authentication authentication,
             HttpServletRequest request) {
 
@@ -59,7 +79,7 @@ public class UserController {
         log.info("ALL USERS REQUEST - User: {} | Page: {} Size: {}", authentication.getName(), page, size);
 
         List<UserSummaryResponse> users = userService.getAllUsers(page, size, token);
-        return ResponseEntity.ok(users);
+        return ResponseEntity.ok(includeSelf ? users : withoutCaller(users, authentication, token));
     }
 
     @GetMapping("/{userId}")

@@ -10,7 +10,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import com.premisave.messenger.service.UserService;
+
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 @Slf4j
 @RestController
@@ -19,6 +23,7 @@ import java.util.List;
 public class SocialController {
 
     private final AuthServiceClient authServiceClient;
+    private final UserService userService;
 
     // ── Likes ────────────────────────────────────────────────────────
 
@@ -111,7 +116,7 @@ public class SocialController {
 
         String token = httpRequest.getHeader("Authorization");
         log.info("GET_REVIEWS - User: {} | Target: {}", authentication.getName(), targetId);
-        return ResponseEntity.ok(authServiceClient.getUserReviews(targetId, token));
+        return ResponseEntity.ok(withReviewers(authServiceClient.getUserReviews(targetId, token), token));
     }
 
     @GetMapping("/stats/{userId}")
@@ -174,7 +179,7 @@ public class SocialController {
 
         String token = httpRequest.getHeader("Authorization");
         log.info("MY_REVIEWS - User: {}", authentication.getName());
-        return ResponseEntity.ok(authServiceClient.getMyReviews(token));
+        return ResponseEntity.ok(withReviewers(authServiceClient.getMyReviews(token), token));
     }
 
     @GetMapping("/my-written-reviews")
@@ -184,7 +189,44 @@ public class SocialController {
 
         String token = httpRequest.getHeader("Authorization");
         log.info("MY_WRITTEN_REVIEWS - User: {}", authentication.getName());
-        return ResponseEntity.ok(authServiceClient.getMyWrittenReviews(token));
+        return ResponseEntity.ok(withReviewers(authServiceClient.getMyWrittenReviews(token), token));
+    }
+
+    // ── Reviewer lookup ──────────────────────────────────────────────────────
+
+    /**
+     * Attaches the reviewer's profile to each review. The review stores whatever
+     * the auth-service saved for the reviewer, which can be an email rather than
+     * an id, so a failed id lookup falls back to a search on that value.
+     */
+    private List<ReviewResponse> withReviewers(List<ReviewResponse> reviews, String token) {
+        if (reviews == null) return List.of();
+        Map<String, UserSummaryResponse> found = new HashMap<>();
+        for (ReviewResponse review : reviews) {
+            String ref = review.getUserId();
+            if (ref == null || ref.isBlank()) continue;
+            if (!found.containsKey(ref)) found.put(ref, resolveUser(ref, token));
+            review.setReviewer(found.get(ref));
+        }
+        return reviews;
+    }
+
+    private UserSummaryResponse resolveUser(String ref, String token) {
+        try {
+            UserSummaryResponse user = userService.getUserSummary(ref, token);
+            boolean fallback = user == null || "Unknown User".equals(user.getDisplayName());
+            if (!fallback) return user;
+            for (UserSummaryResponse candidate : userService.searchUsers(ref, token)) {
+                if (candidate != null && (ref.equalsIgnoreCase(candidate.getId())
+                        || ref.equalsIgnoreCase(candidate.getEmail())
+                        || ref.equalsIgnoreCase(candidate.getUsername()))) {
+                    return candidate;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not resolve reviewer {}: {}", ref, e.getMessage());
+        }
+        return null;
     }
 
     // ── Relationship status checks ────────────────────────────────────────────

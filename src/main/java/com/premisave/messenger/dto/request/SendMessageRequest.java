@@ -32,6 +32,9 @@ public class SendMessageRequest {
     // Reply support
     private String replyToMessageId;
 
+    // Users tagged with @ in the text
+    private java.util.List<String> mentionedUserIds;
+
     // Location sharing
     private Double latitude;
     private Double longitude;

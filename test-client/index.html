@@ -277,6 +277,16 @@ input, textarea { font: inherit; color: inherit; }
 .fld { width: 100%; height: 42px; border: 1px solid var(--line); border-radius: 10px; background: var(--input-bg); padding: 0 12px; outline-offset: 0; }
 .fld:focus { border-color: var(--accent); outline: 0; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
 .note { font-size: 12.5px; color: var(--text-2); margin: 6px 0 0; }
+.prow { display: flex; align-items: center; }
+.prow .person { flex: 1; min-width: 0; }
+.prow .icon-btn { flex: none; margin-right: 10px; }
+.list-h { padding: 12px 20px 4px; font-size: 13px; font-weight: 600; color: var(--accent-strong); }
+.row .at { flex: none; color: var(--accent-strong); font-weight: 700; font-size: 15px; }
+.mention-pop { position: absolute; left: 12px; right: 12px; bottom: 100%; max-height: 260px; overflow: auto; background: var(--panel); border-radius: 12px 12px 0 0; box-shadow: var(--pop-shadow); padding: 4px 0; z-index: 8; }
+.mention-pop .person.sel { background: var(--row-hover); }
+a.mention { color: var(--accent-strong); font-weight: 600; text-decoration: none; }
+a.mention:hover { text-decoration: underline; }
+a.mention.me { background: rgba(0,168,132,.18); border-radius: 4px; padding: 0 3px; }
 .people { margin: 10px -20px -16px; }
 .person { display: flex; align-items: center; gap: 12px; padding: 8px 20px; width: 100%; text-align: left; }
 .person:hover { background: var(--row-hover); }
@@ -402,7 +412,7 @@ button.p-stat:hover { background: var(--row-hover); }
 .stars button, .stars.ro span { display: inline-grid; place-items: center; color: var(--line); }
 .stars button { width: 36px; height: 36px; border-radius: 50%; }
 .stars button:hover { background: var(--panel-2); }
-.stars .on { color: #f5a623; }
+.stars .on, .stars.ro span.on { color: #f5a623; }
 .stars .ico { width: 24px; height: 24px; } .stars.ro .ico { width: 16px; height: 16px; }
 .review-form { padding: 6px 0 14px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
 .review-form .field-l { margin: 4px 0 4px; }
@@ -578,6 +588,17 @@ function fmtDur(s) {
 function userName(u) {
   if (!u) return 'Unknown';
   return u.displayName || [u.firstName, u.lastName].filter(Boolean).join(' ').trim() || u.username || u.email || 'Unknown';
+}
+// True when u is the signed-in user. Compares id, email and username, and the
+// email in the token, so the caller is hidden even if one of them is missing.
+function tokenSub() {
+  try { return JSON.parse(atob(S.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub || ''; } catch (e) { return ''; }
+}
+function isMe(u) {
+  if (!u) return false;
+  const eq = (a, b) => !!a && !!b && String(a).toLowerCase() === String(b).toLowerCase();
+  const me = S.me || {};
+  return eq(u.id, me.id) || eq(u.email, me.email) || eq(u.username, me.username) || eq(u.email, tokenSub());
 }
 const PALETTE = ['#e0557d', '#cf6a2b', '#a86bd1', '#3d8bd9', '#17a2a2', '#4d9a3a', '#c4962a', '#d04b4b', '#6f7de0', '#2e9e7a'];
 function colorFor(key) {
@@ -773,7 +794,7 @@ function renderLogin(message) {
 
 function renderShell() {
   R = {};
-  R.search = h('input', { type: 'search', placeholder: 'Search or start a new chat', 'aria-label': 'Search chats', oninput: e => { S.filter = e.target.value; renderList(); } });
+  R.search = h('input', { type: 'search', placeholder: 'Search chats and people by name or email', 'aria-label': 'Search chats and people', oninput: e => { S.filter = e.target.value; renderList(); searchPeopleSoon(); } });
   R.conn = h('div', { class: 'conn hidden' });
   R.rows = h('div', { class: 'rows scroll', role: 'list' });
   R.meBox = h('button', { class: 'rail-btn', type: 'button', title: 'Settings', 'aria-label': 'Settings', onclick: openSettings });
@@ -849,7 +870,7 @@ function unreadOf(c) {
 function sortedChats() {
   const q = S.filter.trim().toLowerCase();
   return S.chats
-    .filter(c => !q || chatTitle(c).toLowerCase().includes(q))
+    .filter(c => !q || chatTitle(c).toLowerCase().includes(q) || (c.otherUser && [c.otherUser.email, c.otherUser.username].some(x => x && String(x).toLowerCase().includes(q))))
     .sort((a, b) => (toDate(b.lastMessageAt) || 0) - (toDate(a.lastMessageAt) || 0));
 }
 function tickIcon(state) {
@@ -881,15 +902,18 @@ function renderList() {
       avatar(chatTitle(c), chatPhoto(c), otherId(c) || c.id, '', c.chatType !== 'GROUP' && pres.online),
       h('div', { class: 'body' },
         h('div', { class: 'top' }, h('div', { class: 'name' }, chatTitle(c)), h('div', { class: 'time' }, stamp)),
-        h('div', { class: 'bottom' }, preview, un ? h('span', { class: 'badge' }, un > 99 ? '99+' : un) : null)));
+        h('div', { class: 'bottom' }, preview,
+          un && lm && S.me && (lm.mentionedUserIds || []).includes(S.me.id) ? h('span', { class: 'at', title: 'You were tagged' }, '@') : null,
+          un ? h('span', { class: 'badge' }, un > 99 ? '99+' : un) : null)));
   });
-  if (!rows.length) {
+  const people = peopleRows(chats);
+  if (!rows.length && !people.length) {
     R.rows.replaceChildren(h('div', { class: 'empty' },
       ico('chat'),
-      h('h3', null, S.filter ? 'No chats match' : 'No chats yet'),
-      h('p', null, S.filter ? 'Try a different name.' : 'Start a conversation with someone from your contacts.'),
+      h('h3', null, S.filter ? 'No chats or people match' : 'No chats yet'),
+      h('p', null, S.filter ? 'Try a different name or email.' : 'Start a conversation with someone from your contacts.'),
       S.filter ? null : h('button', { class: 'btn', type: 'button', onclick: openNewChat }, 'New chat')));
-  } else R.rows.replaceChildren(...rows);
+  } else R.rows.replaceChildren(...rows, ...people);
 
   const total = S.chats.reduce((n, c) => n + unreadOf(c), 0);
   R.railBadge.textContent = total > 99 ? '99+' : total;
@@ -954,7 +978,24 @@ function tickState(m) {
   return 'sent';
 }
 const URL_RE = /(https?:\/\/[^\s<>"']+[^\s<>"'.,;:!?)])/g;
-function richText(str, q) {
+// Text with @mentions turned into links, then links and search matches.
+function richText(str, q, mentions) {
+  const names = (mentions || []).filter(x => x && x.name);
+  if (!names.length) return richPlain(str, q);
+  const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp('@(' + names.map(x => esc(x.name)).sort((a, b) => b.length - a.length).join('|') + ')', 'g');
+  const frag = document.createDocumentFragment();
+  let last = 0, m;
+  while ((m = re.exec(str)) !== null) {
+    if (m.index > last) frag.append(richPlain(str.slice(last, m.index), q));
+    const who = names.find(x => x.name === m[1]);
+    frag.append(h('a', { class: 'mention' + (S.me && who.id === S.me.id ? ' me' : ''), href: '#', onclick: e => { e.preventDefault(); openProfile(who.id); } }, m[0]));
+    last = m.index + m[0].length;
+  }
+  if (last < str.length) frag.append(richPlain(str.slice(last), q));
+  return frag;
+}
+function richPlain(str, q) {
   const frag = document.createDocumentFragment();
   const hl = (txt, into) => {
     if (!q) { into.append(txt); return; }
@@ -1109,7 +1150,7 @@ function buildMsg(m, prev) {
     }
     if (m.content) {
       const t = h('div', { class: 'text' });
-      t.append(richText(m.content, S.search.open ? S.search.q : ''));
+      t.append(richText(m.content, S.search.open ? S.search.q : '', mentionsOf(m)));
       bubble.append(t);
     }
   }
@@ -1259,6 +1300,7 @@ async function openChat(id) {
   renderThread();
   S.nearBottom = true; scrollBottom();
   markChatRead(id);
+  warmMembers(id);
   if (matchMedia('(min-width: 861px)').matches) R.ta.focus();
 }
 function closeChat() {
@@ -1381,8 +1423,9 @@ function sendText() {
   const text = R.ta.value.trim();
   if (!text) return;
   R.ta.value = ''; S.drafts[c.id] = ''; autoGrow(); syncSendButton();
-  const temp = pendingMsg(c.id, { content: text });
-  const payload = { chatId: c.id, content: text, replyToMessageId: temp.replyToMessageId || undefined };
+  const ids = mentionIdsFor(c.id, text);
+  const temp = pendingMsg(c.id, { content: text, mentionedUserIds: ids });
+  const payload = { chatId: c.id, content: text, replyToMessageId: temp.replyToMessageId || undefined, mentionedUserIds: ids.length ? ids : undefined };
   clearReply();
   pushPending(temp);
   sendPayload(temp, payload);
@@ -1432,7 +1475,7 @@ function clearReply() { S.replyTo = null; if (R.replyBar) { R.replyBar.classList
 const EMOJI = ['😀','😃','😄','😁','😆','😅','😂','🤣','🙂','😉','😊','😇','🥰','😍','🤩','😘','😋','😜','🤪','😎','🤓','🥳','😏','😒','😔','😢','😭','😤','😡','🤯','😱','🥶','🤔','🤗','🙄','😴','👍','👎','👏','🙌','🙏','💪','👋','🤝','✌️','👌','🔥','✨','🎉','💯','❤️','🧡','💛','💚','💙','💜','🖤','💔','👀','✅','❌','⭐','🏠','📎','📷','🎵'];
 
 function buildComposer() {
-  R.ta = h('textarea', { rows: 1, placeholder: 'Type a message', 'aria-label': 'Message', oninput: onType, onkeydown: onComposerKey, onpaste: onPaste });
+  R.ta = h('textarea', { rows: 1, placeholder: 'Type a message. Use @ to tag someone', 'aria-label': 'Message', oninput: onType, onkeydown: onComposerKey, onkeyup: e => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) updateMentionPop(); }, onclick: updateMentionPop, onblur: () => setTimeout(closeMentionPop, 150), onpaste: onPaste });
   R.sendBtn = h('button', { class: 'send', type: 'button', 'aria-label': 'Send', onclick: onSendOrMic }, ico('mic'));
   R.fileAny = h('input', { type: 'file', multiple: true, class: 'hidden', onchange: e => pickFiles(e) });
   R.fileMedia = h('input', { type: 'file', multiple: true, accept: 'image/*,video/*', class: 'hidden', onchange: e => pickFiles(e) });
@@ -1452,7 +1495,7 @@ function syncSendButton() {
 }
 let typingSentAt = 0;
 function onType() {
-  autoGrow(); syncSendButton();
+  autoGrow(); syncSendButton(); updateMentionPop();
   const c = chatById(S.active);
   if (!c || c.chatType === 'GROUP' || !R.ta.value.trim()) return;
   const now = Date.now();
@@ -1462,6 +1505,7 @@ function onType() {
   }
 }
 function onComposerKey(e) {
+  if (mentionKey(e)) return;
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendText(); }
 }
 function onSendOrMic() {
@@ -1635,10 +1679,12 @@ function openNewChat() {
   const list = h('div', { class: 'people' });
   let timer = null;
   const draw = users => {
-    const rows = (users || []).filter(u => u && u.id && (!S.me || u.id !== S.me.id));
-    list.replaceChildren(...(rows.length ? rows.map(u => h('button', { class: 'person', type: 'button', onclick: () => startChatWith(u) },
-      avatar(userName(u), u.profilePictureUrl, u.id, 'sm'),
-      h('div', null, h('div', { class: 'n' }, userName(u)), h('div', { class: 'e' }, u.email || u.username || '')))) :
+    const rows = (users || []).filter(u => u && u.id && !isMe(u));
+    list.replaceChildren(...(rows.length ? rows.map(u => h('div', { class: 'prow' },
+      h('button', { class: 'person', type: 'button', onclick: () => startChatWith(u) },
+        avatar(userName(u), u.profilePictureUrl, u.id, 'sm'),
+        h('div', null, h('div', { class: 'n' }, userName(u)), h('div', { class: 'e' }, u.email || u.username || ''))),
+      btn('icon-btn', 'View ' + userName(u) + ' profile', 'user', () => { closeModal(); openProfile(u.id); }))) :
       [h('div', { class: 'empty' }, h('p', null, 'No one found.'))]));
   };
   const load = async q => {
@@ -1654,7 +1700,7 @@ function openNewChat() {
   input.focus(); load('');
 }
 async function startChatWith(u) {
-  if (S.me && u.id === S.me.id) { toast('You cannot start a chat with yourself.', true); return; }
+  if (isMe(u)) { toast('You cannot start a chat with yourself.', true); return; }
   closeModal();
   try {
     const r = await api('/api/chats/private', { method: 'POST', json: { otherUserId: u.id } });
@@ -1821,7 +1867,7 @@ function memberPicker(excludeIds, onChange) {
   let lastRows = [];
   const drawList = users => {
     lastRows = users || [];
-    const rows = lastRows.filter(u => u && u.id && !exclude.has(u.id) && (!S.me || u.id !== S.me.id));
+    const rows = lastRows.filter(u => u && u.id && !exclude.has(u.id) && !isMe(u));
     list.replaceChildren(...(rows.length ? rows.map(u => {
       const on = picked.has(u.id);
       return h('button', { class: 'person' + (on ? ' sel' : ''), type: 'button', 'aria-pressed': on ? 'true' : 'false',
@@ -1885,11 +1931,11 @@ function openNewGroup() {
 async function openGroupInfo(chat) {
   const c = typeof chat === 'string' ? chatById(chat) : chat;
   if (!c || !c.groupId) { toast('This group is not available.', true); return; }
-  info = { groupId: c.groupId, chatId: c.id };
+  const mineInfo = info = { groupId: c.groupId, chatId: c.id };
   const box = h('div', { class: 'g-members' }, h('div', { class: 'empty' }, h('p', null, 'Loading')));
   const leave = h('button', { class: 'btn danger', type: 'button', onclick: () => leaveGroup(c) }, ico('logout'), 'Leave group');
   const m = openModal('Group info', [box], leave, true);
-  const mo = new MutationObserver(() => { if (!document.body.contains(m)) { info = null; mo.disconnect(); } });
+  const mo = new MutationObserver(() => { if (!document.body.contains(m)) { if (info === mineInfo) info = null; mo.disconnect(); } });
   mo.observe(document.body, { childList: true });
   info.box = box;
   await refreshInfo();
@@ -1900,6 +1946,7 @@ async function refreshInfo() {
   try {
     const g = await api('/api/groups/' + encodeURIComponent(cur.groupId));
     if (info !== cur) return;
+    memberCache[cur.chatId] = g.members || [];
     renderGroupInfo(cur.box, g);
   } catch (e) {
     if (info === cur) cur.box.replaceChildren(h('div', { class: 'empty' }, h('p', null, e.message)));
@@ -2030,6 +2077,7 @@ async function leaveGroup(c) {
 
 // Pushed by the server when a group changes (added, removed, renamed, roles).
 async function onGroupEvent(d) {
+  delete memberCache[d.chatId];
   const before = S.chats.length;
   if (d.event === 'REMOVED') {
     const wasActive = S.active && S.active === d.chatId;
@@ -2093,6 +2141,27 @@ async function getUser(id) {
   userCache.set(id, p);
   return p;
 }
+// A review or follow may name its author by email instead of id. Find the real
+// profile for either, using the search when the id lookup comes back unknown.
+const refCache = new Map();
+function resolveRef(ref, given) {
+  if (given && given.id && !/^unknown/i.test(userName(given))) return Promise.resolve(given);
+  if (!ref) return Promise.resolve({ id: '', displayName: 'Unknown user' });
+  if (refCache.has(ref)) return refCache.get(ref);
+  const p = (async () => {
+    const u = await getUser(ref);
+    if (u && !/^unknown/i.test(userName(u))) return u;
+    try {
+      const hits = (await api('/api/users/search?query=' + encodeURIComponent(ref) + '&includeSelf=true')) || [];
+      const eq = (a, b) => !!a && String(a).toLowerCase() === String(b).toLowerCase();
+      const hit = hits.find(x => x && (eq(x.id, ref) || eq(x.email, ref) || eq(x.username, ref)));
+      if (hit) return hit;
+    } catch (e) { /* keep the unknown placeholder */ }
+    return u || { id: '', displayName: 'Unknown user' };
+  })();
+  refCache.set(ref, p);
+  return p;
+}
 let prof = null;     // { id, box, tab }
 
 function presenceLine(u) {
@@ -2117,8 +2186,9 @@ async function openProfile(userId) {
   const me = S.me && userId === S.me.id;
   const box = h('div', { class: 'prof' }, h('div', { class: 'empty' }, h('p', null, 'Loading')));
   const m = openModal(me ? 'Your profile' : 'Profile', [box], null, true);
-  prof = { id: userId, box, tab: me ? 'followers' : 'reviews' };
-  const mo = new MutationObserver(() => { if (!document.body.contains(m)) { prof = null; mo.disconnect(); } });
+  const mine = prof = { id: userId, box, tab: me ? 'followers' : 'reviews' };
+  // Only clear the state this dialog owns: opening another profile from here replaces it.
+  const mo = new MutationObserver(() => { if (!document.body.contains(m)) { if (prof === mine) prof = null; mo.disconnect(); } });
   mo.observe(document.body, { childList: true });
   await loadProfile();
 }
@@ -2213,14 +2283,17 @@ async function paintTab(pane, cur, me, reviews, views, user, rerun) {
         h('div', null, h('b', null, views.last7Days || 0), h('span', null, 'Last 7 days')),
         h('div', null, h('b', null, views.last30Days || 0), h('span', null, 'Last 30 days')),
         h('div', null, h('b', null, views.uniqueViewers || 0), h('span', null, 'People')));
-      pane.replaceChildren(head, ...(rows.length ? rows.map(v => personRow({ id: v.viewerId, displayName: v.viewerName, profilePictureUrl: v.viewerProfilePicture }, v.viewedAt ? 'Viewed ' + (toDate(v.viewedAt) ? toDate(v.viewedAt).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '') : ''))
+      const viewers = await Promise.all(rows.map(v => resolveRef(v.viewerId, { id: v.viewerId, displayName: v.viewerName, profilePictureUrl: v.viewerProfilePicture })));
+      if (prof !== cur || cur.tab !== tab) return;
+      pane.replaceChildren(head, ...(rows.length ? rows.map((v, i) => personRow(Object.assign({}, viewers[i], { id: viewers[i].id || v.viewerId }), v.viewedAt ? 'Viewed ' + (toDate(v.viewedAt) ? toDate(v.viewedAt).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '') : ''))
         : [h('div', { class: 'empty' }, h('p', null, 'Nobody has viewed your profile yet.'))]));
     } catch (e) { pane.replaceChildren(h('div', { class: 'empty' }, h('p', null, e.message))); }
     return;
   }
 
   // reviews
-  const mine = me ? null : reviews.find(r => r.userId === S.me.id);
+  const byMe = r => isMe({ id: r.userId, email: r.userId, username: r.userId }) || isMe(r.reviewer);
+  const mine = me ? null : reviews.find(byMe);
   const nodes = [];
   if (!me) nodes.push(reviewForm(user, mine, rerun));
   if (!reviews.length) nodes.push(h('div', { class: 'empty' }, h('p', null, me ? 'Nobody has reviewed you yet.' : 'No reviews yet. Be the first.')));
@@ -2228,13 +2301,16 @@ async function paintTab(pane, cur, me, reviews, views, user, rerun) {
   nodes.push(list);
   pane.replaceChildren(...nodes);
   for (const r of reviews.slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))) {
-    const who = await getUser(r.userId);
+    const who = await resolveRef(r.userId, r.reviewer);
     if (prof !== cur || cur.tab !== tab) return;
     const when = toDate(r.createdAt);
+    const own = byMe(r);
+    const known = !!who.id;
+    const sub = [own ? '' : who.email || '', when ? when.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : ''].filter(Boolean).join('  ');
     list.append(h('div', { class: 'review' },
-      h('button', { class: 'person', type: 'button', style: 'padding:0 0 6px', onclick: () => openProfile(r.userId) },
-        avatar(userName(who), who.profilePictureUrl, who.id, 'xs'),
-        h('div', null, h('div', { class: 'n' }, r.userId === (S.me && S.me.id) ? 'You' : userName(who)), h('div', { class: 'e' }, when ? when.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : ''))),
+      h('button', { class: 'person', type: 'button', style: 'padding:0 0 6px', disabled: known ? null : true, title: known ? 'View profile' : '', onclick: () => known && openProfile(who.id) },
+        avatar(userName(who), who.profilePictureUrl, who.id || r.userId, 'sm'),
+        h('div', null, h('div', { class: 'n' }, own ? 'You' : userName(who)), h('div', { class: 'e' }, sub))),
       stars(r.rating),
       r.comment ? h('p', null, r.comment) : null));
   }
@@ -2267,6 +2343,127 @@ function reviewForm(user, mine, rerun) {
   return h('div', { class: 'review-form' },
     h('div', { class: 'field-l' }, mine ? 'Your review of ' + userName(user) : 'Review ' + userName(user)),
     starBox, text, h('div', { class: 'row-end' }, del, submit));
+}
+// ====================================================================
+// Mentions (@) and people search
+// ====================================================================
+const memberCache = {};   // chatId -> [users] for group chats
+
+function membersOf(c) {
+  if (!c) return [];
+  if (c.chatType !== 'GROUP') return [c.otherUser].filter(Boolean);
+  return memberCache[c.id] || [];
+}
+async function warmMembers(chatId) {
+  const c = chatById(chatId);
+  if (!c || c.chatType !== 'GROUP' || memberCache[c.id] || !c.groupId) return;
+  try {
+    const g = await api('/api/groups/' + encodeURIComponent(c.groupId));
+    memberCache[c.id] = g.members || [];
+    const b = bucket(chatId);
+    if (S.active === chatId && b.list.some(m => (m.mentionedUserIds || []).length)) renderThread();
+  } catch (e) { /* the popup simply stays empty until the next try */ }
+}
+function mentionsOf(m) {
+  const ids = m.mentionedUserIds || [];
+  if (!ids.length) return [];
+  const c = chatById(m.chatId);
+  const pool = [...membersOf(c), S.me].filter(Boolean);
+  return ids.map(id => { const u = pool.find(x => x.id === id); return u ? { id, name: userName(u) } : null; }).filter(Boolean);
+}
+
+// Who the sender tagged, per chat: id -> name as inserted into the text.
+const tagged = {};
+function mentionIdsFor(chatId, text) {
+  const map = tagged[chatId] || {};
+  const ids = Object.keys(map).filter(id => text.includes('@' + map[id]));
+  tagged[chatId] = {};
+  return ids;
+}
+
+let mpop = null, mItems = [], mSel = 0, mQuery = null;
+function mentionQuery() {
+  const pos = R.ta.selectionStart;
+  const m = /(^|\s)@([^\s@]{0,30})$/.exec(R.ta.value.slice(0, pos));
+  return m ? { q: m[2].toLowerCase(), start: pos - m[2].length - 1, end: pos } : null;
+}
+function closeMentionPop() { if (mpop) { mpop.remove(); mpop = null; } mItems = []; mQuery = null; }
+function updateMentionPop() {
+  const c = chatById(S.active);
+  const mq = c && mentionQuery();
+  if (!mq) { closeMentionPop(); return; }
+  const items = membersOf(c).filter(u => u && u.id && !isMe(u))
+    .filter(u => !mq.q || [userName(u), u.username, u.email].some(x => x && String(x).toLowerCase().includes(mq.q)))
+    .slice(0, 6);
+  if (!items.length) { closeMentionPop(); return; }
+  mItems = items; mQuery = mq; mSel = Math.min(mSel, items.length - 1);
+  paintMentionPop();
+}
+function paintMentionPop() {
+  if (!mpop) {
+    mpop = h('div', { class: 'mention-pop', role: 'listbox', 'aria-label': 'Tag someone', onmousedown: e => e.preventDefault() });
+    R.composer.append(mpop);
+  }
+  mpop.replaceChildren(...mItems.map((u, i) => h('button', { class: 'person' + (i === mSel ? ' sel' : ''), type: 'button', role: 'option', 'aria-selected': i === mSel ? 'true' : 'false', onclick: () => pickMention(u) },
+    avatar(userName(u), u.profilePictureUrl, u.id, 'sm'),
+    h('div', null, h('div', { class: 'n' }, userName(u)), h('div', { class: 'e' }, u.email || u.username || '')))));
+}
+function pickMention(u) {
+  if (!mQuery) return;
+  const name = userName(u);
+  const v = R.ta.value;
+  R.ta.value = v.slice(0, mQuery.start) + '@' + name + ' ' + v.slice(mQuery.end);
+  const caret = mQuery.start + name.length + 2;
+  R.ta.setSelectionRange(caret, caret);
+  const cid = S.active;
+  (tagged[cid] = tagged[cid] || {})[u.id] = name;
+  closeMentionPop();
+  autoGrow(); syncSendButton(); R.ta.focus();
+}
+// Returns true when the key was used by the popup.
+function mentionKey(e) {
+  if (!mpop || !mItems.length) return false;
+  if (e.key === 'ArrowDown') { mSel = (mSel + 1) % mItems.length; paintMentionPop(); }
+  else if (e.key === 'ArrowUp') { mSel = (mSel - 1 + mItems.length) % mItems.length; paintMentionPop(); }
+  else if (e.key === 'Enter' || e.key === 'Tab') { pickMention(mItems[mSel]); }
+  else if (e.key === 'Escape') { closeMentionPop(); }
+  else return false;
+  e.preventDefault();
+  return true;
+}
+
+// ---------- people in the sidebar search ----------
+S.people = { q: '', list: [] };
+let peopleTimer = null, peopleSeq = 0;
+function searchPeopleSoon() {
+  clearTimeout(peopleTimer);
+  const q = S.filter.trim();
+  if (q.length < 2) {
+    peopleSeq++;
+    if (S.people.q || S.people.list.length) { S.people = { q: '', list: [] }; renderList(); }
+    return;
+  }
+  peopleTimer = setTimeout(async () => {
+    const mine = ++peopleSeq;
+    let list = [];
+    try { list = (await api('/api/users/search?query=' + encodeURIComponent(q))) || []; } catch (e) { /* show chats only */ }
+    if (mine !== peopleSeq) return;
+    S.people = { q, list: list.filter(u => u && u.id && !isMe(u)) };
+    renderList();
+  }, 300);
+}
+function peopleRows(chats) {
+  const q = S.filter.trim();
+  if (!q || S.people.q !== q) return [];
+  const have = new Set(chats.map(otherId).filter(Boolean));
+  const list = S.people.list.filter(u => !have.has(u.id));
+  if (!list.length) return [];
+  return [h('div', { class: 'list-h' }, 'People'),
+    ...list.map(u => h('div', { class: 'prow', role: 'listitem' },
+      h('button', { class: 'person', type: 'button', onclick: () => { S.filter = ''; R.search.value = ''; S.people = { q: '', list: [] }; startChatWith(u); } },
+        avatar(userName(u), u.profilePictureUrl, u.id, 'sm'),
+        h('div', null, h('div', { class: 'n' }, userName(u)), h('div', { class: 'e' }, u.email || u.username || ''))),
+      btn('icon-btn', 'View ' + userName(u) + ' profile', 'user', () => openProfile(u.id))))];
 }
 
 // ====================================================================

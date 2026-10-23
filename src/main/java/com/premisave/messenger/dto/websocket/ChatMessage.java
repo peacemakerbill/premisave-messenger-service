@@ -32,4 +32,7 @@ public class ChatMessage {
     private String replyToMessageId;
 
     private MessageResponse.ReplyPreview replyPreview;
+
+    // Ids of users tagged with @ (the server keeps only members of the chat)
+    private java.util.List<String> mentionedUserIds;
 }

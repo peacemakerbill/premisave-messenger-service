@@ -260,14 +260,14 @@ Message <id> delivery completed. Success: 1/1, Failures: 0
 | `DELETE` | `/api/chats/{chatId}` | Archive a private chat (participants only; groups are left through `/api/groups/{groupId}/leave`) |
 | `POST` | `/api/chats/{chatId}/read` | Mark every unread message in the chat as read and send read receipts |
 | `POST` | `/api/chats/{chatId}/unread` | Flag the chat as unread for the caller only (`markedUnread` on `GET /api/chats`) |
-| `POST` | `/api/messages` | Send a message (JSON with `chatId`, `content`, optional `attachmentId` and `replyToMessageId`, or multipart with `file`) |
+| `POST` | `/api/messages` | Send a message (JSON with `chatId`, `content`, optional `attachmentId`, `replyToMessageId` and `mentionedUserIds`, or multipart with `file`) |
 | `POST` | `/api/messages/{messageId}/reply` | Reply to a message (JSON or multipart) |
 | `GET` | `/api/messages/chat/{chatId}` | Paginated message history (`page`, `size`, newest first); hides messages you deleted for yourself |
 | `POST` | `/api/messages/read/{messageId}` | Mark a message as read |
 | `DELETE` | `/api/messages/{messageId}` | Delete a message for everyone (sender only; also removes the stored file) |
 | `DELETE` | `/api/messages/{messageId}/me` | Delete a message for yourself only |
 | `GET` | `/api/users/me` | The caller's own profile, including the real user id |
-| `GET` | `/api/users`, `/api/users/search?query=`, `/api/users/{userId}` | List, search and look up users |
+| `GET` | `/api/users`, `/api/users/search?query=`, `/api/users/{userId}` | List, search and look up users. The caller is left out of lists and searches (pass `includeSelf=true` to keep them) |
 | `POST` | `/api/groups` | Create a group (`name`, optional `description`, optional repeated `memberIds`); the caller is added automatically as the owner, so do not list your own id. Returns the group with its `chatId` and members |
 | `GET` | `/api/groups/{groupId}` | One group with its chat id and members resolved to profiles (members only) |
 | `PUT` | `/api/groups/{groupId}/name`, `/description` | Rename or re-describe a group (owner only) |
@@ -324,7 +324,9 @@ What it covers: private chats, group chats, replies, emoji, photos, videos, audi
 Notes:
 - Groups: create a group with members, edit its name, description and photo, add and remove members, promote admins, transfer ownership and leave, all from the client. Members are added to the group chat on the server, so they see the group and get its messages straight away. Typing indicators and per-member read receipts are not available in groups.
 - Read state: opening a chat marks its unread messages as read automatically (also when the tab becomes visible again and after a reconnect). Use the chat menu or a right click on a chat row for "Mark as unread" and "Mark as read". Your own messages never count as unread.
-- Profiles: click a contact's name or avatar (or a group member) to see their profile, followers, following, likes and reviews, then follow, like, or review them, or start a chat. Your own profile, with who follows you and who viewed it, is under the person icon on the left rail. Profile editing is not part of the client.
+- Tagging: type `@` in the message box to pick someone from the chat (the other person in a private chat, the members in a group). The tag is stored as `mentionedUserIds`, shown highlighted in the message, and a chat row shows `@` when you were tagged in an unread message. The server keeps only people who are in the chat.
+- Search: the box above the chat list matches chat names and emails, and lists matching people below your chats with their email and a profile button. You never appear in people lists.
+- Profiles: click a contact's name or avatar (or a group member) to see their profile, followers, following, likes and reviews, then follow, like, or review them, or start a chat. Your own profile, with who follows you and who viewed it, is under the person icon on the left rail. Reviews show the reviewer's picture, name and email, and clicking one opens their profile. The server attaches a `reviewer` profile to each review (`GET /api/social/reviews/{id}`, `my-reviews`, `my-written-reviews`), looking the reviewer up by id and then by email, because the auth-service may store either. Profile editing is not part of the client.
 - The client needs `GET /api/users/me`. If it is missing it falls back to the chat list to find your id.
 - Voice notes need microphone permission, which browsers only grant on `localhost` or HTTPS pages.
 
