@@ -1539,6 +1539,11 @@ function closeChat() {
   cancelEdit(true);
   if (S.active) S.drafts[S.active] = R.ta.value;
   S.active = null;
+  clearReply();
+  closeSearch();
+  R.ta.value = ''; autoGrow(); syncSendButton();
+  R.thread.replaceChildren();          // otherwise the old messages show through the empty-chat screen
+  R.toBottom.classList.add('hidden');
   R.app.classList.remove('has-chat');
   renderHeader(); renderList();
 }
@@ -1760,7 +1765,15 @@ function pickFiles(e) {
 let openPop = null;
 function closePop() { if (openPop) { openPop.remove(); openPop = null; } }
 document.addEventListener('mousedown', e => { if (openPop && !openPop.contains(e.target) && !e.target.closest('[data-pop-anchor]')) closePop(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closePop(); closeModal(); closeLightbox(); } });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  // Escape peels off one layer at a time and finally closes the open chat, like Telegram.
+  const layered = document.querySelector('.scrim, .pop, .lightbox, .sv, .drawer.open, .mention-pop');
+  closePop(); closeModal(); closeLightbox();
+  if (layered || e.defaultPrevented || !S.active || !R.app) return;
+  if (S.replyTo) { clearReply(); return; }
+  closeChat();
+});
 function showPop(pop, anchor) { closePop(); anchor.setAttribute('data-pop-anchor', ''); openPop = pop; return pop; }
 function toggleEmoji(anchor) {
   if (openPop && openPop.classList.contains('emoji-pop')) { closePop(); return; }
