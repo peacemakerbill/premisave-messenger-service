@@ -7,6 +7,7 @@ import com.premisave.messenger.entity.Chat;
 import com.premisave.messenger.enums.ChatType;
 import com.premisave.messenger.exception.ChatNotFoundException;
 import com.premisave.messenger.exception.HttpStatusException;
+import com.premisave.messenger.util.UserNames;
 import com.premisave.messenger.repository.ChatRepository;
 import com.premisave.messenger.repository.GroupRepository;
 import com.premisave.messenger.repository.MessageRepository;
@@ -173,7 +174,7 @@ public class ChatService {
 
                         try {
                             UserSummaryResponse sender = userService.getUserSummary(msg.getSenderId(), authToken);
-                            lastMsg.setSenderName(sender.getDisplayName() != null ? sender.getDisplayName() : sender.getUsername());
+                            lastMsg.setSenderName(UserNames.full(sender));
                             lastMsg.setSenderProfilePic(sender.getProfilePictureUrl());
                         } catch (Exception e) {
                             lastMsg.setSenderName("Unknown User");

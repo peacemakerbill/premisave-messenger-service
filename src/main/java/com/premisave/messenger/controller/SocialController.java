@@ -202,29 +202,46 @@ public class SocialController {
     private List<ReviewResponse> withReviewers(List<ReviewResponse> reviews, String token) {
         if (reviews == null) return List.of();
         Map<String, UserSummaryResponse> found = new HashMap<>();
+        List<List<UserSummaryResponse>> everyone = new java.util.ArrayList<>();   // loaded once, only if needed
         for (ReviewResponse review : reviews) {
             String ref = review.getUserId();
             if (ref == null || ref.isBlank()) continue;
-            if (!found.containsKey(ref)) found.put(ref, resolveUser(ref, token));
+            if (!found.containsKey(ref)) found.put(ref, resolveUser(ref, token, everyone));
             review.setReviewer(found.get(ref));
         }
         return reviews;
     }
 
-    private UserSummaryResponse resolveUser(String ref, String token) {
+    private UserSummaryResponse resolveUser(String ref, String token, List<List<UserSummaryResponse>> everyone) {
         try {
             UserSummaryResponse user = userService.getUserSummary(ref, token);
             boolean fallback = user == null || "Unknown User".equals(user.getDisplayName());
             if (!fallback) return user;
-            for (UserSummaryResponse candidate : userService.searchUsers(ref, token)) {
-                if (candidate != null && (ref.equalsIgnoreCase(candidate.getId())
-                        || ref.equalsIgnoreCase(candidate.getEmail())
-                        || ref.equalsIgnoreCase(candidate.getUsername()))) {
-                    return candidate;
-                }
-            }
+
+            // 1. A search on the value (name, username or email, depending on auth-service).
+            UserSummaryResponse hit = matching(userService.searchUsers(ref, token), ref);
+            if (hit != null) return hit;
+
+            // 2. The full user list, matched on id, email or username.
+            if (everyone.isEmpty()) everyone.add(userService.getAllUsers(0, 1000, token));
+            hit = matching(everyone.get(0), ref);
+            if (hit != null) return hit;
         } catch (Exception e) {
             log.warn("Could not resolve reviewer {}: {}", ref, e.getMessage());
+            return null;
+        }
+        log.warn("Reviewer '{}' matches no user by id, email or username", ref);
+        return null;
+    }
+
+    private UserSummaryResponse matching(List<UserSummaryResponse> users, String ref) {
+        if (users == null) return null;
+        for (UserSummaryResponse candidate : users) {
+            if (candidate != null && (ref.equalsIgnoreCase(candidate.getId())
+                    || ref.equalsIgnoreCase(candidate.getEmail())
+                    || ref.equalsIgnoreCase(candidate.getUsername()))) {
+                return candidate;
+            }
         }
         return null;
     }

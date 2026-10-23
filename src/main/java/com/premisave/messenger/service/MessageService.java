@@ -12,6 +12,7 @@ import com.premisave.messenger.enums.MessageDeliveryState;
 import com.premisave.messenger.enums.MessageStatus;
 import com.premisave.messenger.enums.MessageType;
 import com.premisave.messenger.exception.HttpStatusException;
+import com.premisave.messenger.util.UserNames;
 import com.premisave.messenger.exception.MessageNotFoundException;
 import com.premisave.messenger.realtime.RedisMessagePublisher;
 import com.premisave.messenger.repository.ChatRepository;
@@ -641,7 +642,7 @@ public class MessageService {
         } else {
             try {
                 UserSummaryResponse sender = userService.getUserSummary(message.getSenderId(), authToken);
-                response.setSenderName(sender.getDisplayName() != null ? sender.getDisplayName() : sender.getUsername());
+                response.setSenderName(UserNames.full(sender));
                 response.setSenderProfilePic(sender.getProfilePictureUrl());
             } catch (Exception e) {
                 log.warn("Failed to fetch sender details for {}", message.getSenderId());
@@ -668,7 +669,7 @@ public class MessageService {
 
                 try {
                     UserSummaryResponse sender = userService.getUserSummary(original.getSenderId(), authToken);
-                    preview.setSenderName(sender.getDisplayName() != null ? sender.getDisplayName() : sender.getUsername());
+                    preview.setSenderName(UserNames.full(sender));
                 } catch (Exception ignored) {
                 }
 

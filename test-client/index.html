@@ -589,7 +589,9 @@ function fmtDur(s) {
 // ---------- people ----------
 function userName(u) {
   if (!u) return 'Unknown';
-  return u.displayName || [u.firstName, u.lastName].filter(Boolean).join(' ').trim() || u.username || u.email || 'Unknown';
+  // Full name first, then whatever else the profile has.
+  const full = [u.firstName, u.lastName].filter(Boolean).join(' ').trim();
+  return full || u.fullName || u.displayName || u.username || u.email || 'Unknown';
 }
 // True when u is the signed-in user. Compares id, email and username, and the
 // email in the token, so the caller is hidden even if one of them is missing.
@@ -2318,7 +2320,7 @@ async function paintTab(pane, cur, me, reviews, views, user, rerun) {
     list.append(h('div', { class: 'review' },
       h('button', { class: 'person', type: 'button', style: 'padding:0 0 6px', disabled: known ? null : true, title: known ? 'View profile' : '', onclick: () => known && openProfile(who.id) },
         avatar(userName(who), who.profilePictureUrl, who.id || r.userId, 'sm'),
-        h('div', null, h('div', { class: 'n' }, own ? 'You' : userName(who)), h('div', { class: 'e' }, sub))),
+        h('div', null, h('div', { class: 'n' }, own ? 'You' : known ? userName(who) : (/@/.test(r.userId || '') ? r.userId : 'Unknown user')), h('div', { class: 'e' }, sub))),
       stars(r.rating),
       r.comment ? h('p', null, r.comment) : null));
   }

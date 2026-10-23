@@ -1,6 +1,7 @@
 package com.premisave.messenger.controller;
 
 import com.premisave.messenger.dto.response.GroupDetailsResponse;
+import com.premisave.messenger.util.UserNames;
 import com.premisave.messenger.dto.response.UserSummaryResponse;
 import com.premisave.messenger.entity.Group;
 import com.premisave.messenger.security.CurrentUserResolver;
@@ -218,7 +219,7 @@ public class GroupController {
             UserSummaryResponse user = userService.getUserSummary(memberId, authHeader);
             GroupDetailsResponse.Member member = new GroupDetailsResponse.Member();
             member.setId(memberId);
-            member.setDisplayName(user.getDisplayName());
+            member.setDisplayName(UserNames.full(user));
             member.setUsername(user.getUsername());
             member.setEmail(user.getEmail());
             member.setFirstName(user.getFirstName());
