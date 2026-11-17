@@ -196,6 +196,13 @@ calls:
   # the folder the recorder writes to as this service sees it, and the same folder as the recorder sees it.
   recording-enabled: ${CALLS_RECORDING_ENABLED:false}
   recordings-dir: ${CALLS_RECORDINGS_DIR:deploy/livekit/recordings}
+  # Where the videos are kept: LOCAL (the folder above) or NETWORK (a share the operating system has mounted, for example a NAS).
+  # NETWORK refuses to record unless the mount path really is a network share. Recording is also refused below the free space.
+  recordings-mode: ${CALLS_RECORDINGS_MODE:LOCAL}
+  recordings-network-mount-path: ${CALLS_RECORDINGS_NETWORK_MOUNT_PATH:}
+  recordings-network-directory: ${CALLS_RECORDINGS_NETWORK_DIRECTORY:premisave-recordings}
+  recordings-network-require-mount: ${CALLS_RECORDINGS_NETWORK_REQUIRE_MOUNT:true}
+  recordings-min-free-mb: ${CALLS_RECORDINGS_MIN_FREE_MB:500}
   recordings-egress-dir: ${CALLS_RECORDINGS_EGRESS_DIR:/out}
   recording-layout: ${CALLS_RECORDING_LAYOUT:speaker}
   recording-link-ttl-hours: ${CALLS_RECORDING_LINK_TTL_HOURS:6}

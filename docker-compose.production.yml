@@ -12,7 +12,8 @@
 #   - JWT_SECRET and the actuator password have no fallback: the file refuses to start without them.
 #   - Redis keeps its data on disk and is reachable only from the service, never from outside.
 #
-# Run ONE copy of the service: live messages go through a broker inside the service.
+# Several copies can run side by side: live messages are relayed through Redis. Each copy keeps attachments in its own
+# volume, though, so with more than one copy use a shared network storage (STORAGE_MODE=NETWORK, see deploy/README.md).
 
 name: premisave-messenger-production
 
@@ -26,6 +27,12 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       REDIS_URL: redis://redis:6379
+      CALLS_RECORDINGS_DIR: /data/recordings
+      # LOCAL keeps videos in the folder mounted below. NETWORK expects that folder to be a mounted network share (set
+      # CALLS_RECORDINGS_HOST_DIR to the share's folder on this server) and refuses to record if it is not.
+      CALLS_RECORDINGS_MODE: ${CALLS_RECORDINGS_MODE:-LOCAL}
+      CALLS_RECORDINGS_NETWORK_MOUNT_PATH: /data/recordings
+      CALLS_RECORDINGS_NETWORK_DIRECTORY: ""
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in deploy/env/production.env. It must equal the auth-service value}
       ACTUATOR_PASSWORD: ${ACTUATOR_PASSWORD:?Set ACTUATOR_PASSWORD in deploy/env/production.env}
     ports:

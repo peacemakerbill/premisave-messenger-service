@@ -539,6 +539,36 @@
       "defaultValue": "deploy/livekit/recordings"
     },
     {
+      "name": "calls.recordings-mode",
+      "type": "java.lang.String",
+      "description": "Where call recordings are kept: LOCAL (the folder in calls.recordings-dir) or NETWORK (a share the operating system has mounted at calls.recordings-network-mount-path). Set with CALLS_RECORDINGS_MODE.",
+      "defaultValue": "LOCAL"
+    },
+    {
+      "name": "calls.recordings-network-mount-path",
+      "type": "java.lang.String",
+      "description": "NETWORK mode: where the share is mounted, as this service sees it. The service never mounts anything itself. Set with CALLS_RECORDINGS_NETWORK_MOUNT_PATH.",
+      "defaultValue": ""
+    },
+    {
+      "name": "calls.recordings-network-directory",
+      "type": "java.lang.String",
+      "description": "NETWORK mode: the folder inside the share for the videos. Blank means the mount path itself. The recorder must write to the same folder. Set with CALLS_RECORDINGS_NETWORK_DIRECTORY.",
+      "defaultValue": "premisave-recordings"
+    },
+    {
+      "name": "calls.recordings-network-require-mount",
+      "type": "java.lang.Boolean",
+      "description": "NETWORK mode: refuse to record unless the mount path really is on a network share, so videos never fill the local disk by mistake. Set with CALLS_RECORDINGS_NETWORK_REQUIRE_MOUNT.",
+      "defaultValue": true
+    },
+    {
+      "name": "calls.recordings-min-free-mb",
+      "type": "java.lang.Integer",
+      "description": "Recording is refused when less than this many megabytes are free on the storage. 0 turns the check off. Set with CALLS_RECORDINGS_MIN_FREE_MB.",
+      "defaultValue": 500
+    },
+    {
       "name": "calls.recordings-egress-dir",
       "type": "java.lang.String",
       "description": "The recordings folder as the recorder container sees it (where the folder is mounted inside the container). Set with CALLS_RECORDINGS_EGRESS_DIR.",

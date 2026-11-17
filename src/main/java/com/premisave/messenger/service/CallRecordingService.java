@@ -16,6 +16,7 @@ import com.premisave.messenger.realtime.RedisMessagePublisher;
 import com.premisave.messenger.repository.CallRecordingRepository;
 import com.premisave.messenger.repository.CallRepository;
 import com.premisave.messenger.security.AttachmentUrlSigner;
+import com.premisave.messenger.storage.RecordingStorage;
 import com.premisave.messenger.util.UserNames;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,7 +31,6 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -69,6 +69,7 @@ public class CallRecordingService {
     private final AttachmentUrlSigner signer;
     private final RedisMessagePublisher publisher;
     private final MongoTemplate mongoTemplate;
+    private final RecordingStorage storage;
 
     /** A recording file and what to call it, for the download endpoint. */
     public record Content(CallRecording recording, Path path) { }
@@ -78,6 +79,7 @@ public class CallRecordingService {
     /** A host or co-host starts recording the call. */
     public CallRecordingResponse start(UserSummaryResponse me, String callId) {
         requireAvailable();
+        storage.requireReady();
         Call call = require(callId);
         if (!call.running()) throw HttpStatusException.gone("CALL_ENDED", "This call has ended");
         requireManager(call, me.getId());
@@ -192,6 +194,15 @@ public class CallRecordingService {
         CallSettingsResponse r = new CallSettingsResponse();
         r.setRecordingEnabled(settings.recordingAvailable());
         r.setCanManage(isAdmin(me));
+        RecordingStorage.Status st = storage.status();
+        r.setStorageMode(st.mode().name());
+        r.setStorageReady(st.ready());
+        if (r.isCanManage()) {
+            // Paths and reasons are for the administrators only.
+            r.setStorageLocation(storage.location());
+            r.setStorageProblem(st.problem());
+            r.setStorageFreeMb(st.freeMb());
+        }
         return r;
     }
 
@@ -404,7 +415,7 @@ public class CallRecordingService {
 
     /** The video file on this machine. Refuses any path that would leave the recordings folder. */
     private Path fileOf(CallRecording rec) {
-        Path root = Paths.get(props.getRecordingsDir()).toAbsolutePath().normalize();
+        Path root = storage.root();
         Path path = root.resolve(rec.getFileName()).normalize();
         if (!path.startsWith(root)) throw new IllegalStateException("Recording path is outside the recordings folder");
         return path;

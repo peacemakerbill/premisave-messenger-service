@@ -5,7 +5,8 @@
 #   fly secrets import -a premisave-messenger-staging < deploy/env/staging.env
 #   fly deploy -c fly.staging.toml
 #
-# Run ONE machine: live messages go through a broker inside the service.
+# One machine is the simplest. Several work too (live messages are relayed through Redis), but the volume belongs to one
+# machine, so for more than one use a shared network storage (STORAGE_MODE=NETWORK).
 # Fly's Redis (Upstash) gives an address with the password in it: use it for REDIS_URL.
 # MongoDB is not offered by Fly: use MongoDB Atlas for MONGODB_URI.
 

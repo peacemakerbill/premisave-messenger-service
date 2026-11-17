@@ -20,7 +20,8 @@
 # MongoDB: by default the file starts one in the same stack. For production use a managed database
 # (MongoDB Atlas) and set MONGODB_URI to its address.
 #
-# Run ONE copy of the service: live messages go through a broker inside the service.
+# Several copies can run side by side: live messages are relayed through Redis. Each copy keeps attachments in its own
+# volume, though, so with more than one copy use a shared network storage (STORAGE_MODE=NETWORK, see deploy/README.md).
 
 services:
   messenger:

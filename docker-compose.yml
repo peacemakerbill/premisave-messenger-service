@@ -39,6 +39,11 @@ services:
       LIVEKIT_API_URL: http://host.docker.internal:7880
       # Recordings written by the LiveKit egress container (deploy/livekit) land in this folder.
       CALLS_RECORDINGS_DIR: /data/recordings
+      # LOCAL keeps videos in the folder mounted below. NETWORK expects that folder to be a mounted network share (set
+      # CALLS_RECORDINGS_HOST_DIR to the share's folder on this server) and refuses to record if it is not.
+      CALLS_RECORDINGS_MODE: ${CALLS_RECORDINGS_MODE:-LOCAL}
+      CALLS_RECORDINGS_NETWORK_MOUNT_PATH: /data/recordings
+      CALLS_RECORDINGS_NETWORK_DIRECTORY: ""
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

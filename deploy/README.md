@@ -56,11 +56,13 @@ Everything else has a default (see `.env.example`). Make secrets with `openssl r
 
 Health check for every platform: `GET /actuator/health` (public).
 
-## Run one copy only
+## One copy or several
 
-Live messages (the websocket at `/ws`) go through a broker inside the service. A second copy would not see the
-first one's connections, so people on different copies would not receive each other's messages. Keep one
-instance in every environment. The reverse proxy must pass websocket upgrades (see below).
+Live messages (the websocket at `/ws`) are relayed through Redis, so several copies of the service can run side by side
+and people connected to different copies still receive each other's messages. What is per copy is the files:
+attachments (and call recordings) are kept on the copy's own disk. With more than one copy, use `STORAGE_MODE=NETWORK`
+with a share all copies mount (see `docs/CALLS.md` and `.env.example`), or keep one copy. The reverse proxy must pass
+websocket upgrades (see below).
 
 ## Development on your machine
 
@@ -167,7 +169,7 @@ fly secrets import -a premisave-messenger-staging < deploy/env/staging.env
 fly deploy -c fly.staging.toml
 ```
 
-Production is the same with `fly.production.toml` and `premisave-messenger`. Keep one machine. Fly's Redis address goes
+Production is the same with `fly.production.toml` and `premisave-messenger`. One machine is the simplest (a volume belongs to one machine). Fly's Redis address goes
 in `REDIS_URL`. The volume keeps the attachments.
 
 ## Railway
@@ -191,7 +193,7 @@ The image is `ghcr.io/peacemakerbill/premisave-messenger-service:<tag>` (see the
 3. Health check: `GET /actuator/health`. Allow about 90 seconds for the first start.
 4. Mount a persistent volume at `/data` for attachments.
 5. Reachable MongoDB and Redis, and the auth-service of the same environment.
-6. One instance only.
+6. One instance, unless attachments are on a shared network storage (`STORAGE_MODE=NETWORK`).
 
 ## Publishing the image
 

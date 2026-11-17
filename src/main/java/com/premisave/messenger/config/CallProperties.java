@@ -53,8 +53,25 @@ public class CallProperties {
      */
     private boolean recordingEnabled = false;
 
-    /** The folder the recorder writes videos to, as this service sees it. It must be the same folder the recorder writes to. */
+    /** Where recordings are kept: LOCAL (a folder on this server) or NETWORK (a share that the operating system has mounted). */
+    public enum StorageMode { LOCAL, NETWORK }
+
+    private StorageMode recordingsMode = StorageMode.LOCAL;
+
+    /** LOCAL: the folder the recorder writes videos to, as this service sees it. It must be the same folder the recorder writes to. */
     private String recordingsDir = "deploy/livekit/recordings";
+
+    /** NETWORK: where the share is mounted, as this service sees it. The service never mounts anything itself. */
+    private String recordingsNetworkMountPath = "";
+
+    /** NETWORK: the folder inside the share for the videos. Blank means the mount path itself. */
+    private String recordingsNetworkDirectory = "premisave-recordings";
+
+    /** NETWORK: refuse to record unless the mount path really is a network share, so videos never fill the local disk by mistake. */
+    private boolean recordingsNetworkRequireMount = true;
+
+    /** Recording is refused when less than this many megabytes are free. 0 turns the check off. */
+    private int recordingsMinFreeMb = 500;
 
     /** The same folder as the recorder sees it (the path inside the recorder's container). */
     private String recordingsEgressDir = "/out";

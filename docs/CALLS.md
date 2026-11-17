@@ -81,7 +81,7 @@ Endpoints (all under `/api/calls`, signed-in users):
 | `GET /{id}/recordings` | The recordings of the call, newest first. Each ready one has a `playUrl` (a signed link that needs no header, with Range support). |
 | `DELETE /{id}/recordings/{recordingId}` | Deletes a recording and its file. |
 | `GET /{id}/messages?limit=` | The call chat, up to 1000 messages, also after the call ended. |
-| `GET /api/call-settings` | `{ recordingEnabled, canManage }`. |
+| `GET /api/call-settings` | `{ recordingEnabled, canManage, storageMode, storageReady }`, and for administrators also `storageLocation`, `storageProblem` and `storageFreeMb`. |
 | `PUT /api/call-settings/recording` | Administrators only. Body `{ "enabled": true }`. |
 
 New live events: `RECORDING_STARTED`, `RECORDING_STOPPED` and `RECORDING_SETTING`. Every `call` object carries
@@ -106,8 +106,48 @@ Recording is done by LiveKit Egress, the second service in `deploy/livekit/docke
 4. **Switch it on** as an administrator, in the app: Admin, Calls, Call recording.
 
 The recorder runs a headless browser, so each recording uses a good part of a CPU core. Videos are MP4, about 0.5 to 1 GB
-per hour at the default quality. Plan disk space, because recordings are never deleted automatically. If you run the
-messenger on another machine than the recorder, share the folder (NFS or similar) and point both at it.
+per hour at the default quality. Plan disk space, because recordings are never deleted automatically.
+
+### Where recordings are stored
+
+Videos are kept in a folder. That folder is either on the server (LOCAL, the default) or on a network share such as a NAS
+(NETWORK). Both the recorder and the messenger must use the same folder.
+
+| | LOCAL | NETWORK |
+| --- | --- | --- |
+| Messenger | `CALLS_RECORDINGS_MODE=LOCAL`, `CALLS_RECORDINGS_DIR=/srv/premisave/recordings` | `CALLS_RECORDINGS_MODE=NETWORK`, `CALLS_RECORDINGS_NETWORK_MOUNT_PATH=/mnt/premisave-nas`, `CALLS_RECORDINGS_NETWORK_DIRECTORY=premisave-recordings` |
+| Recorder (`deploy/livekit`) | `CALLS_RECORDINGS_HOST_DIR=/srv/premisave/recordings` | `CALLS_RECORDINGS_HOST_DIR=/mnt/premisave-nas/premisave-recordings` |
+
+For NETWORK, mount the share on the host first, the same way as for attachments (the service never mounts anything itself).
+An SMB share on a Synology NAS, in `/etc/fstab`:
+
+```
+//192.168.1.50/premisave  /mnt/premisave-nas  cifs  credentials=/root/.smbcredentials,uid=1000,gid=1000,file_mode=0666,dir_mode=0777,_netdev,nofail  0  0
+```
+
+or NFS: `192.168.1.50:/volume1/premisave  /mnt/premisave-nas  nfs  defaults,_netdev,nofail  0  0`. Then
+`sudo mkdir -p /mnt/premisave-nas/premisave-recordings && sudo chmod 777 /mnt/premisave-nas/premisave-recordings` and start the
+recorder with `CALLS_RECORDINGS_HOST_DIR=/mnt/premisave-nas/premisave-recordings`. The recorder writes there as an unprivileged
+user, so the folder must be writable by everyone (or by the user the share maps to).
+
+Safety checks, both on by default:
+
+* **The share must really be mounted.** With `CALLS_RECORDINGS_NETWORK_REQUIRE_MOUNT=true` (recommended), starting a recording is
+  refused unless the mount path is on a network file system (cifs, nfs, ...). If the share drops, nothing is recorded to the
+  empty mount folder on the local disk. The messenger answers 503 "Recording storage is not available right now" and the
+  administrators see the reason in the app (Admin, Calls).
+* **Enough free space.** Recording is refused when less than `CALLS_RECORDINGS_MIN_FREE_MB` (500) are free. Set 0 to turn it off.
+
+The check covers the messenger's view of the folder. The recorder is a separate container: start it only after the share is
+mounted (`nofail` and `_netdev` in fstab keep the machine booting when the NAS is away), or Docker will create an empty folder
+at that path on the local disk and the recorder will write there.
+
+With the messenger in Docker (the compose files in this repository), the folder is bind mounted into the container at
+`/data/recordings`. In NETWORK mode set `CALLS_RECORDINGS_MODE=NETWORK` and `CALLS_RECORDINGS_HOST_DIR` to the share's folder on the
+host; the compose files already point the mount path at `/data/recordings`. The mount check works through the bind mount.
+
+Several messenger copies, or the messenger on another machine than the recorder, need NETWORK storage that every one of them
+mounts at the same place.
 
 Webhooks: the LiveKit server also reports `egress_started`, `egress_updated` and `egress_ended` to the same
 `/api/calls/livekit-webhook`. If one is lost, a check every 30 seconds looks at the file and settles the recording.
@@ -191,5 +231,7 @@ You need a Linux server (or your own machine for development) with Docker.
 * **The recording ends as "failed" with "video file was not found".** The recorder and the messenger are not looking at the same
   folder, or the folder is not writable. Run `ls -l deploy/livekit/recordings` after a short recording: the file should be there.
 * **Egress logs a Chrome sandbox error.** Add `cap_add: [SYS_ADMIN]` to the `egress` service.
+* **Recording answers 503 "Recording storage is not available right now".** In NETWORK mode the share is not mounted (check `mount | grep premisave` and `/etc/fstab`), or the free space is below `CALLS_RECORDINGS_MIN_FREE_MB`. The messenger log has the exact reason, and so does the
+  administrators' call settings screen.
 * **No record button.** An administrator has to switch recording on first, and the call must have a host or co-host (you are the
   host of a call you start).

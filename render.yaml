@@ -5,8 +5,8 @@
 #   production    paid standard plan with a disk for attachments, deploys by hand, private network
 #
 # Plans and sizes are choices, change them freely. A disk needs a paid plan, and a service with a disk
-# runs as one instance. Run ONE instance of the messenger in any case: live messages go through a broker inside
-# the service, so a second instance would not see the first one's connections.
+# runs as one instance, which is what the messenger needs here: live messages are relayed through Redis, so several
+# instances would work, but each one would keep its own attachments.
 #
 # How to use it: Render dashboard > New > Blueprint > pick this repository. Render asks once for every
 # value marked "sync: false" (secrets and addresses). Names must be unique in the whole file.

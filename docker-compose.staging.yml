@@ -13,8 +13,8 @@
 #   IMAGE_TAG=staging docker compose --env-file deploy/env/staging.env -f docker-compose.staging.yml pull
 #   IMAGE_TAG=staging docker compose --env-file deploy/env/staging.env -f docker-compose.staging.yml up -d
 #
-# Run ONE copy of the service: live messages go through a broker inside the service, so a second copy would not
-# see the first one's connections.
+# Several copies can run side by side: live messages are relayed through Redis. Each copy keeps attachments in its own
+# volume, though, so with more than one copy use a shared network storage (STORAGE_MODE=NETWORK, see deploy/README.md).
 
 name: premisave-messenger-staging
 
@@ -29,6 +29,12 @@ services:
       SPRING_PROFILES_ACTIVE: staging
       MONGODB_URI: mongodb://mongo:27017/premisave-messenger-staging
       REDIS_URL: redis://redis:6379
+      CALLS_RECORDINGS_DIR: /data/recordings
+      # LOCAL keeps videos in the folder mounted below. NETWORK expects that folder to be a mounted network share (set
+      # CALLS_RECORDINGS_HOST_DIR to the share's folder on this server) and refuses to record if it is not.
+      CALLS_RECORDINGS_MODE: ${CALLS_RECORDINGS_MODE:-LOCAL}
+      CALLS_RECORDINGS_NETWORK_MOUNT_PATH: /data/recordings
+      CALLS_RECORDINGS_NETWORK_DIRECTORY: ""
     # Published on this server only. Put a reverse proxy (nginx, Caddy, Traefik) in front for https and websockets.
     ports:
       - "${HTTP_BIND:-127.0.0.1}:${HTTP_PORT:-8081}:8081"

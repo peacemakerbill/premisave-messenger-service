@@ -16,7 +16,9 @@
 #
 #   mkdir -p recordings && chmod 777 recordings     (once, in this folder)
 #
-# The messenger reads the same folder (CALLS_RECORDINGS_DIR, default deploy/livekit/recordings). Recording is switched on or
+# The messenger reads the same folder (CALLS_RECORDINGS_DIR, default deploy/livekit/recordings). To keep the videos on a network
+# share (NAS), mount it on this machine and set CALLS_RECORDINGS_HOST_DIR to a folder on it (see docs/CALLS.md, "Where recordings
+# are stored"). Mount the share BEFORE starting this file, or Docker creates an empty local folder at that path. Recording is switched on or
 # off by an administrator from the dashboard. See docs/CALLS.md, "Recording".
 #
 # This works on Linux. On Docker Desktop for Windows or macOS, host networking is limited: use the
