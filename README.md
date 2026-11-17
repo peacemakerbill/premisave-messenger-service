@@ -63,6 +63,7 @@
 4. [How real-time delivery works](#how-real-time-delivery-works)
 5. [How presence tracking works](#how-presence-tracking-works)
 6. [Calls and recordings](#calls-and-recordings)
+   - [Set up and run LiveKit](#set-up-and-run-livekit)
 7. [Quick start](#quick-start)
 8. [Run it with Docker and deploy it](#run-it-with-docker-and-deploy-it)
 9. [Configuration reference](#configuration-reference)
@@ -200,7 +201,7 @@ Because the session counter lives in Redis rather than in-instance memory, this 
   <img src="docs/assets/calls.svg" alt="The host starts a call, the messenger signs tokens, audio and video go to LiveKit, the recorder writes a file to storage and the messenger plays it back" width="100%" />
 </p>
 
-The messenger never carries audio or video. It signs the join tokens, rings people, keeps the call records and the chat inside the call, and starts and stops the recorder. The media runs on a [LiveKit](https://livekit.io) server (see `deploy/livekit/`), and recording uses LiveKit Egress next to it. [docs/CALLS.md](docs/CALLS.md) has the full set-up.
+The messenger never carries audio or video. It signs the join tokens, rings people, keeps the call records and the chat inside the call, and starts and stops the recorder. The media runs on a [LiveKit](https://livekit.io) server (see `deploy/livekit/`), and recording uses LiveKit Egress next to it. [Set up and run LiveKit](#set-up-and-run-livekit) below has the steps, and [docs/CALLS.md](docs/CALLS.md) has the details.
 
 **Recording**
 
@@ -227,6 +228,82 @@ Before it starts a recording the service checks that the folder is there, that i
 | `PUT` | `/api/call-settings/recording` | Administrators only: `{ "enabled": true \| false }` switches recording for everyone |
 
 In the Flutter app the switch is under Messenger settings, then Calls, for administrators (and in the admin area, Call settings). In the browser client it is under Settings, Calls.
+
+### Set up and run LiveKit
+
+<p align="center">
+  <img src="docs/assets/livekit.svg" alt="Make a secret, make a recordings folder, start LiveKit and the recorder with docker compose, then check port 7880" width="100%" />
+</p>
+
+Calls and recording need a LiveKit server. Without one the chat works as before, and every call endpoint answers `503 CALLS_NOT_CONFIGURED`. [`deploy/livekit/docker-compose.yml`](deploy/livekit/docker-compose.yml) starts two containers on the machine where you run it: `premisave-livekit` (the media server) and `premisave-egress` (the recorder). Both use the host network, so the UDP media ports work without mapping hundreds of them. That works on Linux; on Docker Desktop for Windows or macOS see [docs/CALLS.md](docs/CALLS.md#windows-and-macos-with-docker-desktop).
+
+You need Docker with Compose, the messenger's `.env`, and a **Redis that `localhost:6379` reaches**. LiveKit and the recorder talk through it, and LiveKit does not start without it. It does not have to be the messenger's own Redis. If you run the messenger from source and have Redis on this computer, you are set. The Redis that `docker compose up` starts for the messenger is not published outside Docker, so with the Docker setup start a small one for LiveKit (skip this if something already listens on 6379):
+
+```bash
+docker run -d --name premisave-livekit-redis --restart unless-stopped -p 127.0.0.1:6379:6379 redis:7-alpine
+```
+
+**1. Make a key and a secret.** Run this in the messenger folder. It writes both into `.env` and replaces any earlier values. The secret must be at least 32 characters.
+
+```bash
+SECRET=$(openssl rand -hex 32)
+sed -i '/^LIVEKIT_API_KEY=/d;/^LIVEKIT_API_SECRET=/d' .env
+printf 'LIVEKIT_API_KEY=premisave\nLIVEKIT_API_SECRET=%s\n' "$SECRET" >> .env
+```
+
+`LIVEKIT_URL` and `LIVEKIT_API_URL` already default to `ws://localhost:7880` and `http://localhost:7880`, which is right when LiveKit runs beside the messenger.
+
+**2. Make the folder for the videos**, once. The recorder runs as an unprivileged user, so the folder must be writable by everyone:
+
+```bash
+mkdir -p deploy/livekit/recordings && chmod 777 deploy/livekit/recordings
+```
+
+To keep the videos somewhere else (a bigger disk, a mounted share), create that folder the same way and put its absolute path in `.env` as both `CALLS_RECORDINGS_DIR` and `CALLS_RECORDINGS_HOST_DIR`. The messenger and the recorder must see the same folder.
+
+**3. Start LiveKit and the recorder.** The first run downloads the two images.
+
+```bash
+cd deploy/livekit
+docker compose --env-file ../../.env up -d
+```
+
+**4. Check them.**
+
+```bash
+docker compose ps                                  # premisave-livekit and premisave-egress, both Up
+curl http://localhost:7880                         # prints OK
+docker compose logs --tail 40 livekit egress       # no Redis errors, "starting service" from both
+docker inspect premisave-egress --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{"\n"}}{{end}}'
+```
+
+The last command must print your recordings folder pointing at `/out`. If it prints a different folder, the settings file was not read: start again from `deploy/livekit` with `--env-file ../../.env`.
+
+**5. Restart the messenger** so it picks up the key and secret (`docker compose up -d --force-recreate messenger`, or restart `./mvnw spring-boot:run`). `GET /api/call-settings` now answers instead of `CALLS_NOT_CONFIGURED`.
+
+**6. Try a call.** Sign in as two people (two browsers, or the browser client and the app), start a call from one and join from the other. To record, an administrator switches recording on (Messenger settings, Calls, Call recording, or `PUT /api/call-settings/recording`). Then the host presses Record, stops it, and the finished video appears under the call a few seconds later:
+
+```bash
+find deploy/livekit/recordings -name '*.mp4'     # or the folder you chose; one file per recording, in a folder named after the call
+```
+
+Every day, from `deploy/livekit`:
+
+| Command | What it does |
+| --- | --- |
+| `docker compose ps` | Shows whether both containers are running |
+| `docker compose logs -f livekit egress` | Follows both logs (`egress` is the recorder) |
+| `docker compose --env-file ../../.env up -d --force-recreate` | Applies a changed `.env` or folder. A plain `up -d` keeps the old settings |
+| `docker compose pull && docker compose --env-file ../../.env up -d` | Updates to the newest images |
+| `docker compose down` | Stops both. The videos stay in their folder |
+
+**On a server**, the same compose file runs there, with these differences (all of it is in [docs/CALLS.md](docs/CALLS.md#production)):
+
+- Give LiveKit a domain and put a TLS proxy (Caddy or nginx) in front of port 7880. Set `LIVEKIT_URL=wss://live.your-domain.com`, and keep `LIVEKIT_API_URL=http://localhost:7880`.
+- Open `7881/tcp` and `50000-50200/udp` in the firewall, and set `LIVEKIT_USE_EXTERNAL_IP=true` on a cloud server.
+- Pin the image versions in the file once calls are in production, instead of `latest`.
+- Start it with the same settings file as the messenger: `docker compose --env-file ../env/production.env up -d`, run in `deploy/livekit`.
+- Render and Heroku cannot run it (no host network, no shared folder). Use a server with Docker, or LiveKit Cloud for calls without recording.
 
 ## Quick start
 
@@ -349,6 +426,8 @@ Start them in this order, each in its own folder (the folders sit side by side):
 (cd premisave-messenger-service/deploy/livekit && docker compose --env-file ../../.env up -d)   # 3. only for calls
 (cd premisave_flutter_frontend && ./run.sh)                                          # 4. the app
 ```
+
+The first time you want calls, do steps 1 and 2 of [Set up and run LiveKit](#set-up-and-run-livekit) first (key and secret, recordings folder, and a Redis on port 6379). Step 3 above is the same command as its step 3.
 
 To stop: `docker compose down` in each backend folder, and the same in `deploy/livekit` if you started it.
 

@@ -176,6 +176,22 @@ You need a Linux server (or your own machine for development) with Docker.
 3. **Restart the messenger.** With a key and secret set, calls switch on. With them empty, every call endpoint answers
    `503 CALLS_NOT_CONFIGURED`.
 4. Check it: `curl http://localhost:7880` answers `OK`.
+5. **Redis.** LiveKit needs a Redis at `LIVEKIT_REDIS_ADDRESS` (default `localhost:6379`) and does not start without one. The Redis
+   that the messenger's own `docker compose up` starts is not published outside Docker. In that case start a small one for
+   LiveKit: `docker run -d --name premisave-livekit-redis --restart unless-stopped -p 127.0.0.1:6379:6379 redis:7-alpine`.
+
+### Day to day
+
+Run these in `deploy/livekit`.
+
+| Command | What it does |
+| --- | --- |
+| `docker compose ps` | Both `premisave-livekit` and `premisave-egress` should be Up |
+| `docker compose logs -f livekit egress` | Follows both logs |
+| `docker compose --env-file ../../.env up -d --force-recreate` | Applies a changed `.env`. A plain `up -d` keeps the old settings |
+| `docker compose pull` then `up -d` | Updates the images |
+| `docker compose down` | Stops both. Recordings stay in their folder |
+| `docker inspect premisave-egress --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{"\n"}}{{end}}'` | Shows which folder the recorder writes to. It must be the folder the messenger reads |
 
 ### Trying it on your own machine
 

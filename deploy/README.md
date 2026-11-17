@@ -126,10 +126,25 @@ Attachments live in the `messenger-data` volume: back it up.
 
 ### Calls and recordings on a server
 
-Calls need a LiveKit server. `deploy/livekit/docker-compose.yml` starts one (and the recorder) on the same server; see
-`docs/CALLS.md`. Finished recordings are read from the folder in `CALLS_RECORDINGS_HOST_DIR`
-(default `deploy/livekit/recordings`), which the compose files mount into the messenger. Give that folder
-`chmod 777` as the calls guide says.
+Calls need a LiveKit server, and recording needs the recorder next to it. `deploy/livekit/docker-compose.yml` starts both on the same server as the service. The full steps, with a picture, are in the README under [Set up and run LiveKit](../README.md#set-up-and-run-livekit). On a server they are:
+
+```bash
+# 1. a key and a secret in the settings file you already made (deploy/env/staging.env or production.env)
+SECRET=$(openssl rand -hex 32)
+sed -i '/^LIVEKIT_API_KEY=/d;/^LIVEKIT_API_SECRET=/d' deploy/env/staging.env
+printf 'LIVEKIT_API_KEY=premisave\nLIVEKIT_API_SECRET=%s\n' "$SECRET" >> deploy/env/staging.env
+
+# 2. a Redis for LiveKit on port 6379 (skip if one is already there), and the folder for the videos
+docker run -d --name premisave-livekit-redis --restart unless-stopped -p 127.0.0.1:6379:6379 redis:7-alpine
+mkdir -p deploy/livekit/recordings && chmod 777 deploy/livekit/recordings
+
+# 3. start LiveKit and the recorder with the same settings file, then restart the service
+(cd deploy/livekit && docker compose --env-file ../env/staging.env up -d)
+```
+
+Use `production.env` for production. Also set `LIVEKIT_URL` and `LIVEKIT_API_URL` in that file: `wss://live.your-domain.com` and `http://localhost:7880`, with a TLS proxy in front of port 7880. Open `7881/tcp` and `50000-50200/udp` in the firewall, and set `LIVEKIT_USE_EXTERNAL_IP=true` on a cloud server.
+
+Finished recordings are read from the folder in `CALLS_RECORDINGS_HOST_DIR` (default `deploy/livekit/recordings`), which the compose files mount into the service. The recorder and the service must see the same folder. To check it: `docker inspect premisave-egress --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{"\n"}}{{end}}'`. To change a setting later, run the same `up -d` with `--force-recreate`. To stop it: `docker compose down` in `deploy/livekit`.
 
 ## Checking, reading the log and stopping
 
