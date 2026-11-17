@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Premisave Messenger</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.15.0/dist/livekit-client.umd.js"></script>
 <style>
 :root {
   --accent: #3390ec;
@@ -625,6 +626,115 @@ body.sv-open { overflow: hidden; }
 .join-hero .g-name { margin-top: 10px; justify-content: center; }
 .join-hero .btn { margin-top: 18px; min-width: 200px; }
 select.fld { appearance: auto; }
+/* ---------- calls ---------- */
+.call-banner { display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); z-index: 3; }
+.call-banner .ico { color: var(--accent-strong); }
+.call-banner .tx { flex: 1; min-width: 0; font-weight: 500; }
+.call-banner .btn { height: 34px; padding: 0 18px; }
+.incoming-stack { position: fixed; top: 16px; right: 16px; z-index: 70; display: grid; gap: 10px; width: min(340px, calc(100vw - 32px)); }
+.incoming { background: var(--panel); border-radius: 14px; box-shadow: var(--pop-shadow); padding: 14px; display: grid; gap: 12px; animation: tin .2s ease-out; }
+.incoming .who { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.incoming .n { font-weight: 600; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.incoming .s { color: var(--text-2); font-size: 13.5px; }
+.incoming .row2 { display: flex; gap: 8px; justify-content: flex-end; }
+.incoming .ring-av { animation: ringpulse 1.2s ease-in-out infinite; border-radius: 50%; }
+@keyframes ringpulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent); } 50% { box-shadow: 0 0 0 10px transparent; } }
+.btn.accept { background: #2f9e44; } .btn.accept:hover { background: #278a3a; }
+.btn.decline { background: var(--danger); } .btn.decline:hover { background: #c9302c; }
+body.in-call { overflow: hidden; }
+body.in-call .toasts { bottom: 108px; }
+body.in-call .scrim { z-index: 75; }
+body.in-call .pop { z-index: 76; }
+.call { position: fixed; inset: 0; z-index: 60; background: #0b1117; color: #fff; display: flex; flex-direction: column; }
+.call button { color: inherit; }
+.call-top { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+.call-top .t { flex: 1; min-width: 0; }
+.call-top .t b { display: block; font-size: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.call-top .t span { font-size: 13px; color: #9fb0c0; }
+.rec-pill { display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 999px; background: rgba(229,57,53,.18); color: #ff8a86; font-size: 13px; font-weight: 600; }
+.rec-pill .led { width: 9px; height: 9px; border-radius: 50%; background: var(--danger); animation: pulse 1s ease-in-out infinite; }
+.call-main { flex: 1; min-height: 0; display: flex; position: relative; }
+.call-stage { flex: 1; min-width: 0; padding: 8px 14px 14px; overflow: auto; display: grid; gap: 10px; align-content: center; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+.call-stage[data-n="1"] { grid-template-columns: minmax(0, 880px); justify-content: center; }
+.call-stage[data-n="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tile { position: relative; background: #17212b; border-radius: 14px; overflow: hidden; aspect-ratio: 16 / 10; display: grid; place-items: center; box-shadow: 0 0 0 0 #4fae4e; transition: box-shadow .15s; }
+.tile.speaking { box-shadow: 0 0 0 3px #4fae4e; }
+.tile.ringing { opacity: .7; }
+.tile .media { position: absolute; inset: 0; }
+.tile .media video { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
+.tile.screen .media video { object-fit: contain; }
+.tile.mirror .media video { transform: scaleX(-1); }
+.tile .ph { display: grid; justify-items: center; gap: 8px; }
+.tile:not(.novideo) .ph { display: none; }
+.tile .lab { position: absolute; left: 10px; bottom: 10px; max-width: calc(100% - 20px); display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 8px; background: rgba(0,0,0,.55); font-size: 13px; }
+.tile .lab .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .lab .ico { width: 15px; height: 15px; color: #ff8a86; }
+.call-bar { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 12px 16px calc(16px + env(safe-area-inset-bottom)); flex-wrap: wrap; }
+.cbtn { position: relative; width: 52px; height: 52px; border-radius: 50%; background: rgba(255,255,255,.14); display: grid; place-items: center; transition: background .15s; }
+.cbtn:hover { background: rgba(255,255,255,.24); }
+.cbtn .ico { width: 24px; height: 24px; }
+.cbtn.off { background: #fff; color: #111 !important; }
+.cbtn.on { background: var(--btn-bg); }
+.cbtn.live { background: var(--danger); }
+.cbtn.end { background: var(--danger); width: 64px; border-radius: 26px; } .cbtn.end:hover { background: #c9302c; }
+.cbtn .badge { position: absolute; top: -2px; right: -2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--danger); color: #fff; font-size: 11px; font-weight: 600; display: grid; place-items: center; }
+.cbtn .badge.hidden { display: none; }
+.pill-btn { height: 40px; padding: 0 16px; border-radius: 20px; background: rgba(229,57,53,.2); color: #ff8a86 !important; font-weight: 600; font-size: 13.5px; }
+.pill-btn:hover { background: rgba(229,57,53,.32); }
+.call-side { width: 340px; flex: none; background: var(--panel); color: var(--text); display: flex; flex-direction: column; min-height: 0; }
+.call-side.hidden { display: none; }
+.call-side button { color: inherit; }
+.cs-head { display: flex; align-items: center; padding: 8px 8px 8px 18px; border-bottom: 1px solid var(--line); }
+.cs-head h3 { flex: 1; margin: 0; font-size: 17px; font-weight: 500; }
+.cs-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 0; }
+.cs-msgs { display: grid; gap: 8px; padding: 10px 14px; align-content: start; }
+.cs-msg { background: var(--panel-2); border-radius: 10px; padding: 7px 11px; max-width: 92%; }
+.cs-msg.mine { justify-self: end; background: var(--bubble-out); }
+.cs-msg .by { font-size: 12.5px; font-weight: 600; color: var(--accent-strong); }
+.cs-msg .tx { white-space: pre-wrap; word-break: break-word; }
+.cs-msg .at { font-size: 11.5px; color: var(--text-2); text-align: right; }
+.cs-send { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--line); }
+.cs-send .fld { flex: 1; }
+.cs-tools { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 14px 12px; border-bottom: 1px solid var(--line); }
+.cs-tools .btn { height: 34px; padding: 0 12px; font-size: 13.5px; }
+.cs-person { display: flex; align-items: center; gap: 10px; padding: 8px 14px; }
+.cs-person .nm { flex: 1; min-width: 0; }
+.cs-person .nm b { display: block; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cs-person .nm span { font-size: 12.5px; color: var(--text-2); }
+.cs-person .icon-btn { width: 34px; height: 34px; }
+.cs-person .icon-btn .ico { width: 19px; height: 19px; }
+.cs-empty { padding: 24px 18px; color: var(--text-2); text-align: center; }
+.cs-sec { padding: 10px 14px 2px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+@media (max-width: 860px) { .call-side { position: absolute; inset: 0; width: auto; z-index: 2; } .call-stage[data-n="2"] { grid-template-columns: 1fr; } .cbtn { width: 46px; height: 46px; } }
+/* history, details, settings */
+.crow { display: flex; align-items: center; gap: 12px; padding: 9px 20px; margin: 0 -20px; cursor: pointer; }
+.crow:hover { background: var(--row-hover); }
+.crow .ci { width: 40px; height: 40px; border-radius: 50%; background: var(--panel-2); display: grid; place-items: center; color: var(--text-2); flex: none; }
+.crow .ci.miss { color: var(--danger); }
+.crow .ci.live { color: #2f9e44; }
+.crow .tx { flex: 1; min-width: 0; }
+.crow .tx b { display: block; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crow .tx span { font-size: 13px; color: var(--text-2); }
+.crow .tx span.miss { color: var(--danger); }
+.crow .icon-btn { width: 36px; height: 36px; }
+.ctools { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.ctools .btn { height: 36px; padding: 0 14px; font-size: 14px; }
+.cdetail h4 { margin: 16px 0 6px; font-size: 14px; color: var(--text-2); font-weight: 600; }
+.cdetail .recrow { background: var(--panel-2); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; display: grid; gap: 8px; }
+.cdetail .recrow .top { display: flex; align-items: center; gap: 10px; }
+.cdetail .recrow .top .tx { flex: 1; min-width: 0; }
+.cdetail .recrow video { width: 100%; max-height: 300px; border-radius: 8px; background: #000; }
+.cdetail .recrow .err { color: var(--danger); font-size: 13px; }
+.cdetail a.btn { text-decoration: none; }
+.cs { display: grid; gap: 14px; }
+.cs-row { display: flex; align-items: center; gap: 14px; }
+.cs-row > div:first-child { flex: 1; min-width: 0; }
+.cs-row .n { font-weight: 500; }
+.cs-row .note { margin: 2px 0 0; }
+.cs button.switch { border: 0; padding: 0; cursor: pointer; }
+.cs .kv { display: grid; grid-template-columns: 120px 1fr; gap: 4px 12px; font-size: 14px; }
+.cs .kv dt { color: var(--text-2); } .cs .kv dd { margin: 0; word-break: break-all; }
+.cs .bad { color: var(--danger); } .cs .good { color: #2f9e44; }
 </style>
 </head>
 <body>
@@ -719,7 +829,17 @@ const ICONS = {
   check1: '<path d="M4 12.5l5 5L20 6.5"/>',
   check2: '<path d="M1.5 12.5l5 5L17.5 6.5M10 16.5l1.5 1L22.5 6.5"/>',
   music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
-  home: '<path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>'
+  home: '<path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
+  phone: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>',
+  hangup: '<path d="M10.7 13.3a16 16 0 0 0 3.4 2.6l1.3-1.3a2 2 0 0 1 2.1-.5 12.8 12.8 0 0 0 2.8.7 2 2 0 0 1 1.7 2v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.4 19.4 0 0 1-3.3-2.7m-2.7-3.3A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7 12.8 12.8 0 0 0 .7 2.8 2 2 0 0 1-.5 2.1L8.1 9.9"/><path d="M23 1L1 23"/>',
+  micoff: '<path d="M1 1l22 22"/><path d="M9 9v3a3 3 0 0 0 5.1 2.1M15 9.3V4a3 3 0 0 0-5.9-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.1 1.2M12 19v4M8 23h8"/>',
+  videooff: '<path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.7 0H14a2 2 0 0 1 2 2v3.3l1 1L23 7v10"/><path d="M1 1l22 22"/>',
+  screen: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
+  rec: '<circle cx="12" cy="12" r="9.5"/><circle class="f" cx="12" cy="12" r="4.5"/>',
+  lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  unlock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
+  incoming: '<path d="M17 7L7 17M7 8v9h9"/>',
+  outgoing: '<path d="M7 17L17 7M8 7h9v9"/>'
 };
 function ico(name, cls) {
   return h('span', { class: 'ico' + (cls ? ' ' + cls : ''), html: '<svg viewBox="0 0 24 24" aria-hidden="true">' + (ICONS[name] || '') + '</svg>' });
@@ -1050,6 +1170,7 @@ function renderShell() {
   // chat panel
   R.head = h('header', { class: 'chat-head hidden' });
   R.searchBar = h('div', { class: 'search-bar hidden' });
+  R.callBanner = h('div', { class: 'call-banner hidden' });
   R.thread = h('div', { class: 'thread scroll', onscroll: onThreadScroll });
   R.toBottom = h('button', { class: 'to-bottom hidden', type: 'button', 'aria-label': 'Jump to latest', onclick: () => scrollBottom(true) }, ico('down'));
   R.replyBar = h('div', { class: 'reply-bar hidden' });
@@ -1063,7 +1184,7 @@ function renderShell() {
 
   const chat = h('section', { class: 'chat' },
     h('div', { class: 'wall' }),
-    R.head, R.searchBar, R.thread, R.toBottom, R.replyBar, R.composer, R.drop, R.placeholder);
+    R.head, R.searchBar, R.callBanner, R.thread, R.toBottom, R.replyBar, R.composer, R.drop, R.placeholder);
   R.chat = chat;
 
   R.app = h('div', { class: 'app' }, list, chat);
@@ -1094,6 +1215,7 @@ function openDrawer() {
       item('user', 'My profile', () => openProfile(me.id)),
       item('newchat', 'New chat', openNewChat),
       item('status', 'Status', () => showSection('status')),
+      item('phone', 'Calls', openCallHistory),
       item('scan', 'Scan QR code', openJoinScanner),
       item('sliders', 'Settings', openSettings),
       h('button', { class: 'dr-item', type: 'button', onclick: toggleTheme }, ico('moon'), h('span', null, 'Night mode'), h('span', { class: 'switch', 'data-theme-switch': '' }, h('i'))),
@@ -1215,6 +1337,8 @@ function renderHeader() {
     btn('icon-btn back', 'Back to chats', 'back', closeChat),
     h('div', { class: 'hit', onclick: () => openHeader(c) }, avatar(chatTitle(c), chatPhoto(c), otherId(c) || c.id, 'sm')),
     h('div', { class: 'who hit', onclick: () => openHeader(c) }, h('div', { class: 'n' }, chatTitle(c)), h('div', { class: 's' + (live ? ' live' : '') }, status)),
+    btn('icon-btn', 'Voice call', 'phone', () => startCall(c, 'AUDIO')),
+    btn('icon-btn', 'Video call', 'video', () => startCall(c, 'VIDEO')),
     btn('icon-btn', 'Search in chat', 'search', toggleSearch),
     btn('icon-btn', 'Chat menu', 'more', e => openChatMenu(e.currentTarget)));
 }
@@ -1561,6 +1685,7 @@ async function openChat(id) {
   closeSearch();
   R.app.classList.add('has-chat');
   renderHeader(); renderList();
+  refreshJoinBanner(id);
   R.ta.value = S.drafts[id] || '';
   autoGrow(); syncSendButton();
   const b = bucket(id);
@@ -1586,6 +1711,7 @@ function closeChat() {
   R.thread.replaceChildren();          // otherwise the old messages show through the empty-chat screen
   R.toBottom.classList.add('hidden');
   R.app.classList.remove('has-chat');
+  paintJoinBanner(null);
   renderHeader(); renderList();
 }
 function markAllRead(chatId) {
@@ -2022,6 +2148,7 @@ function openSettings() {
     h('div', { style: 'display:flex;gap:14px;align-items:center;margin-bottom:18px;cursor:pointer', title: 'View profile', onclick: () => openProfile(me.id) },
       avatar(userName(me), me.profilePictureUrl, me.id, 'lg'),
       h('div', null, h('div', { style: 'font-size:18px;font-weight:600' }, userName(me)), h('div', { class: 'note', style: 'margin:2px 0 0' }, me.email || ''), h('div', { class: 'note', style: 'margin:2px 0 0;word-break:break-all' }, 'User id: ' + (me.id || '')))),
+    h('label', { class: 'field-l' }, 'Calls'), callSettingsBlock(),
     h('label', { class: 'field-l' }, 'Messenger service'), apiIn,
     h('label', { class: 'field-l' }, 'Auth service'), authIn,
     h('p', { class: 'note' }, 'Live updates connect to ' + wsUrl() + '. Changing the messenger address reconnects.')
@@ -3916,7 +4043,9 @@ async function boot() {
     refreshStatusFeed();
     connectWS();
     startPolling();
+    loadCallSettings();
     runPendingJoin();
+    runPendingCall();
   } catch (e) {
     if (e.status === 401 || e.status === 403) { S.token = ''; store.del('sessionStorage', 'pm-token'); renderLogin('Your session ended. Sign in again.'); }
     else renderLogin(e.message);
@@ -3930,6 +4059,7 @@ function userFromToken() {
   } catch (e) { return { id: '', email: '' }; }
 }
 function signOut() {
+  if (S.call) finishCall(S.call, { leave: true });
   disconnectWS(); stopPolling();
   S.token = ''; S.me = null; S.chats = []; S.msgs = {}; S.active = null;
   store.del('sessionStorage', 'pm-token');
@@ -3992,6 +4122,7 @@ function subscribeAll(client) {
   client.subscribe('/user/queue/reactions', f => { const d = parse(f); if (d) onReaction(d); });
   client.subscribe('/user/queue/status', f => { const d = parse(f); if (d) onStatusEvent(d); });
   client.subscribe('/user/queue/groups', f => { const d = parse(f); if (d) onGroupEvent(d); });
+  client.subscribe('/user/queue/calls', f => { const d = parse(f); if (d) onCallEvent(d); });
   client.subscribe('/topic/presence', f => { const d = parse(f); if (d) onPresence(d); });
 }
 
@@ -4050,6 +4181,7 @@ function onPresence(d) {
 async function resync() {
   await loadChats(true);
   const id = S.active; if (!id) return;
+  refreshJoinBanner(id);
   try {
     const rows = await api('/api/messages/chat/' + encodeURIComponent(id) + '?page=0&size=40');
     mergePage(id, rows || []);
@@ -4091,9 +4223,699 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('online', () => { if (S.token && S.wsState !== 'open') { S.retry = 0; connectWS(true); } });
 
 // ====================================================================
+// Calls: voice and video through LiveKit, ringing, history and recordings
+// The messenger signs the join token and rings people (REST and /user/queue/calls).
+// The audio and video go straight between this page and the LiveKit server.
+// ====================================================================
+S.call = null;            // the call this page is in: { id, call, room, role, tiles, chat, panel, ... }
+S.callSettings = null;    // { recordingEnabled, canManage, storageMode, storageReady, ... }
+S.ringing = new Map();    // callId -> { call, el, timer }
+S.bannerCall = null;      // the running call in the open chat, for the Join banner
+
+const OPEN_CALL = st => st === 'RINGING' || st === 'ACTIVE' || st === 'WAITING';
+
+function lk() { return window.LivekitClient; }
+function myCallRole(call) {
+  const me = S.me && S.me.id;
+  const p = ((call && call.call && call.call.participants) || []).find(x => x.userId === me);
+  return p ? p.role : (call && call.role) || 'MEMBER';
+}
+const canRun = call => { const r = myCallRole(call); return r === 'HOST' || r === 'COHOST'; };
+function callTitle(c) {
+  if (!c) return 'Call';
+  if (c.title) return c.title;
+  const chat = c.chatId ? chatById(c.chatId) : null;
+  if (chat) return chatTitle(chat);
+  const me = S.me && S.me.id;
+  const other = (c.participants || []).find(p => p.userId !== me);
+  return other ? other.displayName : (c.kind === 'LINK' ? 'Call link' : 'Call');
+}
+function mediaMessage(e, what) {
+  const n = e && e.name;
+  if (n === 'NotAllowedError' || n === 'PermissionDeniedError') return 'Allow the ' + what + ' in your browser to use it. It needs https or localhost.';
+  if (n === 'NotFoundError') return 'No ' + what + ' was found on this computer.';
+  if (n === 'NotReadableError') return 'The ' + what + ' is in use by another app.';
+  return 'The ' + what + ' could not be turned on' + (e && e.message ? ': ' + e.message : '.');
+}
+
+// ---------- settings ----------
+async function loadCallSettings() {
+  try { S.callSettings = await api('/api/call-settings'); } catch (e) { S.callSettings = null; }
+  if (S.call) paintCallBar(S.call);
+  return S.callSettings;
+}
+
+// ---------- the Join banner in a chat ----------
+async function refreshJoinBanner(chatId) {
+  if (!chatId) { paintJoinBanner(null); return; }
+  let call = null;
+  try { call = await api('/api/calls/active?chatId=' + encodeURIComponent(chatId)); } catch (e) { /* no banner */ }
+  if (S.active !== chatId) return;
+  paintJoinBanner(call);
+}
+function paintJoinBanner(call) {
+  const b = R.callBanner;
+  if (!b) return;
+  S.bannerCall = call;
+  const mine = S.call && call && S.call.id === call.id;
+  if (!call || mine || !OPEN_CALL(call.status)) { b.classList.add('hidden'); b.replaceChildren(); return; }
+  const n = (call.participants || []).filter(p => p.state === 'JOINED').length;
+  b.replaceChildren(ico(call.type === 'VIDEO' ? 'video' : 'phone'),
+    h('span', { class: 'tx' }, (call.type === 'VIDEO' ? 'Video' : 'Voice') + ' call in progress' + (n ? ', ' + n + (n === 1 ? ' person' : ' people') + ' in it' : '')),
+    h('button', { class: 'btn', type: 'button', onclick: () => joinCall(call.id) }, 'Join'));
+  b.classList.remove('hidden');
+}
+
+// ---------- starting, answering and joining ----------
+async function startCall(c, type) {
+  if (!lk()) { toast('The call library did not load. Check your connection and reload the page.', true); return; }
+  if (S.call) { toast('You are already in a call.', true); return; }
+  try { await enterCall(await api('/api/calls', { method: 'POST', json: { chatId: c.id, type } })); }
+  catch (e) { toast(e.message, true); }
+}
+async function joinCall(id) {
+  if (!lk()) { toast('The call library did not load. Check your connection and reload the page.', true); return; }
+  if (S.call && S.call.id === id) return;
+  try {
+    if (S.call) await finishCall(S.call, { leave: true });
+    await enterCall(await api('/api/calls/' + encodeURIComponent(id) + '/join', { method: 'POST' }));
+  } catch (e) { toast(e.message, true); }
+}
+async function enterCall(r) {
+  if (!r || !r.url || !r.token) {
+    toast(r && r.reason === 'BUSY' ? 'They are on another call right now.' : 'The call could not start.' + (r && r.reason ? ' (' + r.reason + ')' : ''), true);
+    if (S.active) refreshJoinBanner(S.active);
+    return;
+  }
+  const call = { id: r.call.id, call: r.call, role: r.role, type: r.call.type, tiles: new Map(), names: {}, chat: [], chatUnread: 0, panel: null,
+    speaking: new Set(), connected: false, reconnecting: false, started: Date.now(), ending: false };
+  S.call = call;
+  closeModal();
+  openCallUi(call);
+  const room = new (lk().Room)({ adaptiveStream: true, dynacast: true });
+  call.room = room;
+  wireRoom(call, room);
+  try { await room.connect(r.url, r.token); }
+  catch (e) { toast('Could not connect to the call server: ' + (e && e.message ? e.message : e), true); await finishCall(call, { leave: true }); return; }
+  if (call.ending) return;
+  call.connected = true;
+  call.started = (call.call.startedAt && toDate(call.call.startedAt)) ? toDate(call.call.startedAt).getTime() : Date.now();
+  try { room.startAudio(); } catch (e) { /* the browser will ask for a click */ }
+  try { await room.localParticipant.setMicrophoneEnabled(true); } catch (e) { toast(mediaMessage(e, 'microphone'), true); }
+  if (call.type === 'VIDEO') { try { await room.localParticipant.setCameraEnabled(true); } catch (e) { toast(mediaMessage(e, 'camera'), true); } }
+  paintTiles(call); paintCallBar(call); paintCallTop(call);
+  loadCallChat(call);
+  if (S.active) refreshJoinBanner(S.active);
+}
+function wireRoom(call, room) {
+  const E = lk().RoomEvent;
+  const again = () => { paintTiles(call); paintCallBar(call); };
+  [E.ParticipantConnected, E.ParticipantDisconnected, E.TrackPublished, E.TrackUnpublished, E.TrackMuted, E.TrackUnmuted,
+    E.LocalTrackPublished, E.LocalTrackUnpublished].forEach(ev => room.on(ev, again));
+  room.on(E.TrackSubscribed, (track) => {
+    if (track.kind === 'audio') { const el = track.attach(); call.audio.append(el); }
+    again();
+  });
+  room.on(E.TrackUnsubscribed, (track) => { track.detach().forEach(el => el.remove()); again(); });
+  room.on(E.ActiveSpeakersChanged, sp => { call.speaking = new Set((sp || []).map(p => p.identity)); markSpeaking(call); });
+  room.on(E.Reconnecting, () => { call.reconnecting = true; paintCallTop(call); });
+  room.on(E.Reconnected, () => { call.reconnecting = false; paintCallTop(call); });
+  room.on(E.AudioPlaybackStatusChanged, () => { if (!room.canPlaybackAudio && call.audioHint) call.audioHint.classList.remove('hidden'); else if (call.audioHint) call.audioHint.classList.add('hidden'); });
+  room.on(E.Disconnected, () => { if (!call.ending) finishCall(call, { leave: true, note: 'You were disconnected from the call.' }); });
+}
+async function finishCall(call, o = {}) {
+  if (!call || call.ending) return;
+  call.ending = true;
+  clearInterval(call.timer);
+  if (S.call === call) S.call = null;
+  try { if (call.room) call.room.disconnect(); } catch (e) { /* already closed */ }
+  for (const t of call.tiles.values()) detachTile(t);
+  if (call.ui) call.ui.remove();
+  document.body.classList.remove('in-call');
+  document.title = 'Premisave Messenger';
+  if (o.note) toast(o.note);
+  if (o.leave) { try { await api('/api/calls/' + encodeURIComponent(call.id) + (o.end ? '/end' : '/leave'), { method: 'POST' }); } catch (e) { /* the call is already over */ } }
+  if (S.active) refreshJoinBanner(S.active);
+}
+
+// ---------- the incoming call ----------
+let ringCtx = null, ringTimer = null;
+function ringOnce() {
+  try {
+    ringCtx = ringCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (ringCtx.state === 'suspended') ringCtx.resume();
+    [0, 0.28].forEach((d, i) => {
+      const o = ringCtx.createOscillator(), g = ringCtx.createGain(), t = ringCtx.currentTime + d;
+      o.type = 'sine'; o.frequency.value = i ? 520 : 440;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+      o.connect(g); g.connect(ringCtx.destination); o.start(t); o.stop(t + 0.26);
+    });
+  } catch (e) { /* the browser may block sound until the page is clicked */ }
+}
+function startRing() { if (ringTimer) return; ringOnce(); ringTimer = setInterval(ringOnce, 2600); }
+function stopRing() { if (!S.ringing.size && ringTimer) { clearInterval(ringTimer); ringTimer = null; } }
+function showIncoming(call) {
+  if (S.ringing.has(call.id)) return;
+  let stack = $('#incoming');
+  if (!stack) { stack = h('div', { id: 'incoming', class: 'incoming-stack' }); document.body.append(stack); }
+  const who = call.initiatorName || 'Someone';
+  const group = call.kind === 'GROUP' || call.kind === 'LINK';
+  const title = group ? callTitle(call) : who;
+  const sub = (call.type === 'VIDEO' ? 'Incoming video call' : 'Incoming voice call') + (group ? ' from ' + who : '');
+  const init = (call.participants || []).find(p => p.userId === call.initiatorId);
+  const el = h('div', { class: 'incoming', role: 'alertdialog', 'aria-label': 'Incoming call from ' + who },
+    h('div', { class: 'who' }, h('div', { class: 'ring-av' }, avatar(who, init && init.profilePictureUrl, call.initiatorId, 'sm')),
+      h('div', { style: 'min-width:0' }, h('div', { class: 'n' }, title), h('div', { class: 's' }, sub))),
+    h('div', { class: 'row2' },
+      h('button', { class: 'btn decline', type: 'button', onclick: () => declineCall(call.id) }, ico('hangup'), 'Decline'),
+      h('button', { class: 'btn accept', type: 'button', onclick: () => acceptCall(call.id) }, ico(call.type === 'VIDEO' ? 'video' : 'phone'), 'Accept')));
+  stack.append(el);
+  S.ringing.set(call.id, { call, el, timer: setTimeout(() => dismissIncoming(call.id), 70000) });
+  startRing();
+}
+function dismissIncoming(id) {
+  const r = S.ringing.get(id);
+  if (!r) return;
+  clearTimeout(r.timer); r.el.remove(); S.ringing.delete(id); stopRing();
+}
+async function acceptCall(id) { dismissIncoming(id); await joinCall(id); }
+async function declineCall(id) {
+  dismissIncoming(id);
+  try { await api('/api/calls/' + encodeURIComponent(id) + '/decline', { method: 'POST' }); } catch (e) { toast(e.message, true); }
+}
+
+// ---------- live events from /user/queue/calls ----------
+function onCallEvent(d) {
+  if (!d || !d.callId) return;
+  const me = S.me && S.me.id;
+  const c = d.call;
+  const cur = S.call && S.call.id === d.callId ? S.call : null;
+  if (cur && c) { cur.call = c; if (!cur.role || cur.role !== myCallRole(cur)) cur.role = myCallRole(cur); }
+  switch (d.type) {
+    case 'INCOMING':
+      if (c) {
+        showIncoming(c);
+        if (S.ws) { try { S.ws.send('/app/call.ringing', {}, JSON.stringify({ callId: d.callId })); } catch (e) { /* not connected */ } }
+      }
+      break;
+    case 'ENDED':
+      dismissIncoming(d.callId);
+      if (cur) finishCall(cur, { note: 'The call ended.' });
+      break;
+    case 'PARTICIPANT_REMOVED':
+      if (d.userId === me && cur) finishCall(cur, { leave: false, note: 'A host removed you from the call.' });
+      break;
+    case 'PARTICIPANT_DECLINED': case 'PARTICIPANT_MISSED':
+      if (cur && d.userId !== me) {
+        const p = (c && c.participants || []).find(x => x.userId === d.userId);
+        toast((p ? p.displayName : 'Someone') + (d.type === 'PARTICIPANT_DECLINED' ? ' declined the call.' : ' did not answer.'));
+      }
+      dismissIncoming(d.callId);
+      break;
+    case 'PARTICIPANT_JOINED': case 'PARTICIPANT_LEFT':
+      if (d.userId === me && d.type === 'PARTICIPANT_JOINED') dismissIncoming(d.callId);   // answered on another device
+      break;
+    case 'MUTED_BY_HOST':
+      if (cur && cur.room && (!d.userId || d.userId === me)) {
+        cur.room.localParticipant.setMicrophoneEnabled(false).catch(() => {});
+        toast('A host muted you.');
+      }
+      break;
+    case 'CHAT':
+      if (cur && d.message) {
+        if (!cur.chat.some(m => m.id === d.message.id)) cur.chat.push(d.message);
+        if (cur.panel !== 'chat' && d.message.senderId !== me) { cur.chatUnread++; paintCallBar(cur); } else paintSide(cur);
+      }
+      break;
+    case 'RECORDING_STARTED': if (cur) toast('Recording started.'); break;
+    case 'RECORDING_STOPPED': if (cur) toast('Recording stopped. The video will be ready in a moment.'); break;
+    case 'RECORDING_SETTING': loadCallSettings(); break;
+    default: break;
+  }
+  if (cur) { paintTiles(cur); paintCallBar(cur); paintCallTop(cur); if (cur.panel === 'people') paintSide(cur); }
+  if (c && c.chatId && c.chatId === S.active) refreshJoinBanner(S.active);
+  if (d.type === 'ENDED' && S.active) refreshJoinBanner(S.active);
+}
+
+// ---------- the call screen ----------
+function openCallUi(call) {
+  call.audio = h('div', { class: 'hidden' });
+  call.stage = h('div', { class: 'call-stage', 'data-n': '0' });
+  call.top = h('div', { class: 'call-top' });
+  call.bar = h('div', { class: 'call-bar' });
+  call.side = h('aside', { class: 'call-side hidden', 'aria-label': 'Call panel' });
+  call.audioHint = h('button', { class: 'pill-btn hidden', type: 'button', onclick: () => { try { call.room.startAudio(); } catch (e) { /* ignore */ } call.audioHint.classList.add('hidden'); } }, 'Click to hear the call');
+  call.ui = h('div', { class: 'call', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Call' },
+    call.top, h('div', { class: 'call-main' }, call.stage, call.side), call.bar, call.audio);
+  document.body.append(call.ui);
+  document.body.classList.add('in-call');
+  call.timer = setInterval(() => paintCallTop(call), 1000);
+  paintCallTop(call); paintCallBar(call); paintTiles(call);
+}
+function callStatusText(call) {
+  const st = call.call && call.call.status;
+  if (!call.connected) return 'Connecting';
+  if (call.reconnecting) return 'Reconnecting';
+  if (st === 'RINGING') return 'Ringing';
+  if (st === 'WAITING') return 'Waiting for others to join';
+  return fmtDur(Math.floor((Date.now() - call.started) / 1000));
+}
+function paintCallTop(call) {
+  if (!call.top) return;
+  const txt = callStatusText(call);
+  const rec = call.call && call.call.recording;
+  document.title = txt.indexOf(':') > 0 ? txt + ' ' + callTitle(call.call) : 'Premisave Messenger';
+  call.top.replaceChildren(
+    h('div', { class: 't' }, h('b', null, callTitle(call.call)), h('span', null, (call.type === 'VIDEO' ? 'Video call, ' : 'Voice call, ') + txt.charAt(0).toLowerCase() + txt.slice(1))),
+    rec ? h('span', { class: 'rec-pill', title: 'This call is being recorded' }, h('i', { class: 'led' }), 'Recording') : '',
+    call.audioHint);
+}
+function paintCallBar(call) {
+  if (!call.bar || !call.room) { if (call.bar) call.bar.replaceChildren(); return; }
+  const lp = call.room.localParticipant;
+  const mic = lp.isMicrophoneEnabled, cam = lp.isCameraEnabled, scr = lp.isScreenShareEnabled;
+  const run = canRun(call);
+  const cs = (call.call && call.call.recordingEnabled);
+  const b = (cls, label, icon, fn, badge) => h('button', { class: 'cbtn ' + cls, type: 'button', title: label, 'aria-label': label, onclick: fn }, ico(icon),
+    badge ? h('span', { class: 'badge' }, badge) : null);
+  const kids = [
+    b(mic ? '' : 'off', mic ? 'Mute' : 'Unmute', mic ? 'mic' : 'micoff', () => toggleLocal(call, 'mic')),
+    b(cam ? '' : 'off', cam ? 'Turn camera off' : 'Turn camera on', cam ? 'video' : 'videooff', () => toggleLocal(call, 'cam')),
+    b(scr ? 'on' : '', scr ? 'Stop sharing' : 'Share screen', 'screen', () => toggleLocal(call, 'screen')),
+    cs && run ? b(call.call.recording ? 'live' : '', call.call.recording ? 'Stop recording' : 'Record the call', 'rec', () => toggleRecording(call)) : null,
+    b(call.panel === 'chat' ? 'on' : '', 'Chat in the call', 'chat', () => openPanel(call, 'chat'), call.chatUnread ? String(call.chatUnread) : null),
+    b(call.panel === 'people' ? 'on' : '', 'People', 'users', () => openPanel(call, 'people')),
+    h('button', { class: 'cbtn end', type: 'button', title: 'Leave the call', 'aria-label': 'Leave the call', onclick: () => finishCall(call, { leave: true }) }, ico('hangup')),
+    myCallRole(call) === 'HOST' ? h('button', { class: 'pill-btn', type: 'button', onclick: () => { if (confirm('End this call for everyone?')) finishCall(call, { leave: true, end: true }); } }, 'End for everyone') : null
+  ];
+  call.bar.replaceChildren(...kids.filter(Boolean));
+}
+async function toggleLocal(call, what) {
+  const lp = call.room.localParticipant;
+  try {
+    if (what === 'mic') await lp.setMicrophoneEnabled(!lp.isMicrophoneEnabled);
+    else if (what === 'cam') await lp.setCameraEnabled(!lp.isCameraEnabled);
+    else await lp.setScreenShareEnabled(!lp.isScreenShareEnabled);
+  } catch (e) {
+    if (what !== 'screen' || (e && e.name !== 'NotAllowedError')) toast(mediaMessage(e, what === 'mic' ? 'microphone' : what === 'cam' ? 'camera' : 'screen'), true);
+  }
+  paintCallBar(call); paintTiles(call);
+}
+async function toggleRecording(call) {
+  const on = call.call.recording;
+  try {
+    await api('/api/calls/' + encodeURIComponent(call.id) + '/recording/' + (on ? 'stop' : 'start'), { method: 'POST' });
+    call.call.recording = !on;
+    paintCallBar(call); paintCallTop(call);
+  } catch (e) { toast(e.message, true); }
+}
+
+// tiles
+function displayNameFor(call, p) {
+  const id = p.identity;
+  const cp = ((call.call && call.call.participants) || []).find(x => x.userId === id);
+  if (cp && cp.displayName) return cp.displayName;
+  if (S.me && id === S.me.id) return userName(S.me);
+  if (call.names[id]) return call.names[id];
+  call.names[id] = p.name || 'Participant';
+  getUser(id).then(u => { call.names[id] = userName(u); paintTiles(call); });
+  return call.names[id];
+}
+function photoFor(call, id) {
+  if (S.me && id === S.me.id) return S.me.profilePictureUrl;
+  const cp = ((call.call && call.call.participants) || []).find(x => x.userId === id);
+  return cp && cp.profilePictureUrl;
+}
+function buildTile(call, w) {
+  const t = { key: w.key, track: null, vid: null };
+  t.media = h('div', { class: 'media' });
+  t.ph = h('div', { class: 'ph' }, avatar(w.name, w.photo, w.id, 'lg'));
+  t.nm = h('span', { class: 'nm' });
+  t.mic = ico('micoff');
+  t.lab = h('div', { class: 'lab' }, t.mic, t.nm);
+  t.el = h('div', { class: 'tile' }, t.media, t.ph, t.lab);
+  return t;
+}
+function detachTile(t) {
+  if (t.track && t.vid) { try { t.track.detach(t.vid); } catch (e) { /* ignore */ } }
+  t.track = null; t.vid = null; t.media.replaceChildren();
+}
+function paintTiles(call) {
+  if (!call.stage || !call.room || call.ending) return;
+  const Src = lk().Track.Source;
+  const meId = S.me && S.me.id;
+  const want = [];
+  for (const p of [call.room.localParticipant, ...call.room.remoteParticipants.values()]) {
+    const local = p === call.room.localParticipant;
+    const name = displayNameFor(call, p);
+    want.push({ key: p.identity, id: p.identity, p, local, kind: 'cam', pub: p.getTrackPublication(Src.Camera), name: name + (local ? ' (you)' : ''), photo: photoFor(call, p.identity) });
+    const scr = p.getTrackPublication(Src.ScreenShare);
+    if (scr && scr.track) want.push({ key: p.identity + ':screen', id: p.identity, p, local, kind: 'screen', pub: scr, name: name + (local ? ' (you) are' : ' is') + ' sharing the screen' });
+  }
+  for (const cp of (call.call && call.call.participants) || []) {
+    if (cp.state === 'INVITED' && cp.userId !== meId && !call.room.remoteParticipants.has(cp.userId)) {
+      want.push({ key: 'inv:' + cp.userId, id: cp.userId, kind: 'invited', name: cp.displayName || 'Someone', photo: cp.profilePictureUrl });
+    }
+  }
+  for (const [k, t] of call.tiles) if (!want.some(w => w.key === k)) { detachTile(t); t.el.remove(); call.tiles.delete(k); }
+  for (const w of want) {
+    let t = call.tiles.get(w.key);
+    if (!t) { t = buildTile(call, w); call.tiles.set(w.key, t); call.stage.append(t.el); }
+    t.nm.textContent = w.kind === 'invited' ? w.name + ', ringing' : w.name;
+    const track = w.pub && w.pub.track && !w.pub.isMuted ? w.pub.track : null;
+    if (track !== t.track) {
+      detachTile(t);
+      if (track) { const el = track.attach(); el.playsInline = true; if (w.local) el.muted = true; t.media.append(el); t.track = track; t.vid = el; }
+    }
+    t.el.classList.toggle('novideo', !track);
+    t.el.classList.toggle('screen', w.kind === 'screen');
+    t.el.classList.toggle('mirror', !!w.local && w.kind === 'cam');
+    t.el.classList.toggle('ringing', w.kind === 'invited');
+    t.mic.classList.toggle('hidden', !(w.kind === 'cam' && w.p && !w.p.isMicrophoneEnabled));
+    t.id = w.id;
+  }
+  call.stage.dataset.n = String(Math.min(call.tiles.size, 3));
+  markSpeaking(call);
+}
+function markSpeaking(call) { for (const t of call.tiles.values()) t.el.classList.toggle('speaking', call.speaking.has(t.id) && !t.key.includes(':')); }
+
+// side panel: chat and people
+function openPanel(call, name) {
+  call.panel = call.panel === name ? null : name;
+  if (call.panel === 'chat') call.chatUnread = 0;
+  paintSide(call); paintCallBar(call);
+}
+function paintSide(call) {
+  const s = call.side;
+  if (!s) return;
+  if (!call.panel) { s.classList.add('hidden'); s.replaceChildren(); return; }
+  s.classList.remove('hidden');
+  const head = h('div', { class: 'cs-head' }, h('h3', null, call.panel === 'chat' ? 'Chat in the call' : 'People'), btn('icon-btn', 'Close', 'x', () => openPanel(call, call.panel)));
+  if (call.panel === 'chat') {
+    const me = S.me && S.me.id;
+    const msgs = h('div', { class: 'cs-msgs' }, ...(call.chat.length ? call.chat.map(m => h('div', { class: 'cs-msg' + (m.senderId === me ? ' mine' : '') },
+      m.senderId === me ? null : h('div', { class: 'by' }, m.senderName || 'Someone'), h('div', { class: 'tx' }, m.text), h('div', { class: 'at' }, fmtTime(toDate(m.createdAt) || new Date())))) :
+      [h('div', { class: 'cs-empty' }, 'Messages here are only for people in this call. They are kept for 30 days.')]));
+    const input = h('input', { class: 'fld', placeholder: 'Message', maxlength: '1000', 'aria-label': 'Message to the call' });
+    const send = async () => {
+      const text = input.value.trim(); if (!text) return;
+      input.value = '';
+      try { const m = await api('/api/calls/' + encodeURIComponent(call.id) + '/messages', { method: 'POST', json: { text } }); if (m && !call.chat.some(x => x.id === m.id)) call.chat.push(m); paintSide(call); }
+      catch (e) { toast(e.message, true); input.value = text; }
+    };
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); send(); } });
+    s.replaceChildren(head, h('div', { class: 'cs-body' }, msgs), h('div', { class: 'cs-send' }, input, btn('icon-btn', 'Send', 'send', send)));
+    const body = s.querySelector('.cs-body'); body.scrollTop = body.scrollHeight;
+    if (document.activeElement === document.body) input.focus();
+  } else {
+    const run = canRun(call), host = myCallRole(call) === 'HOST', me = S.me && S.me.id;
+    const c = call.call || {};
+    const tools = h('div', { class: 'cs-tools' },
+      run ? h('button', { class: 'btn', type: 'button', onclick: () => openAddToCall(call) }, ico('newchat'), 'Add people') : null,
+      run ? h('button', { class: 'btn outline', type: 'button', onclick: () => hostAct(call, '/mute-all', 'Everyone else was muted.') }, ico('micoff'), 'Mute all') : null,
+      run ? h('button', { class: 'btn outline', type: 'button', onclick: () => hostAct(call, '/lock', c.locked ? 'The call is unlocked.' : 'The call is locked.', { locked: !c.locked }) }, ico(c.locked ? 'unlock' : 'lock'), c.locked ? 'Unlock' : 'Lock') : null,
+      c.linkUrl ? h('button', { class: 'btn outline', type: 'button', onclick: () => copyText(c.linkUrl, 'Call link copied.') }, ico('link'), 'Copy link') : null);
+    const rows = (c.participants || []).filter(p => p.state === 'JOINED' || p.state === 'INVITED');
+    const list = rows.length ? rows.map(p => {
+      const you = p.userId === me;
+      const acts = [];
+      if (run && !you && p.state === 'JOINED') {
+        acts.push(btn('icon-btn', 'Mute ' + p.displayName, 'micoff', () => hostAct(call, '/participants/' + encodeURIComponent(p.userId) + '/mute', p.displayName + ' was muted.')));
+        if (host) acts.push(btn('icon-btn', p.role === 'COHOST' ? 'Remove co-host' : 'Make co-host', 'users', () => hostAct(call, '/participants/' + encodeURIComponent(p.userId) + '/role', p.role === 'COHOST' ? 'Now a member.' : 'Now a co-host.', { role: p.role === 'COHOST' ? 'MEMBER' : 'COHOST' })));
+        if (p.role !== 'HOST') acts.push(btn('icon-btn', 'Remove ' + p.displayName, 'ban', () => { if (confirm('Remove ' + p.displayName + ' from the call?')) hostAct(call, '/participants/' + encodeURIComponent(p.userId) + '/remove', p.displayName + ' was removed.'); }));
+      }
+      return h('div', { class: 'cs-person' }, avatar(p.displayName, p.profilePictureUrl, p.userId, 'sm'),
+        h('div', { class: 'nm' }, h('b', null, (p.displayName || 'Someone') + (you ? ' (you)' : '')),
+          h('span', null, (p.role === 'HOST' ? 'Host' : p.role === 'COHOST' ? 'Co-host' : 'Member') + (p.state === 'INVITED' ? ', ringing' : ''))), ...acts);
+    }) : [h('div', { class: 'cs-empty' }, 'Nobody else is here yet.')];
+    s.replaceChildren(head, h('div', { class: 'cs-body' }, tools, h('div', { class: 'cs-sec' }, 'In this call'), ...list));
+  }
+}
+async function loadCallChat(call) {
+  try {
+    const rows = await api('/api/calls/' + encodeURIComponent(call.id) + '/messages');
+    const have = new Set(call.chat.map(m => m.id));
+    for (const m of (rows || [])) if (!have.has(m.id)) call.chat.push(m);
+    call.chat.sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+    if (call.panel === 'chat') paintSide(call);
+  } catch (e) { /* the chat is optional */ }
+}
+async function hostAct(call, path, ok, json) {
+  try {
+    await api('/api/calls/' + encodeURIComponent(call.id) + path, { method: 'POST', json });
+    toast(ok);
+    if (path === '/lock' && call.call) call.call.locked = !!json.locked;
+    paintSide(call);
+  } catch (e) { toast(e.message, true); }
+}
+function copyText(text, ok) {
+  const done = () => toast(ok || 'Copied.');
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, () => toast(text));
+  else toast(text);
+}
+function openAddToCall(call) {
+  const input = h('input', { class: 'fld', type: 'search', placeholder: 'Search people by name or email', 'aria-label': 'Search people' });
+  const list = h('div', { class: 'people' });
+  const reasons = { ALREADY_IN_CALL: 'is already in the call', NOT_REACHABLE: 'cannot be reached right now', REMOVED: 'was removed from this call', FULL: 'cannot be added, the call is full' };
+  const draw = users => {
+    const rows = (users || []).filter(u => u && u.id && !isMe(u));
+    list.replaceChildren(...(rows.length ? rows.map(u => h('div', { class: 'prow' },
+      h('button', { class: 'person', type: 'button', onclick: async () => {
+        try {
+          const r = await api('/api/calls/' + encodeURIComponent(call.id) + '/invite', { method: 'POST', json: { userIds: [u.id] } });
+          const sk = r && r.skipped && r.skipped[0];
+          toast(sk ? userName(u) + ' ' + (reasons[sk.reason] || 'was not added') + '.' : 'Calling ' + userName(u) + '.', !!sk);
+          if (r && r.call) { call.call = r.call; paintSide(call); paintTiles(call); }
+          if (!sk) closeModal();
+        } catch (e) { toast(e.message, true); }
+      } }, avatar(userName(u), u.profilePictureUrl, u.id, 'sm'), h('div', null, h('div', { class: 'n' }, userName(u)), h('div', { class: 'e' }, u.email || u.username || ''))))) :
+      [h('div', { class: 'empty' }, h('p', null, 'No one found.'))]));
+  };
+  let timer = null;
+  const load = async q => {
+    try { draw(q ? await api('/api/users/search?query=' + encodeURIComponent(q)) : await api('/api/users?page=0&size=50')); }
+    catch (e) { list.replaceChildren(h('div', { class: 'empty' }, h('p', null, e.message))); }
+  };
+  input.oninput = () => { clearTimeout(timer); timer = setTimeout(() => load(input.value.trim()), 260); };
+  openModal('Add people to the call', [input, list]);
+  input.focus(); load('');
+}
+
+// ---------- call history ----------
+async function openCallHistory() {
+  const body = h('div', null, h('div', { class: 'empty' }, h('p', null, 'Loading')));
+  const clear = h('button', { class: 'btn danger', type: 'button', onclick: async () => {
+    if (!confirm('Remove all finished calls from your history? Other people keep theirs.')) return;
+    try { await api('/api/calls', { method: 'DELETE' }); toast('History cleared.'); load(); } catch (e) { toast(e.message, true); }
+  } }, ico('trash'), 'Clear history');
+  openModal('Calls', body, [clear, h('div', { style: 'flex:1' }), h('button', { class: 'btn', type: 'button', onclick: closeModal }, 'Close')], true);
+  const tools = h('div', { class: 'ctools' },
+    h('button', { class: 'btn outline', type: 'button', onclick: openNewCallLink }, ico('link'), 'New call link'),
+    h('button', { class: 'btn outline', type: 'button', onclick: openJoinCallLink }, ico('scan'), 'Join with a link'),
+    S.callSettings ? h('button', { class: 'btn outline', type: 'button', onclick: openCallSettings }, ico('sliders'), 'Call settings') : null);
+  const load = async () => {
+    let rows = [];
+    try { rows = await api('/api/calls?limit=50') || []; } catch (e) { body.replaceChildren(tools, h('div', { class: 'empty' }, h('p', null, e.message))); return; }
+    const me = S.me && S.me.id;
+    body.replaceChildren(tools, ...(rows.length ? rows.map(c => callRow(c, me, load)) : [h('div', { class: 'empty' }, h('p', null, 'No calls yet. Use the phone or video button in a chat.'))]));
+  };
+  load();
+}
+function callRow(c, me, reload) {
+  const mine = c.initiatorId === me;
+  const open = OPEN_CALL(c.status);
+  const missed = c.status === 'MISSED' && !mine;
+  const label = { ENDED: 'Ended', MISSED: mine ? 'Not answered' : 'Missed', DECLINED: mine ? 'Declined' : 'You declined', CANCELLED: mine ? 'Cancelled' : 'Cancelled by the caller' }[c.status] || (open ? 'In progress' : c.status);
+  const when = toDate(c.createdAt);
+  const sub = [(c.type === 'VIDEO' ? 'Video' : 'Voice') + (c.kind === 'GROUP' ? ' group call' : c.kind === 'LINK' ? ' call link' : ''), label,
+    when ? (sameDay(when, new Date()) ? fmtTime(when) : when.toLocaleDateString([], { day: 'numeric', month: 'short' }) + ' ' + fmtTime(when)) : '',
+    c.durationSeconds > 0 ? fmtDur(c.durationSeconds) : '', c.recordingCount > 0 ? c.recordingCount + (c.recordingCount === 1 ? ' recording' : ' recordings') : ''].filter(Boolean).join(', ');
+  const chat = c.chatId ? chatById(c.chatId) : null;
+  const acts = [];
+  if (open) acts.push(h('button', { class: 'btn', type: 'button', style: 'height:34px;padding:0 14px', onclick: e => { e.stopPropagation(); joinCall(c.id); } }, 'Join'));
+  else if (chat) acts.push(btn('icon-btn', 'Call again', c.type === 'VIDEO' ? 'video' : 'phone', e => { e.stopPropagation(); closeModal(); startCall(chat, c.type); }));
+  if (!open) acts.push(btn('icon-btn', 'Remove from history', 'trash', async e => {
+    e.stopPropagation();
+    try { await api('/api/calls/' + encodeURIComponent(c.id), { method: 'DELETE' }); reload(); } catch (er) { toast(er.message, true); }
+  }));
+  return h('div', { class: 'crow', role: 'button', tabindex: '0', onclick: () => openCallDetails(c.id), onkeydown: e => { if (e.key === 'Enter') openCallDetails(c.id); } },
+    h('div', { class: 'ci' + (missed ? ' miss' : open ? ' live' : '') }, ico(missed ? 'alert' : mine ? 'outgoing' : 'incoming')),
+    h('div', { class: 'tx' }, h('b', null, callTitle(c)), h('span', { class: missed ? 'miss' : '' }, sub)), ...acts);
+}
+async function openCallDetails(id) {
+  const box = h('div', { class: 'cdetail' }, h('div', { class: 'empty' }, h('p', null, 'Loading')));
+  openModal('Call details', box, [h('button', { class: 'btn ghost', type: 'button', onclick: openCallHistory }, ico('back'), 'Calls'), h('div', { style: 'flex:1' }), h('button', { class: 'btn', type: 'button', onclick: closeModal }, 'Close')], true);
+  let c;
+  try { c = await api('/api/calls/' + encodeURIComponent(id)); } catch (e) { box.replaceChildren(h('div', { class: 'empty' }, h('p', null, e.message))); return; }
+  const me = S.me && S.me.id;
+  const parts = (c.participants || []).map(p => h('div', { class: 'cs-person', style: 'padding-left:0;padding-right:0' }, avatar(p.displayName, p.profilePictureUrl, p.userId, 'xs'),
+    h('div', { class: 'nm' }, h('b', null, (p.displayName || 'Someone') + (p.userId === me ? ' (you)' : '')),
+      h('span', null, (p.role === 'HOST' ? 'Host' : p.role === 'COHOST' ? 'Co-host' : 'Member') + ', ' + ({ JOINED: 'in the call', LEFT: 'left', INVITED: 'ringing', DECLINED: 'declined', MISSED: 'did not answer', REMOVED: 'removed' }[p.state] || p.state.toLowerCase())))));
+  const recBox = h('div', null);
+  const msgBox = h('div', null);
+  box.replaceChildren(
+    h('div', { class: 'crow', style: 'cursor:default;margin:0 -20px 4px' }, h('div', { class: 'ci' }, ico(c.type === 'VIDEO' ? 'video' : 'phone')),
+      h('div', { class: 'tx' }, h('b', null, callTitle(c)), h('span', null, (c.type === 'VIDEO' ? 'Video' : 'Voice') + ' call' + (c.initiatorName ? ' started by ' + c.initiatorName : '') + (c.durationSeconds > 0 ? ', ' + fmtDur(c.durationSeconds) : '')))),
+    h('h4', null, 'People'), ...parts,
+    ...(c.recordingEnabled || c.recordingCount > 0 ? [h('h4', null, 'Recordings'), recBox] : []),
+    h('h4', null, 'Chat in the call'), msgBox);
+  const loadRecs = async () => {
+    let recs = [];
+    try { recs = await api('/api/calls/' + encodeURIComponent(id) + '/recordings') || []; } catch (e) { recBox.replaceChildren(h('p', { class: 'note' }, e.message)); return; }
+    if (!recs.length) { recBox.replaceChildren(h('p', { class: 'note' }, c.recordingEnabled ? 'This call was not recorded.' : 'Recording is switched off.')); return; }
+    recBox.replaceChildren(...recs.map(r => recRow(r, id, loadRecs)));
+  };
+  if (c.recordingEnabled || c.recordingCount > 0) loadRecs();
+  try {
+    const msgs = await api('/api/calls/' + encodeURIComponent(id) + '/messages') || [];
+    msgBox.replaceChildren(...(msgs.length ? msgs.map(m => h('div', { class: 'cs-msg' + (m.senderId === me ? ' mine' : ''), style: 'max-width:100%;margin-bottom:6px' },
+      h('div', { class: 'by' }, m.senderName || 'Someone'), h('div', { class: 'tx' }, m.text), h('div', { class: 'at' }, (toDate(m.createdAt) || new Date()).toLocaleString()))) : [h('p', { class: 'note' }, 'Nothing was written in this call, or the messages are older than 30 days.')]));
+  } catch (e) { msgBox.replaceChildren(h('p', { class: 'note' }, e.message)); }
+}
+function recRow(r, callId, reload) {
+  const live = r.status === 'STARTING' || r.status === 'RECORDING' || r.status === 'STOPPING';
+  const state = { STARTING: 'Starting', RECORDING: 'Recording now', STOPPING: 'Saving the video', READY: 'Ready', FAILED: 'Failed' }[r.status] || r.status;
+  const when = toDate(r.startedAt || r.createdAt);
+  const acts = [];
+  const row = h('div', { class: 'recrow' });
+  if (r.status === 'READY' && r.playUrl) {
+    acts.push(h('button', { class: 'btn', type: 'button', style: 'height:34px;padding:0 14px', onclick: () => {
+      if (row.querySelector('video')) { row.querySelector('video').remove(); return; }
+      const v = h('video', { controls: true, preload: 'metadata', src: r.playUrl, playsinline: true });
+      v.addEventListener('error', () => { v.replaceWith(h('div', { class: 'err' }, 'The video could not be played. The link may have expired: close this and open the call again.')); });
+      row.append(v); v.play().catch(() => {});
+    } }, ico('play'), 'Watch'));
+    acts.push(h('a', { class: 'btn outline', style: 'height:34px;padding:0 14px', href: r.playUrl, download: '', target: '_blank', rel: 'noopener' }, ico('download'), 'Download'));
+  }
+  if (live) acts.push(h('button', { class: 'btn outline', type: 'button', style: 'height:34px;padding:0 14px', onclick: reload }, 'Refresh'));
+  if (r.canDelete && !live) acts.push(btn('icon-btn', 'Delete the recording', 'trash', async () => {
+    if (!confirm('Delete this recording? This cannot be undone.')) return;
+    try { await api('/api/calls/' + encodeURIComponent(callId) + '/recordings/' + encodeURIComponent(r.id), { method: 'DELETE' }); reload(); } catch (e) { toast(e.message, true); }
+  }));
+  row.append(h('div', { class: 'top' }, h('div', { class: 'tx' }, h('b', null, state + (when ? ', ' + when.toLocaleString() : '')),
+    h('div', { class: 'note', style: 'margin:2px 0 0' }, [r.startedByName ? 'Started by ' + r.startedByName : '', r.durationSeconds > 0 ? fmtDur(r.durationSeconds) : '', r.sizeBytes > 0 ? fmtSize(r.sizeBytes) : ''].filter(Boolean).join(', '))), ...acts));
+  if (r.status === 'FAILED') row.append(h('div', { class: 'err' }, r.error || 'The recording failed.'));
+  return row;
+}
+
+// ---------- call links ----------
+const CALL_EXPIRY = [['', 'The longest allowed'], ['1', '1 hour'], ['24', '1 day'], ['168', '7 days']];
+function callCodeFrom(text) {
+  const t = String(text || '').trim();
+  let m = t.match(new RegExp('/call/(' + CODE_RE + ')(?:[/?#]|$)'));
+  if (m) return m[1];
+  m = t.match(new RegExp('[?&#]call=(' + CODE_RE + ')'));
+  if (m) return m[1];
+  m = t.match(new RegExp('^(' + CODE_RE + ')$'));
+  return m ? m[1] : null;
+}
+function openNewCallLink() {
+  const title = h('input', { class: 'fld', placeholder: 'Name shown to people who open the link (optional)', maxlength: '80', 'aria-label': 'Call name' });
+  const type = h('select', { class: 'fld', 'aria-label': 'Call type' }, h('option', { value: 'VIDEO' }, 'Video call'), h('option', { value: 'AUDIO' }, 'Voice call'));
+  const exp = h('select', { class: 'fld', 'aria-label': 'How long the link works' }, ...CALL_EXPIRY.map(([v, l]) => h('option', { value: v }, l)));
+  const out = h('div', null);
+  const make = h('button', { class: 'btn', type: 'button', onclick: async () => {
+    make.disabled = true;
+    try {
+      const c = await api('/api/calls/links', { method: 'POST', json: { type: type.value, title: title.value.trim() || null, expiresInHours: exp.value ? Number(exp.value) : null } });
+      const link = h('input', { class: 'fld', readonly: true, value: c.linkUrl || '', 'aria-label': 'Call link', onfocus: e => e.target.select() });
+      out.replaceChildren(h('label', { class: 'field-l' }, 'Link'), link,
+        h('div', { class: 'ctools', style: 'margin-top:10px' },
+          h('button', { class: 'btn outline', type: 'button', onclick: () => copyText(c.linkUrl, 'Call link copied.') }, ico('copy'), 'Copy'),
+          h('button', { class: 'btn', type: 'button', onclick: () => joinCall(c.id) }, ico('video'), 'Join now')),
+        h('p', { class: 'note' }, 'Anyone signed in who has the link can join. Join yourself first, then share it.'));
+      make.remove();
+    } catch (e) { toast(e.message, true); make.disabled = false; }
+  } }, 'Make the link');
+  openModal('New call link', [h('label', { class: 'field-l' }, 'Name'), title, h('label', { class: 'field-l' }, 'Type'), type, h('label', { class: 'field-l' }, 'Works for'), exp, out], [make]);
+}
+function openJoinCallLink() {
+  const input = h('input', { class: 'fld', placeholder: 'Paste a call link or its code', 'aria-label': 'Call link' });
+  const go = h('button', { class: 'btn', type: 'button', onclick: () => {
+    const code = callCodeFrom(input.value);
+    if (!code) { toast('That does not look like a call link.', true); return; }
+    openCallLinkPreview(code);
+  } }, 'Continue');
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') go.click(); });
+  openModal('Join with a link', [input], [go]);
+  input.focus();
+}
+async function openCallLinkPreview(code) {
+  const box = h('div', null, h('div', { class: 'empty' }, h('p', null, 'Loading')));
+  const joinBtn = h('button', { class: 'btn', type: 'button', disabled: true }, 'Join');
+  openModal('Join a call', box, [joinBtn]);
+  let p;
+  try { p = await api('/api/calls/links/' + encodeURIComponent(code)); } catch (e) { box.replaceChildren(h('div', { class: 'empty' }, h('p', null, e.message))); return; }
+  const why = !p.joinable ? 'This link has expired or the call has ended.' : p.full ? 'This call is full.' : p.locked ? 'This call is locked. A host has to let you in.' : '';
+  box.replaceChildren(h('div', { class: 'join-hero' }, h('div', { class: 'av icon lg' }, ico(p.type === 'VIDEO' ? 'video' : 'phone')),
+    h('h3', { style: 'margin:12px 0 2px' }, p.title || 'Call'), h('p', { class: 'note' }, (p.type === 'VIDEO' ? 'Video' : 'Voice') + ' call' + (p.hostName ? ' hosted by ' + p.hostName : '') + ', ' + p.participantCount + (p.participantCount === 1 ? ' person' : ' people') + ' in it'),
+    why ? h('p', { class: 'note bad', style: 'color:var(--danger)' }, why) : null));
+  joinBtn.disabled = !p.joinable || p.full;
+  joinBtn.onclick = async () => {
+    joinBtn.disabled = true;
+    try {
+      if (!lk()) throw new Error('The call library did not load. Check your connection and reload the page.');
+      if (S.call) await finishCall(S.call, { leave: true });
+      await enterCall(await api('/api/calls/links/' + encodeURIComponent(code) + '/join', { method: 'POST' }));
+    } catch (e) { toast(e.message, true); joinBtn.disabled = false; }
+  };
+}
+function runPendingCall() {
+  if (!S.pendingCall) return;
+  const code = S.pendingCall; S.pendingCall = null;
+  openCallLinkPreview(code);
+}
+// Opened as index.html#call=<code>: remember it until the person is signed in.
+function takePendingCall() {
+  const t = location.hash + location.search;
+  const m = t.match(new RegExp('[?&#]call=(' + CODE_RE + ')'));
+  if (!m) return null;
+  try { history.replaceState(null, '', location.pathname); } catch (e) { /* ignore */ }
+  return m[1];
+}
+
+// ---------- call settings (Settings, and the menu for administrators) ----------
+function callSettingsBlock() {
+  const box = h('div', { class: 'cs' }, h('p', { class: 'note' }, 'Loading'));
+  const paint = s => {
+    if (!s) { box.replaceChildren(h('p', { class: 'note' }, 'Call settings are not available right now.')); return; }
+    const on = !!s.recordingEnabled;
+    const control = s.canManage
+      ? h('button', { class: 'switch' + (on ? ' on' : ''), type: 'button', role: 'switch', 'aria-checked': String(on), 'aria-label': 'Call recording', onclick: async e => {
+        e.currentTarget.disabled = true;
+        try { S.callSettings = await api('/api/call-settings/recording', { method: 'PUT', json: { enabled: !on } }); toast(S.callSettings.recordingEnabled ? 'Call recording is on.' : 'Call recording is off.'); paint(S.callSettings); }
+        catch (er) { toast(er.message, true); paint(S.callSettings); }
+      } }, h('i'))
+      : h('span', { class: 'note', style: 'margin:0' }, on ? 'On' : 'Off');
+    const kids = [h('div', { class: 'cs-row' }, h('div', null, h('div', { class: 'n' }, 'Call recording'),
+      h('div', { class: 'note' }, s.canManage
+        ? (on ? 'On. Hosts and co-hosts can record calls. Turn it off to hide recording for everyone.' : 'Off. Turn it on so hosts and co-hosts can record calls.')
+        : (on ? 'On. A host or co-host can record a call, and everyone who was in the call can watch it afterwards.' : 'Off. An administrator has switched call recording off.'))), control)];
+    const kv = [['Stored on', s.storageMode === 'NETWORK' ? 'A network share' : 'This server'],
+      ['Storage', s.storageReady ? h('span', { class: 'good' }, 'Ready') : h('span', { class: 'bad' }, 'Not ready, recording will not start')]];
+    if (s.canManage) {
+      if (s.storageLocation) kv.push(['Folder', s.storageLocation]);
+      if (s.storageFreeMb != null) kv.push(['Free space', s.storageFreeMb >= 1024 ? (s.storageFreeMb / 1024).toFixed(1) + ' GB' : s.storageFreeMb + ' MB']);
+      if (s.storageProblem) kv.push(['Problem', h('span', { class: 'bad' }, s.storageProblem)]);
+    }
+    kids.push(h('dl', { class: 'kv' }, ...kv.flatMap(([k, v]) => [h('dt', null, k), h('dd', null, v)])));
+    box.replaceChildren(...kids);
+  };
+  if (S.callSettings) paint(S.callSettings);
+  loadCallSettings().then(paint);
+  return box;
+}
+function openCallSettings() {
+  openModal('Call settings', callSettingsBlock(), [h('button', { class: 'btn', type: 'button', onclick: closeModal }, 'Close')]);
+}
+
+window.addEventListener('beforeunload', e => { if (S.call) { e.preventDefault(); e.returnValue = ''; } });
+
+// ====================================================================
 // Start
 // ====================================================================
 initTheme();
 S.pendingJoin = takePendingJoin();
+S.pendingCall = takePendingCall();
 if (S.token) boot().catch(() => {}); else renderLogin();
 </script></body></html>

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=0E9AA7&height=240&section=header&text=Premisave%20Messenger%20Service&fontSize=48&fontColor=ffffff&fontAlignY=34&desc=Real-time%20chat%20microservice%20with%20WebSocket%2FSTOMP%20and%20Redis-backed%20horizontal%20scaling&descSize=16&descAlignY=58&animation=fadeIn" alt="Premisave Messenger Service - real-time chat microservice banner" />
+  <img src="docs/assets/banner.svg" alt="Premisave Messenger: chat, presence and calls for the Premisave platform" width="100%" />
 </p>
 
 <h1 align="center">Premisave Messenger Service: Real-Time Chat &amp; Presence API</h1>
@@ -42,6 +42,8 @@
   <a href="#architecture">Architecture</a> ·
   <a href="#how-real-time-delivery-works">Real-time delivery</a> ·
   <a href="#how-presence-tracking-works">Presence</a> ·
+  <a href="#calls-and-recordings">Calls</a> ·
+  <a href="#run-it-with-docker-and-deploy-it">Docker</a> ·
   <a href="#api-reference">API reference</a> ·
   <a href="#configuration-reference">Configuration</a> ·
   <a href="#troubleshooting">Troubleshooting</a>
@@ -51,7 +53,7 @@
 
 > **Disclaimer.** This is an independent, community-built project shared as a portfolio and reference implementation. It is not affiliated with or endorsed by any third party mentioned here. Always follow your own provider's current documentation for production credentials and go-live requirements.
 
----
+<p align="center"><img src="docs/assets/divider.svg" alt="" width="100%" /></p>
 
 ## Table of contents
 
@@ -60,19 +62,21 @@
 3. [Architecture](#architecture)
 4. [How real-time delivery works](#how-real-time-delivery-works)
 5. [How presence tracking works](#how-presence-tracking-works)
-6. [Quick start](#quick-start)
-7. [Configuration reference](#configuration-reference)
-8. [API reference](#api-reference)
-9. [WebSocket destinations reference](#websocket-destinations-reference)
-10. [Testing with the browser chat client](#testing-with-the-browser-chat-client)
-11. [Data model](#data-model)
-12. [Scaling and production readiness](#scaling-and-production-readiness)
-13. [Security notes](#security-notes)
-14. [Project structure](#project-structure)
-15. [Troubleshooting](#troubleshooting)
-16. [Roadmap ideas](#roadmap-ideas)
-17. [Contributing](#contributing)
-18. [Author](#author)
+6. [Calls and recordings](#calls-and-recordings)
+7. [Quick start](#quick-start)
+8. [Run it with Docker and deploy it](#run-it-with-docker-and-deploy-it)
+9. [Configuration reference](#configuration-reference)
+10. [API reference](#api-reference)
+11. [WebSocket destinations reference](#websocket-destinations-reference)
+12. [Testing with the browser chat client](#testing-with-the-browser-chat-client)
+13. [Data model](#data-model)
+14. [Scaling and production readiness](#scaling-and-production-readiness)
+15. [Security notes](#security-notes)
+16. [Project structure](#project-structure)
+17. [Troubleshooting](#troubleshooting)
+18. [Roadmap ideas](#roadmap-ideas)
+19. [Contributing](#contributing)
+20. [Author](#author)
 
 ---
 
@@ -107,6 +111,8 @@ It was built as a sibling service to `auth-service` (which owns user identity an
 | **Group invite links and QR codes** | Owners and admins make a link (and a QR code that holds it) that anyone signed in can use to join the group. A link can expire after a set time or after a set number of joins, and can be revoked at any time. One working link per group: making a new one revokes the old one. |
 | **Notifications** | When something happens to you in a group (made an admin, made the owner, demoted, added, removed) you get a stored notification that waits in your list if you were offline, a live push on `/user/queue/notifications`, and an email. Emails go through auth-service, so set `INTERNAL_API_KEY` to the same value as its `API_KEY`. Nothing is sent to the person who did the action. |
 | **Audio and video calls** | One to one and group calls (voice or video), screen sharing, a chat inside the call, adding people during a call, raise hand and reactions, host controls (mute, remove, lock, co-hosts), call links, and call history with missed calls. The media runs on a self-hosted [LiveKit](https://livekit.io) server; this service signs the join tokens, rings people and keeps the call records. See [docs/CALLS.md](docs/CALLS.md). |
+| **Call recording** | A host or co-host records a call. The recorder (LiveKit Egress) writes an MP4 to a folder on the server or to a mounted network share, and everyone who was in the call can watch it afterwards. An administrator switches recording on or off for everyone (`/api/call-settings`) and sees whether the storage is ready, how much space is free and where the videos are. See [Calls and recordings](#calls-and-recordings). |
+| **Docker and deploy files** | One image for development, staging and production, with ready files for Docker Compose, Coolify, Render, Heroku, Fly.io and Railway. See [Run it with Docker and deploy it](#run-it-with-docker-and-deploy-it). |
 | **Tagging** | Type `@` to tag someone, or `@all` to tag everyone in a group (groups only). Private chats can tag the other person. The picker shows each person's name, username and email. A tagged person gets a stored notification (`MENTIONED`, or `MENTIONED_ALL` for `@all`), a live push, and an email with an `@` badge that opens the chat. Emails are limited to one per person and chat every few minutes, and `@all` in a very large group is in-app only. Editing a message only notifies people who were newly tagged. |
 | **File attachments** | Send images, video, audio, documents and any other file type in a chat. Upload first (`POST /api/attachments`), then send a message carrying the `attachmentId`, over REST or WebSocket. Stored on local disk or a mounted network share, downloaded through expiring signed links with range support. |
 | **Public media** | Group photos and `/api/media/upload` files use the same storage and are served without a token from `/api/media/files/...`. |
@@ -118,23 +124,9 @@ It was built as a sibling service to `auth-service` (which owns user identity an
 
 ## Architecture
 
-```
-┌──────────────┐      JWT (Bearer)      ┌─────────────────────────┐
-│   End User   │ ────HTTP + WS────────► │                         │
-└──────────────┘                        │                         │      ┌──────────────┐
-                                         │   Premisave Messenger  │ ───► │ File storage │
-┌──────────────┐    Feign / JWT         │      Service             │      └──────────────┘
-│ auth-service │ ◄────────────────────► │  (this repository)     │
-└──────────────┘                        │                         │      ┌──────────────┐
-                                         │  MongoDB  <───►  Redis  │ ───► │ auth-service │
-                                         │                         │      │ (identity,   │
-                                         └─────────────────────────┘      │  profiles)   │
-                                                    │                     └──────────────┘
-                                                    │  pub/sub relay
-                                                    ▼
-                                         (every messenger-service
-                                          instance subscribes here)
-```
+<p align="center">
+  <img src="docs/assets/architecture.svg" alt="The messenger sits between the Flutter and browser clients and MongoDB, Redis, auth-service, file storage and LiveKit" width="100%" />
+</p>
 
 **Design choices**
 
@@ -143,6 +135,13 @@ It was built as a sibling service to `auth-service` (which owns user identity an
 - **WebSocket authentication resolves the real account ID once, at connect time**, via `auth-service`'s `/profile/me`, and carries both the ID and the original JWT together on the STOMP session's `Principal` for the life of that connection — downstream enrichment calls reuse the real token instead of fabricating one.
 
 ## How real-time delivery works
+
+<p align="center">
+  <img src="docs/assets/realtime.svg" alt="A message goes from Ana to a messenger copy, through Redis to every copy, and the copy holding Ben delivers it" width="100%" />
+</p>
+
+<details>
+<summary>The same flow as a Mermaid diagram</summary>
 
 ```mermaid
 sequenceDiagram
@@ -164,9 +163,18 @@ sequenceDiagram
     MS-->>A: DELIVERY STATUS on /user/queue/delivery-status
 ```
 
+</details>
+
 This same relay pattern covers typing indicators (`/queue/typing`), read receipts (`/queue/read-receipts`), and presence changes (`/topic/presence` — a topic-wide broadcast rather than a single-user push, using the same envelope with no target user).
 
 ## How presence tracking works
+
+<p align="center">
+  <img src="docs/assets/presence.svg" alt="A person is online from the first connected session to the last, and only the first and last change are broadcast" width="100%" />
+</p>
+
+<details>
+<summary>The same flow as a Mermaid diagram</summary>
 
 ```mermaid
 flowchart TD
@@ -182,7 +190,43 @@ flowchart TD
     I -- No, other sessions remain --> K[Stay online silently, no broadcast]
 ```
 
+</details>
+
 Because the session counter lives in Redis rather than in-instance memory, this is correct even when a user's two tabs, or two devices, happen to connect to different instances behind a load balancer.
+
+## Calls and recordings
+
+<p align="center">
+  <img src="docs/assets/calls.svg" alt="The host starts a call, the messenger signs tokens, audio and video go to LiveKit, the recorder writes a file to storage and the messenger plays it back" width="100%" />
+</p>
+
+The messenger never carries audio or video. It signs the join tokens, rings people, keeps the call records and the chat inside the call, and starts and stops the recorder. The media runs on a [LiveKit](https://livekit.io) server (see `deploy/livekit/`), and recording uses LiveKit Egress next to it. [docs/CALLS.md](docs/CALLS.md) has the full set-up.
+
+**Recording**
+
+- A host or co-host starts and stops it. Everyone in the call sees a red "Recording" sign while it runs.
+- When it stops, the video appears under the call in the history. Anyone who was in the call can watch or download it through a signed link (`playUrl`) that supports seeking.
+- An administrator can switch recording off for everyone. While it is off, the apps hide it completely and `GET /api/calls/{id}/recordings` returns an empty list.
+
+**Where the videos are kept**
+
+| `CALLS_RECORDINGS_MODE` | The videos go to | Use it when |
+|---|---|---|
+| `LOCAL` (default) | `CALLS_RECORDINGS_DIR` on the server | One server, or a disk you manage yourself |
+| `NETWORK` | A share (NAS, NFS, SMB) that the operating system has already mounted at `CALLS_RECORDINGS_NETWORK_MOUNT_PATH` | Several copies of the service, or a server with little disk |
+
+The LiveKit recorder must write to the same folder the messenger reads. In `deploy/livekit/docker-compose.yml` that folder is `CALLS_RECORDINGS_HOST_DIR` on the host, mounted at `/out` in the recorder container.
+
+Before it starts a recording the service checks that the folder is there, that it is on a mounted network share when `NETWORK` is set (`CALLS_RECORDINGS_NETWORK_REQUIRE_MOUNT=true`), and that at least `CALLS_RECORDINGS_MIN_FREE_MB` (500) are free. If not, starting is refused with `503 Recording storage is not available right now` instead of losing the video. Mount the share before you start the recorder, because the recorder container is not covered by that check.
+
+**Call settings**
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/api/call-settings` | `{ recordingEnabled, canManage, storageMode, storageReady }` for everyone. An administrator also gets `storageLocation`, `storageProblem` and `storageFreeMb` |
+| `PUT` | `/api/call-settings/recording` | Administrators only: `{ "enabled": true \| false }` switches recording for everyone |
+
+In the Flutter app the switch is under Messenger settings, then Calls, for administrators (and in the admin area, Call settings). In the browser client it is under Settings, Calls.
 
 ## Quick start
 
@@ -239,6 +283,31 @@ WebSocket authenticated for user: <userId> (<email>)
 Message <id> delivery completed. Success: 1/1, Failures: 0
 ```
 
+## Run it with Docker and deploy it
+
+<p align="center">
+  <img src="docs/assets/deploy.svg" alt="One Docker image runs in development, staging and production on Docker Compose, Coolify, Render, Heroku, Fly.io or Railway" width="100%" />
+</p>
+
+One image runs everywhere. What makes an environment development, staging or production is only the variables, above all `SPRING_PROFILES_ACTIVE` (`dev`, `staging` or `prod`). The image listens on `PORT` (or 8081), starts as an unprivileged user and answers `GET /actuator/health`.
+
+```bash
+# development: the service with its own MongoDB and Redis (start auth-service first, on port 8080)
+docker compose up --build
+
+# staging on a server with Docker: copy the example, fill it in, then
+cp deploy/env/staging.env.example deploy/env/staging.env
+docker compose --env-file deploy/env/staging.env -f docker-compose.staging.yml up -d --build
+
+# production: pull an exact version
+cp deploy/env/production.env.example deploy/env/production.env
+IMAGE_TAG=1.0.0 docker compose --env-file deploy/env/production.env -f docker-compose.production.yml up -d
+```
+
+Each environment pairs with the auth-service of the **same** environment: `JWT_SECRET` identical, `INTERNAL_API_KEY` equal to the auth-service `API_KEY`, `AUTH_SERVICE_URL` pointing at it, and separate databases. Several copies can run side by side because Redis relays live messages between them. Attachments and recordings are per copy, so with more than one copy use `STORAGE_MODE=NETWORK` and a share every copy mounts.
+
+[deploy/README.md](deploy/README.md) walks through each platform, and `.github/workflows/docker-image.yml` builds the image and publishes it to ghcr.io on the `develop`, `staging` and `main` branches.
+
 ## Configuration reference
 
 | Variable | Required | Default | Purpose |
@@ -271,6 +340,14 @@ Message <id> delivery completed. Success: 1/1, Failures: 0
 | `CALLS_RING_TIMEOUT_SECONDS` | No | `45` | How long phones ring before the call counts as missed (`calls.ring-timeout-seconds`). |
 | `CALLS_MAX_PARTICIPANTS` / `CALLS_RING_LIMIT` | No | `50` / `32` | The most people in one call, and the most people a group call rings at once. Other group members can still join from the chat. |
 | `CALLS_LINK_BASE_URL` / `CALLS_LINK_TTL_HOURS` | No | `https://premisave.com/call` / `168` | Start of every call link, and the longest a call link stays valid. |
+| `CALLS_RECORDINGS_MODE` | No | `LOCAL` | Where call recordings are kept: `LOCAL` (a folder on the server) or `NETWORK` (a share mounted by the operating system). |
+| `CALLS_RECORDINGS_DIR` | LOCAL mode | `deploy/livekit/recordings` | The folder for recordings in `LOCAL` mode. The LiveKit recorder writes here too. |
+| `CALLS_RECORDINGS_NETWORK_MOUNT_PATH` | NETWORK mode | blank | Where the share is mounted, for example `/mnt/premisave-nas`. |
+| `CALLS_RECORDINGS_NETWORK_DIRECTORY` | No | `premisave-recordings` | A folder inside the share. Blank uses the mount path itself. |
+| `CALLS_RECORDINGS_NETWORK_REQUIRE_MOUNT` | No | `true` | Refuse to record unless the mount path is really a network filesystem (cifs, nfs and so on). |
+| `CALLS_RECORDINGS_MIN_FREE_MB` | No | `500` | Recording will not start when less than this is free. |
+| `SPRING_PROFILES_ACTIVE` | No | `prod` in the Docker image | `dev`, `staging` or `prod`. Sets log levels and is how one image becomes each environment. |
+| `PORT` | No | `8081` | The port the container listens on. Hosting platforms set it for you. |
 | `STORAGE_SIGNING_SECRET` | No | `JWT_SECRET` | Key used to sign download links. |
 | `STORAGE_NETWORK_*` | NETWORK mode | blank | `PROTOCOL`, `HOST`, `SHARE`, `MOUNT_PATH`, `DIRECTORY`, `REQUIRE_MOUNT`. With `REQUIRE_MOUNT=true` the service refuses to start or write unless the path is on a mounted network share. |
 
@@ -352,6 +429,12 @@ Message <id> delivery completed. Success: 1/1, Failures: 0
 | `POST` | `/api/calls/links` | Make a call link: `{ "type", "title", "expiresInHours" }`. Returns the call with `linkUrl`. Join it yourself, then share the link |
 | `GET` | `/api/calls/links/{code}` | What someone sees before joining from a link |
 | `POST` | `/api/calls/links/{code}/join` | Join from a link. Returns `url` and `token` |
+| `POST` | `/api/calls/{id}/recording/start` | A host or co-host starts recording. `503` when recording is off or the storage is not ready |
+| `POST` | `/api/calls/{id}/recording/stop` | A host or co-host stops it. The video is ready a few seconds later |
+| `GET` | `/api/calls/{id}/recordings` | The recordings of a call, newest first, each with `status`, `durationSeconds`, `sizeBytes`, `canDelete` and, when ready, a signed `playUrl`. Anyone who was in the call can read them |
+| `DELETE` | `/api/calls/{id}/recordings/{recordingId}` | Delete a recording and its file (the person who started it, a host or a co-host) |
+| `GET` | `/api/calls/recordings/{recordingId}/file` | The video, from the signed `playUrl` (`exp`, `sig`). Supports HTTP Range |
+| `GET` / `PUT` | `/api/call-settings`, `/api/call-settings/recording` | Read the call switches, or (administrators) turn recording on or off. See [Calls and recordings](#calls-and-recordings) |
 | `POST` | `/api/calls/livekit-webhook` | LiveKit reports people connecting and dropping off. Signed by LiveKit; not for apps |
 | `POST` | `/api/attachments` | Upload a file for a chat (multipart `file`, `chatId`); returns an `attachmentId` |
 | `GET` | `/api/attachments/{attachmentId}/content` | Download or stream a file (Bearer token or the signed link from a message) |
@@ -386,7 +469,7 @@ Connect with a STOMP client to `ws://<host>:8081/ws-messenger`, sending `Authori
 
 ## Testing with the browser chat client
 
-`test-client/index.html` is a single-file chat client styled like Telegram Web, with light and dark themes. The menu button (top left) opens the side menu with your profile, new chat, status, settings, night mode and sign out; Chats and Status are the two tabs under the search box. It talks to the real service over REST and raw STOMP, so it exercises everything described above.
+`test-client/index.html` is a single-file chat client styled like Telegram Web, with light and dark themes. The menu button (top left) opens the side menu with your profile, new chat, status, settings, night mode and sign out; Chats and Status are the two tabs under the search box. It talks to the real service over REST and raw STOMP, so it exercises everything described above, including calls.
 
 1. Start auth-service (`8080`) and this service (`8081`).
 2. Serve the client (recommended). Localhost is a secure origin, so microphone access for voice notes works and CORS behaves like a real front end:
@@ -400,9 +483,15 @@ Connect with a STOMP client to `ws://<host>:8081/ws-messenger`, sending `Authori
 3. Sign in with an auth-service account. The service addresses can be changed under "Connection and token", and a token can be pasted instead of a password.
 4. Open a second tab in a private window and sign in as another user to chat with yourself from both sides. A private window keeps its own session, so the two users do not log each other out.
 
-What it covers: private chats, group chats, replies, emoji, photos, videos, audio, documents and voice notes (upload progress, captions, drag and drop, paste), live delivery and read ticks, typing and online status, unread counters, mark as read and unread, editing your own messages, in-chat search, delete for me and for everyone, automatic reconnect with a polling fallback, and a mobile layout.
+What it covers: voice and video calls (see below), private chats, group chats, replies, emoji, photos, videos, audio, documents and voice notes (upload progress, captions, drag and drop, paste), live delivery and read ticks, typing and online status, unread counters, mark as read and unread, editing your own messages, in-chat search, delete for me and for everyone, automatic reconnect with a polling fallback, and a mobile layout.
 
 Notes:
+- Calls: the phone and video buttons in a chat header start a voice or video call, and a banner at the top of a chat offers Join when a call is already running there. The page loads the [LiveKit browser SDK](https://docs.livekit.io/reference/client-sdk-js/) from jsDelivr, and it needs a LiveKit server configured in the messenger (see [docs/CALLS.md](docs/CALLS.md)). The microphone and camera need `localhost` or `https`.
+  - Ringing: an incoming call shows a card with Accept and Decline and plays a ring tone (browsers may keep it silent until you have clicked on the page). The client tells the server its phone is ringing, so the caller sees "Ringing".
+  - In the call: tiles with a speaking highlight, mute, camera, share screen, a chat that only the people in the call can see, a People panel with host controls (add people, mute one or all, make or remove a co-host, remove, lock or unlock), Leave, and End for everyone for the host.
+  - Recording: hosts and co-hosts see a Record button while recording is switched on. Everyone sees the red Recording sign. Starting is refused with the server's message when the storage is not ready.
+  - Menu, Calls: your history with missed, declined and running calls, Join and Call again, details with the people, the chat and the recordings (Watch, Download, Delete), New call link, and Join with a link. A link such as `.../call/CODE`, or opening the client as `index.html#call=CODE`, shows who is hosting before you join.
+  - Call settings: under Settings, Calls, everyone sees whether recording is on and where the videos are stored. An administrator can switch recording on or off, and also sees the storage folder, free space and any problem (for example a share that is not mounted).
 - Groups: create a group with members, edit its name, description and photo, add and remove members, promote admins, transfer ownership and leave, all from the client. When the owner chooses Leave group, the client asks them to pick the new owner first (admins are listed first) and the button reads "Make <name> owner and leave". Members are added to the group chat on the server, so they see the group and get its messages straight away. Typing indicators and per-member read receipts are not available in groups.
 - Invite links and QR codes: in a group's info the owner and admins see Invite with link or QR code. It makes a link with an optional expiry and join limit, shows the QR code, and offers Copy, Send to chat, Share and Save QR. New link replaces the old one and Revoke stops it. To join, open the side menu and choose Scan QR code, or use Join a group in the New chat dialog. You can scan with the camera, choose a picture of a QR code, or paste a link or code, and you see the group before you join. A link in a message (`.../join/CODE`) opens the same preview when clicked, and opening the client as `index.html#join=CODE` goes straight to it after sign-in. The camera needs `https` or `localhost`; where it is blocked, choose a picture or paste the link instead.
 - Read state: opening a chat marks its unread messages as read automatically (also when the tab becomes visible again and after a reconnect). Use the chat menu or a right click on a chat row for "Mark as unread" and "Mark as read". Your own messages never count as unread.
@@ -438,6 +527,8 @@ Notes:
 | ![Done](https://img.shields.io/badge/status-done-4c9a2a?style=flat-square) | Multi-device presence correctness (Redis session counter) |
 | ![Done](https://img.shields.io/badge/status-done-4c9a2a?style=flat-square) | Structured error handling for downstream failures |
 | ![Done](https://img.shields.io/badge/status-done-4c9a2a?style=flat-square) | Observability (Prometheus metrics, health probes) |
+| ![Done](https://img.shields.io/badge/status-done-4c9a2a?style=flat-square) | One Docker image for development, staging and production, with files for six platforms |
+| ![Done](https://img.shields.io/badge/status-done-4c9a2a?style=flat-square) | Call recordings on a local folder or a network share, with mount and free-space checks |
 
 **Known limitations, tracked honestly rather than glossed over:**
 
@@ -461,6 +552,10 @@ Notes:
 
 ## Project structure
 
+<p align="center">
+  <img src="docs/assets/stats.svg" alt="Bar chart of Java lines per package" width="100%" />
+</p>
+
 ```
 premisave-messenger-service/
 ├── src/main/java/com/premisave/messenger/
@@ -469,7 +564,7 @@ premisave-messenger-service/
 │   ├── controller/       # REST + WebSocket (@MessageMapping) controllers
 │   ├── service/          # Chat, Message, Group, GroupInvite, Presence, Media, User, Attachment, Call and LiveKit services
 │   ├── util/             # QrCodes (QR code PNGs, ZXing)
-│   ├── storage/          # FileStorage (local or mounted network share), StoredFile
+│   ├── storage/          # FileStorage and RecordingStorage (local folder or mounted network share)
 │   ├── realtime/         # Redis pub/sub relay (publisher, subscriber, envelope)
 │   ├── entity/            # MongoDB documents
 │   ├── dto/               # Request/response DTOs
@@ -479,10 +574,19 @@ premisave-messenger-service/
 │   └── PremisaveMessengerServiceApplication.java
 ├── src/main/resources/
 │   └── application.yml
-├── deploy/livekit/       # docker-compose for the LiveKit media server used by calls
-├── docs/CALLS.md         # How calls work and how to set LiveKit up
+├── Dockerfile, docker/   # The image and its entrypoint
+├── docker-compose*.yml   # Development, staging, production and Coolify
+├── render.yaml, heroku.yml, app.json, fly.*.toml, railway.json
+├── deploy/
+│   ├── README.md         # Deploying, platform by platform
+│   ├── env/              # The values each environment needs
+│   └── livekit/          # LiveKit and the recorder, for calls
+├── docs/
+│   ├── CALLS.md          # How calls work and how to set LiveKit up
+│   └── assets/           # The pictures in this README
+├── tool/readme_assets.py # Redraws those pictures (python3 tool/readme_assets.py)
 ├── test-client/
-│   └── index.html        # Browser chat client for manual testing (light and dark themes)
+│   └── index.html        # Browser chat client, with calls (light and dark themes)
 └── pom.xml
 ```
 
@@ -516,6 +620,18 @@ Spring Cloud release trains are pinned to specific Spring Boot minor versions. I
 <summary><b>A WebSocket-delivered message shows the sender as "Unknown User"</b></summary>
 
 Check that the real JWT — not a fabricated token — is what's being passed to the sender-enrichment call. A common mistake is reconstructing a fake `"Bearer " + userId` string somewhere in the delivery path instead of threading the real token all the way through.
+</details>
+
+<details>
+<summary><b>Starting a recording answers <code>503 Recording storage is not available right now</code></b></summary>
+
+The service checked the recordings folder and it cannot take a video. As an administrator, open Call settings (the app) or call `GET /api/call-settings`: `storageProblem` says why, for example the share is not mounted, the folder is missing or less than `CALLS_RECORDINGS_MIN_FREE_MB` is free. Mount the share (or free space), then try again. With `NETWORK` mode, mount it before you start the LiveKit recorder.
+</details>
+
+<details>
+<summary><b>A call connects but there is no Recording button</b></summary>
+
+Recording is hidden when an administrator has switched it off (`recordingEnabled` is false in `GET /api/call-settings`) or when you are not a host or co-host of the call. Only hosts and co-hosts can record.
 </details>
 
 ## Roadmap ideas
