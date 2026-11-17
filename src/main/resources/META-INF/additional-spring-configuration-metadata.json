@@ -398,6 +398,70 @@
       "defaultValue": "premisave-messenger"
     },
     {
+      "name": "calls.livekit-url",
+      "type": "java.lang.String",
+      "description": "Address the apps connect to for call audio, video and screen sharing, for example wss://live.premisave.com. Set with LIVEKIT_URL.",
+      "defaultValue": "ws://localhost:7880"
+    },
+    {
+      "name": "calls.livekit-api-url",
+      "type": "java.lang.String",
+      "description": "Address this service uses to reach the LiveKit server, to remove people, mute them and close finished rooms. Usually http://localhost:7880. Set with LIVEKIT_API_URL.",
+      "defaultValue": "http://localhost:7880"
+    },
+    {
+      "name": "calls.api-key",
+      "type": "java.lang.String",
+      "description": "LiveKit API key. Must match a key in the LiveKit server's config. Leave empty, together with the secret, to keep calls switched off. Set with LIVEKIT_API_KEY."
+    },
+    {
+      "name": "calls.api-secret",
+      "type": "java.lang.String",
+      "description": "LiveKit API secret, at least 32 characters. Must match the secret the LiveKit server has for that key. Set with LIVEKIT_API_SECRET."
+    },
+    {
+      "name": "calls.ring-timeout-seconds",
+      "type": "java.lang.Integer",
+      "description": "How many seconds phones ring before the call counts as missed. Set with CALLS_RING_TIMEOUT_SECONDS.",
+      "defaultValue": 45
+    },
+    {
+      "name": "calls.max-participants",
+      "type": "java.lang.Integer",
+      "description": "Most people allowed in one call at the same time. Set with CALLS_MAX_PARTICIPANTS.",
+      "defaultValue": 50
+    },
+    {
+      "name": "calls.ring-limit",
+      "type": "java.lang.Integer",
+      "description": "Most people a group call rings at once. Others in the group can still join from the chat. Set with CALLS_RING_LIMIT.",
+      "defaultValue": 32
+    },
+    {
+      "name": "calls.token-ttl-minutes",
+      "type": "java.lang.Integer",
+      "description": "How many minutes a call join token works. It is only needed to connect. Set with CALLS_TOKEN_TTL_MINUTES.",
+      "defaultValue": 120
+    },
+    {
+      "name": "calls.link-base-url",
+      "type": "java.lang.String",
+      "description": "What a call link starts with. The full link is this, a slash and the call code. Set with CALLS_LINK_BASE_URL.",
+      "defaultValue": "https://premisave.com/call"
+    },
+    {
+      "name": "calls.link-ttl-hours",
+      "type": "java.lang.Integer",
+      "description": "The longest a call link stays valid, in hours. Set with CALLS_LINK_TTL_HOURS.",
+      "defaultValue": 168
+    },
+    {
+      "name": "calls.chat-max-length",
+      "type": "java.lang.Integer",
+      "description": "Most characters in one message in a call's chat. Set with CALLS_CHAT_MAX_LENGTH.",
+      "defaultValue": 2000
+    },
+    {
       "name": "storage.mode",
       "type": "java.lang.String",
       "description": "Where attachments are stored: LOCAL (under storage.root) or NETWORK (a share already mounted by the operating system). Set with STORAGE_MODE.",
