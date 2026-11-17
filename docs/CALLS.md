@@ -177,8 +177,12 @@ You need a Linux server (or your own machine for development) with Docker.
    `503 CALLS_NOT_CONFIGURED`.
 4. Check it: `curl http://localhost:7880` answers `OK`.
 5. **Redis.** LiveKit needs a Redis at `LIVEKIT_REDIS_ADDRESS` (default `localhost:6379`) and does not start without one. The Redis
-   that the messenger's own `docker compose up` starts is not published outside Docker. In that case start a small one for
-   LiveKit: `docker run -d --name premisave-livekit-redis --restart unless-stopped -p 127.0.0.1:6379:6379 redis:7-alpine`.
+   that the messenger's own `docker compose up` starts is not published outside Docker. A Redis installed on the computer
+   works, and LiveKit can share it. Otherwise start a small one for LiveKit, but only when nothing listens on 6379 yet
+   (a second one cannot take the port and stays in the `Created` state; remove it with `docker rm -f premisave-livekit-redis`):
+   ```bash
+   ss -ltn | grep -q ':6379 ' || docker run -d --name premisave-livekit-redis --restart unless-stopped -p 127.0.0.1:6379:6379 redis:7-alpine
+   ```
 
 ### Day to day
 

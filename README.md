@@ -237,11 +237,17 @@ In the Flutter app the switch is under Messenger settings, then Calls, for admin
 
 Calls and recording need a LiveKit server. Without one the chat works as before, and every call endpoint answers `503 CALLS_NOT_CONFIGURED`. [`deploy/livekit/docker-compose.yml`](deploy/livekit/docker-compose.yml) starts two containers on the machine where you run it: `premisave-livekit` (the media server) and `premisave-egress` (the recorder). Both use the host network, so the UDP media ports work without mapping hundreds of them. That works on Linux; on Docker Desktop for Windows or macOS see [docs/CALLS.md](docs/CALLS.md#windows-and-macos-with-docker-desktop).
 
-You need Docker with Compose, the messenger's `.env`, and a **Redis that `localhost:6379` reaches**. LiveKit and the recorder talk through it, and LiveKit does not start without it. It does not have to be the messenger's own Redis. If you run the messenger from source and have Redis on this computer, you are set. The Redis that `docker compose up` starts for the messenger is not published outside Docker, so with the Docker setup start a small one for LiveKit (skip this if something already listens on 6379):
+You need Docker with Compose, the messenger's `.env`, and a **Redis that `localhost:6379` reaches**. LiveKit and the recorder talk through it, and LiveKit does not start without it. It does not have to be the messenger's own Redis. If you run the messenger from source and have Redis on this computer, you are set. The Redis that `docker compose up` starts for the messenger is not published outside Docker, so with the Docker setup LiveKit needs one of its own. This starts a small one, but only when nothing is listening on port 6379 yet. A Redis you installed on this computer already uses that port, and LiveKit can share it:
 
 ```bash
-docker run -d --name premisave-livekit-redis --restart unless-stopped -p 127.0.0.1:6379:6379 redis:7-alpine
+if ss -ltn 2>/dev/null | grep -q ':6379 '; then
+  echo "Something already listens on 6379, LiveKit will use it"
+else
+  docker run -d --name premisave-livekit-redis --restart unless-stopped -p 127.0.0.1:6379:6379 redis:7-alpine
+fi
 ```
+
+If the port is taken and the container shows as `Created` in `docker ps -a`, it never started: remove it with `docker rm -f premisave-livekit-redis`. To see which Redis answers, run `redis-cli -h 127.0.0.1 ping`, which prints `PONG`.
 
 **1. Make a key and a secret.** Run this in the messenger folder. It writes both into `.env` and replaces any earlier values. The secret must be at least 32 characters.
 

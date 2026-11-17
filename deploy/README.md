@@ -134,8 +134,12 @@ SECRET=$(openssl rand -hex 32)
 sed -i '/^LIVEKIT_API_KEY=/d;/^LIVEKIT_API_SECRET=/d' deploy/env/staging.env
 printf 'LIVEKIT_API_KEY=premisave\nLIVEKIT_API_SECRET=%s\n' "$SECRET" >> deploy/env/staging.env
 
-# 2. a Redis for LiveKit on port 6379 (skip if one is already there), and the folder for the videos
-docker run -d --name premisave-livekit-redis --restart unless-stopped -p 127.0.0.1:6379:6379 redis:7-alpine
+# 2. a Redis for LiveKit on port 6379 (only if nothing listens there yet), and the folder for the videos
+if ss -ltn 2>/dev/null | grep -q ':6379 '; then
+  echo "Something already listens on 6379, LiveKit will use it"
+else
+  docker run -d --name premisave-livekit-redis --restart unless-stopped -p 127.0.0.1:6379:6379 redis:7-alpine
+fi
 mkdir -p deploy/livekit/recordings && chmod 777 deploy/livekit/recordings
 
 # 3. start LiveKit and the recorder with the same settings file, then restart the service
