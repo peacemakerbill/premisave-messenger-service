@@ -1,0 +1,303 @@
+PREMISAVE MESSENGER: HOW TO RUN EVERYTHING IN DEVELOPMENT
+Including LiveKit (calls and call recording)
+
+This file is plain text so you can read it in a terminal:   less instructions/RUN-IN-DEVELOPMENT.txt
+Every command below can be pasted into a terminal as it is (bash or zsh). Folder names assume the three
+projects sit side by side:
+
+    /home/graham218/MyProjects/premisave/premisave_auth_service
+    /home/graham218/MyProjects/premisave/premisave-messenger-service
+    /home/graham218/MyProjects/premisave/premisave_flutter_frontend
+
+Change the path if yours is different.
+
+
+WHAT RUNS WHERE
+
+    auth-service        port 8080    sign in, users, tokens
+    messenger           port 8081    chats, messages, calls, recordings
+    LiveKit server      port 7880    carries the audio and video (only needed for calls)
+    LiveKit recorder    no port      saves calls as MP4 files (only needed for recording)
+    Redis               port 6379    LiveKit and the recorder talk through it
+    Flutter app                      the thing you click on
+
+Start them in that order. Chat works without LiveKit. Calls do not.
+
+
+WHAT YOU NEED INSTALLED
+
+    Docker with the Compose plugin       docker compose version   must print a version
+    Flutter SDK                          only to run the app (flutter doctor)
+    Java 21 and Maven                    only if you run a backend from source instead of Docker
+
+
+PART 1. THE SETTINGS FILE (ONCE)
+
+The messenger reads its settings from a file named .env in the messenger folder.
+
+    cd /home/graham218/MyProjects/premisave/premisave-messenger-service
+    ls -la .env
+
+If it is missing, copy the example and fill it in:
+
+    cp .env.example .env
+
+Things that must be right in it:
+
+    JWT_SECRET            exactly the same value as JWT_SECRET in the auth-service .env
+    AUTH_SERVICE_URL      http://localhost:8080 (from source) or http://host.docker.internal:8080 (messenger in Docker)
+    LIVEKIT_API_KEY       any name, for example premisave
+    LIVEKIT_API_SECRET    a random value of at least 32 characters (see Part 4)
+
+Never commit .env. It is ignored by git.
+
+
+PART 2. START THE AUTH-SERVICE AND THE MESSENGER WITH DOCKER
+
+Auth-service first:
+
+    cd /home/graham218/MyProjects/premisave/premisave_auth_service
+    docker compose up --build -d
+
+Messenger second:
+
+    cd /home/graham218/MyProjects/premisave/premisave-messenger-service
+    docker compose up --build -d
+
+The first build takes a few minutes. Java needs about a minute to start after "up", so a curl that
+runs straight away can fail with "connection reset". Wait and try again.
+
+Check them:
+
+    curl http://localhost:8080/health
+    curl http://localhost:8081/health
+
+The messenger answers with the status of MongoDB and Redis. Watch the log:
+
+    docker compose logs -f
+
+To rebuild only the messenger after a code change:
+
+    docker compose up --build -d messenger
+
+
+PART 2B. OR RUN THE MESSENGER FROM SOURCE
+
+Use this when you are changing Java code and do not want to rebuild an image each time. The Docker
+messenger and a source messenger both want port 8081, so stop the Docker one first:
+
+    cd /home/graham218/MyProjects/premisave/premisave-messenger-service
+    docker compose down
+
+You then need MongoDB and Redis that the program can reach (the .env points at them):
+
+    docker run -d --name messenger-mongo -p 27017:27017 mongo:8
+    ss -ltn | grep -q ':6379 ' || docker run -d --name messenger-redis -p 6379:6379 redis:7
+
+Run the messenger:
+
+    ./mvnw spring-boot:run
+
+With a source messenger, AUTH_SERVICE_URL in .env should be http://localhost:8080.
+
+
+PART 3. THE BROWSER TEST CLIENT (OPTIONAL)
+
+You can try chat and calls without the app. Open this file in Chrome:
+
+    /home/graham218/MyProjects/premisave/premisave-messenger-service/test-client/index.html
+
+Sign in with two different accounts in two browser windows. The camera and microphone work on
+localhost.
+
+
+PART 4. LIVEKIT: SET UP (ONCE)
+
+LiveKit is the server that carries audio and video. With a self-hosted LiveKit there is no account and no
+dashboard to get keys from. You choose the key and the secret yourself, and both the messenger and
+LiveKit read them from the same .env file.
+
+STEP 1. Check what is already in .env (the secret is not printed):
+
+    cd /home/graham218/MyProjects/premisave/premisave-messenger-service
+    grep -E '^LIVEKIT_API_KEY=.' .env
+    awk -F= '/^LIVEKIT_API_SECRET=/{print "secret length:", length($2)}' .env
+
+You want a key line and a secret length of 32 or more. If either is missing, create both. This replaces
+any earlier values:
+
+    SECRET=$(openssl rand -hex 32)
+    sed -i '/^LIVEKIT_API_KEY=/d;/^LIVEKIT_API_SECRET=/d' .env
+    printf 'LIVEKIT_API_KEY=premisave\nLIVEKIT_API_SECRET=%s\n' "$SECRET" >> .env
+
+LIVEKIT_URL and LIVEKIT_API_URL default to ws://localhost:7880 and http://localhost:7880, which is right
+when LiveKit runs on the same computer as the messenger.
+
+STEP 2. Make the folder where recordings are saved. Recordings go to the folder named in .env as
+CALLS_RECORDINGS_DIR (what the messenger reads) and CALLS_RECORDINGS_HOST_DIR (what the recorder writes).
+They must be the same folder:
+
+    grep -E '^CALLS_RECORDINGS_(DIR|HOST_DIR)=' .env
+
+If you have not set them, the default is deploy/livekit/recordings:
+
+    mkdir -p deploy/livekit/recordings && chmod 777 deploy/livekit/recordings
+
+If you chose another folder, make it the same way:
+
+    mkdir -p /home/graham218/MyProjects/file-storage/premisave-messenger/recordings
+    chmod 777 /home/graham218/MyProjects/file-storage/premisave-messenger/recordings
+
+STEP 3. Redis. LiveKit does not start without a Redis on localhost:6379. A Redis you installed on this
+computer is fine, LiveKit shares it. Check:
+
+    ss -ltn | grep ':6379 '
+    redis-cli -h 127.0.0.1 ping          (prints PONG, if redis-cli is installed)
+
+If nothing listens on 6379, start a small one:
+
+    docker run -d --name premisave-livekit-redis --restart unless-stopped -p 127.0.0.1:6379:6379 redis:7-alpine
+
+If the port is already taken, that container shows as "Created" in "docker ps -a" and never starts. Remove
+it with:  docker rm -f premisave-livekit-redis   (the Redis that is already there keeps working.)
+
+
+PART 5. LIVEKIT: START IT
+
+    cd /home/graham218/MyProjects/premisave/premisave-messenger-service/deploy/livekit
+    docker compose --env-file ../../.env up -d
+
+The first run downloads two images. Always pass --env-file ../../.env, otherwise Docker does not see
+your key and secret.
+
+Check it:
+
+    docker compose --env-file ../../.env ps
+    curl http://localhost:7880
+    docker compose --env-file ../../.env logs --tail 40 livekit egress
+
+What you should see:
+
+    ps       premisave-livekit and premisave-egress, both Up
+    curl     prints OK
+    logs     "connecting to redis" and "starting LiveKit server", and no errors
+
+Check that the recorder writes to the right folder. The command must print your recordings folder,
+pointing at /out:
+
+    docker inspect premisave-egress --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{"\n"}}{{end}}'
+
+Then restart the messenger so it picks up the key and secret:
+
+    cd /home/graham218/MyProjects/premisave/premisave-messenger-service
+    docker compose up -d --force-recreate messenger
+
+(Running from source: stop it with Ctrl+C and start ./mvnw spring-boot:run again.)
+
+When the key and secret are set, GET /api/call-settings answers. When they are empty, every call endpoint
+answers 503 CALLS_NOT_CONFIGURED.
+
+
+PART 6. LIVEKIT: EVERY DAY
+
+Run these in the deploy/livekit folder.
+
+    docker compose --env-file ../../.env ps                         is it running
+    docker compose --env-file ../../.env logs -f livekit egress     follow both logs
+    docker compose --env-file ../../.env up -d --force-recreate     apply a changed .env
+    docker compose pull                                             download newer images
+    docker compose --env-file ../../.env up -d                      ...then start with them
+    docker compose down                                             stop both, recordings stay
+
+"egress" is the recorder.
+
+Warnings such as 'The "LIVEKIT_API_KEY" variable is not set' appear when you run a command without
+--env-file. They are harmless for ps and logs. Add --env-file ../../.env to anything that starts or
+recreates the containers.
+
+After you change LIVEKIT_API_KEY or LIVEKIT_API_SECRET, recreate LiveKit and restart the messenger.
+Both must have the same values or calls fail with "invalid token".
+
+
+PART 7. TRY A CALL AND A RECORDING
+
+    1. Make sure the messenger answers:   curl http://localhost:8081/health
+    2. Sign in as an administrator. Open Messenger settings, Calls, Call recording, and switch it on.
+       (Or call PUT /api/call-settings/recording with {"enabled": true}.)
+       CALLS_RECORDING_ENABLED in .env only sets the starting value. The switch overrides it.
+    3. Sign in as a second person (another browser, or the app).
+    4. Start a call from the first account and join from the second.
+    5. As the host press Record, wait about 20 seconds, then stop.
+    6. Look for the file. There is one MP4 per recording, in a folder named after the call:
+
+           find /home/graham218/MyProjects/file-storage/premisave-messenger/recordings -name '*.mp4'
+
+    7. The video also appears under the call in the history and plays from there.
+
+If no file appears:
+
+    cd /home/graham218/MyProjects/premisave/premisave-messenger-service/deploy/livekit
+    docker compose --env-file ../../.env logs --tail 60 egress
+
+Common causes: the recorder and the messenger use different folders (check the docker inspect command in
+Part 5), the folder is not writable (chmod 777), or recording is switched off.
+
+
+PART 8. START THE FLUTTER APP
+
+    cd /home/graham218/MyProjects/premisave/premisave_flutter_frontend
+    ./run.sh
+
+Pick the platform and environment it asks for. On the Android emulator the app reaches your computer at
+10.0.2.2, which it already does by default. A real phone needs your computer's address, for example:
+
+    --dart-define=BASE_URL=http://192.168.1.20:8080 --dart-define=MESSENGER_URL=http://192.168.1.20:8081
+
+For calls on a real phone, also set LIVEKIT_URL in the messenger .env to ws://192.168.1.20:7880, then
+recreate LiveKit and restart the messenger.
+
+
+PART 9. STOP EVERYTHING
+
+    cd /home/graham218/MyProjects/premisave/premisave-messenger-service/deploy/livekit && docker compose down
+    cd /home/graham218/MyProjects/premisave/premisave-messenger-service && docker compose down
+    cd /home/graham218/MyProjects/premisave/premisave_auth_service && docker compose down
+
+The data stays in Docker volumes. "docker compose down -v" also deletes the data, so use it only for a
+clean start. Recordings are plain files in their folder and are never removed by it.
+
+
+WHEN SOMETHING IS WRONG
+
+    Port 8081 was already in use
+        The Docker messenger (or a staging stack) is still running. Run "docker compose down" in the
+        messenger folder, or in the folder of the stack that uses the port.
+
+    curl says "connection reset" right after "up -d"
+        Java is still starting. Wait about a minute and try again.
+
+    "couldn't find env file" or "no such file"
+        You ran the command from the wrong folder. Compose commands run in the folder that holds the
+        compose file. Check with:  pwd
+
+    Calls drop at once, or the app says "invalid token"
+        The messenger and LiveKit have different keys or secrets. Fix .env, recreate LiveKit, restart the
+        messenger.
+
+    Every call request answers 503 CALLS_NOT_CONFIGURED
+        LIVEKIT_API_KEY or LIVEKIT_API_SECRET is empty, or the secret is shorter than 32 characters.
+
+    Connects, but no sound or picture
+        UDP is blocked. Open 50000-50200/udp and 7881/tcp in the firewall.
+
+    Chrome says the camera is blocked
+        The page is not secure. Use localhost (or https and wss on another device).
+
+    LiveKit will not start
+        Redis is not reachable on localhost:6379. See Part 4, step 3.
+
+    Recording says "Recording storage is not available right now"
+        The recordings folder is missing or has less free space than CALLS_RECORDINGS_MIN_FREE_MB.
+        Open Call settings as an administrator: it shows the exact reason.
+
+More detail: README.md (section "Set up and run LiveKit"), docs/CALLS.md and deploy/README.md.

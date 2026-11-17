@@ -418,6 +418,8 @@ Useful commands, all run in the project folder:
 
 The first build takes a few minutes because Maven downloads the dependencies once. The next ones reuse them.
 
+Prefer one plain-text page you can keep open in a terminal? [`instructions/RUN-IN-DEVELOPMENT.txt`](instructions/RUN-IN-DEVELOPMENT.txt) has every command in order: the settings file, auth-service, messenger, LiveKit, the app, how to stop everything, and what to do when something is wrong.
+
 ### The whole system on one computer
 
 <p align="center">
@@ -839,6 +841,8 @@ premisave-messenger-service/
 │   ├── render.yaml, railway.json, fly.staging.toml, fly.production.toml
 │   ├── env/              # The values each environment needs, and from-dotenv.sh to fill them in
 │   └── livekit/          # LiveKit and the recorder, for calls
+├── instructions/
+│   └── RUN-IN-DEVELOPMENT.txt   # Every command to run the whole system and LiveKit on your computer, as plain text
 ├── docs/
 │   ├── CALLS.md          # How calls work and how to set LiveKit up
 │   └── assets/           # The pictures in this README
