@@ -106,6 +106,7 @@ It was built as a sibling service to `auth-service` (which owns user identity an
 | **Group chats** | Create, add/remove members (single or bulk), promote/demote admins, transfer ownership, group photo, leave group. |
 | **Group invite links and QR codes** | Owners and admins make a link (and a QR code that holds it) that anyone signed in can use to join the group. A link can expire after a set time or after a set number of joins, and can be revoked at any time. One working link per group: making a new one revokes the old one. |
 | **Notifications** | When something happens to you in a group (made an admin, made the owner, demoted, added, removed) you get a stored notification that waits in your list if you were offline, a live push on `/user/queue/notifications`, and an email. Emails go through auth-service, so set `INTERNAL_API_KEY` to the same value as its `API_KEY`. Nothing is sent to the person who did the action. |
+| **Audio and video calls** | One to one and group calls (voice or video), screen sharing, a chat inside the call, adding people during a call, raise hand and reactions, host controls (mute, remove, lock, co-hosts), call links, and call history with missed calls. The media runs on a self-hosted [LiveKit](https://livekit.io) server; this service signs the join tokens, rings people and keeps the call records. See [docs/CALLS.md](docs/CALLS.md). |
 | **Tagging** | Type `@` to tag someone, or `@all` to tag everyone in a group (groups only). Private chats can tag the other person. The picker shows each person's name, username and email. A tagged person gets a stored notification (`MENTIONED`, or `MENTIONED_ALL` for `@all`), a live push, and an email with an `@` badge that opens the chat. Emails are limited to one per person and chat every few minutes, and `@all` in a very large group is in-app only. Editing a message only notifies people who were newly tagged. |
 | **File attachments** | Send images, video, audio, documents and any other file type in a chat. Upload first (`POST /api/attachments`), then send a message carrying the `attachmentId`, over REST or WebSocket. Stored on local disk or a mounted network share, downloaded through expiring signed links with range support. |
 | **Public media** | Group photos and `/api/media/upload` files use the same storage and are served without a token from `/api/media/files/...`. |
@@ -265,6 +266,11 @@ Message <id> delivery completed. Success: 1/1, Failures: 0
 | `MENTION_EMAIL_COOLDOWN_MINUTES` | No | `5` | At most one mention email per person and chat in this many minutes (`notifications.mention-email-cooldown-minutes`). The in-app notification is never held back. |
 | `MENTION_ALL_EMAIL_MAX_MEMBERS` | No | `100` | An `@all` in a group with more people than this sends no emails, only in-app notifications (`notifications.mention-all-email-max-members`). |
 | `STORAGE_URL_TTL` / `STORAGE_UNCLAIMED_TTL` | No | `6h` / `24h` | Lifetime of a signed link, and how long an unsent upload is kept. |
+| `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | For calls | empty | The key and secret of your LiveKit server (the secret must be at least 32 characters). Empty keeps calls switched off. See [docs/CALLS.md](docs/CALLS.md). |
+| `LIVEKIT_URL` / `LIVEKIT_API_URL` | For calls | `ws://localhost:7880` / `http://localhost:7880` | What the apps connect to for audio and video, and what this service uses to reach LiveKit. |
+| `CALLS_RING_TIMEOUT_SECONDS` | No | `45` | How long phones ring before the call counts as missed (`calls.ring-timeout-seconds`). |
+| `CALLS_MAX_PARTICIPANTS` / `CALLS_RING_LIMIT` | No | `50` / `32` | The most people in one call, and the most people a group call rings at once. Other group members can still join from the chat. |
+| `CALLS_LINK_BASE_URL` / `CALLS_LINK_TTL_HOURS` | No | `https://premisave.com/call` / `168` | Start of every call link, and the longest a call link stays valid. |
 | `STORAGE_SIGNING_SECRET` | No | `JWT_SECRET` | Key used to sign download links. |
 | `STORAGE_NETWORK_*` | NETWORK mode | blank | `PROTOCOL`, `HOST`, `SHARE`, `MOUNT_PATH`, `DIRECTORY`, `REQUIRE_MOUNT`. With `REQUIRE_MOUNT=true` the service refuses to start or write unless the path is on a mounted network share. |
 
@@ -321,12 +327,32 @@ Message <id> delivery completed. Success: 1/1, Failures: 0
 | `DELETE` | `/api/groups/{groupId}/invite` | Revoke the link and its QR code (owner and admins) |
 | `GET` | `/api/group-invites/{code}` | Preview what a link leads to (`name`, `description`, `groupPhotoUrl`, `memberCount`, `alreadyMember`, `chatId`). Never lists members. Any signed-in user |
 | `POST` | `/api/group-invites/{code}/join` | Join with a link. Counts one use; a person already in the group is not counted again. Returns `groupId`, `chatId`, `name`, `alreadyMember` |
-| `GET` | `/api/notifications` | Your notifications, newest first (`limit` 1 to 100, default 50). Each has `id`, `type` (includes `MENTIONED` and `MENTIONED_ALL`), `title`, `body`, `groupId`, `chatId`, `actorId`, `actorName`, `createdAt`, `read` |
+| `GET` | `/api/notifications` | Your notifications, newest first (`limit` 1 to 100, default 50). Each has `id`, `type` (includes `MENTIONED`, `MENTIONED_ALL` and `MISSED_CALL`), `title`, `body`, `groupId`, `chatId`, `actorId`, `actorName`, `createdAt`, `read` |
 | `GET` | `/api/notifications/unread-count` | `{ "count": 3 }` |
 | `POST` | `/api/notifications/{id}/read` | Mark one as read |
 | `POST` | `/api/notifications/read-all` | Mark all as read. Returns `{ "updated": n }` |
 | `DELETE` | `/api/notifications/{id}` | Delete one |
 | `DELETE` | `/api/notifications` | Delete all of yours |
+| `POST` | `/api/calls` | Call the people in a chat: `{ "chatId", "type": "AUDIO" \| "VIDEO" }`. Returns the call plus `url` and `token` to connect with. If a call is already running in that chat, joins it. A private call to someone who is already in another call returns `reason: "BUSY"` and no token |
+| `POST` | `/api/calls/{id}/join` | Answer a ringing call, or join a running one (a group call from the chat). Returns `url`, `token`, `role` |
+| `POST` | `/api/calls/{id}/decline` | Say no to a ringing call |
+| `POST` | `/api/calls/{id}/leave` | Hang up. A one to one call ends for both; a group call ends when the last person leaves |
+| `POST` | `/api/calls/{id}/end` | A host ends the call for everyone |
+| `POST` | `/api/calls/{id}/invite` | Add people to the call and ring them: `{ "userIds": [...] }`. Returns who was invited and who was skipped (`ALREADY_IN_CALL`, `NOT_REACHABLE`, `REMOVED`, `FULL`) |
+| `POST` | `/api/calls/{id}/participants/{userId}/mute` | A host mutes one person's microphone |
+| `POST` | `/api/calls/{id}/mute-all` | A host mutes everyone else |
+| `POST` | `/api/calls/{id}/participants/{userId}/remove` | A host removes someone. They cannot rejoin unless a host adds them again |
+| `POST` | `/api/calls/{id}/participants/{userId}/role` | The host sets `{ "role": "COHOST" \| "MEMBER" \| "HOST" }` (`HOST` hands the call over) |
+| `POST` | `/api/calls/{id}/lock` | A host locks or unlocks the call: `{ "locked": true }`. A locked call lets in only people already invited or already in it |
+| `GET` / `POST` | `/api/calls/{id}/messages` | The chat inside the call (`{ "text" }` to send). Kept 30 days |
+| `GET` | `/api/calls/active?chatId=` | The call running in a chat right now, for the join banner. `204` when none |
+| `GET` | `/api/calls` | Your call history, newest first (`limit` 1 to 100, `before` the createdAt of the last one you have) |
+| `GET` | `/api/calls/{id}` | One call |
+| `DELETE` | `/api/calls/{id}` / `/api/calls` | Remove one finished call, or all, from your own history |
+| `POST` | `/api/calls/links` | Make a call link: `{ "type", "title", "expiresInHours" }`. Returns the call with `linkUrl`. Join it yourself, then share the link |
+| `GET` | `/api/calls/links/{code}` | What someone sees before joining from a link |
+| `POST` | `/api/calls/links/{code}/join` | Join from a link. Returns `url` and `token` |
+| `POST` | `/api/calls/livekit-webhook` | LiveKit reports people connecting and dropping off. Signed by LiveKit; not for apps |
 | `POST` | `/api/attachments` | Upload a file for a chat (multipart `file`, `chatId`); returns an `attachmentId` |
 | `GET` | `/api/attachments/{attachmentId}/content` | Download or stream a file (Bearer token or the signed link from a message) |
 | `POST` | `/api/media/upload` | Upload a public file and get its URL back |
@@ -345,15 +371,17 @@ Connect with a STOMP client to `ws://<host>:8081/ws-messenger`, sending `Authori
 | Send | `/app/chat.sendMessage` | Send a message (`chatId`, `content`, `messageType`, optional `attachmentId`) |
 | Send | `/app/chat.typing` | Notify the recipient you're typing |
 | Send | `/app/chat.read` | Mark a message as read (`id`) |
+| Send | `/app/call.ringing` | The app tells the server its phone is ringing for a call (`callId`), so the caller sees "Ringing" |
 | Subscribe | `/user/queue/messages` | Incoming messages from others |
 | Subscribe | `/user/queue/delivery-status` | Live delivery confirmation for messages *you* sent |
 | Subscribe | `/user/queue/read-receipts` | Live "seen" notifications for messages *you* sent |
 | Subscribe | `/user/queue/typing` | Typing indicators from the other participant |
 | Subscribe | `/user/queue/errors` | Send failures for the message you just tried to send (`code`, `message`, `chatId`) |
 | Subscribe | `/user/queue/groups` | Group changes that concern you: `ADDED`, `REMOVED` or `UPDATED`, with `groupId` and `chatId` |
-| Subscribe | `/user/queue/notifications` | A new notification for you: `MADE_ADMIN`, `REMOVED_ADMIN`, `BECAME_OWNER`, `ADDED_TO_GROUP` or `REMOVED_FROM_GROUP`, in the same shape as `GET /api/notifications` |
+| Subscribe | `/user/queue/notifications` | A new notification for you: `MADE_ADMIN`, `REMOVED_ADMIN`, `BECAME_OWNER`, `ADDED_TO_GROUP`, `REMOVED_FROM_GROUP` or `MISSED_CALL`, in the same shape as `GET /api/notifications` |
 | Subscribe | `/user/queue/reactions` | Someone reacted to or removed a reaction from a message in one of your chats. Same payload as the reaction endpoints, with the full `reactions` map |
 | Subscribe | `/user/queue/status` | `NEW_STATUS` and `STATUS_DELETED` for the people who follow the owner, and `ACTIVITY` with the new totals for the owner when someone views, likes, reacts or comments |
+| Subscribe | `/user/queue/calls` | Everything about calls, as `{ type, callId, actorId, userId, call, message, at }`. `type` is `INCOMING` (a call is ringing for you), `RINGING`, `PARTICIPANT_INVITED`, `PARTICIPANT_JOINED`, `PARTICIPANT_LEFT`, `PARTICIPANT_DECLINED`, `PARTICIPANT_MISSED`, `PARTICIPANT_REMOVED`, `MUTED_BY_HOST`, `ROLE_CHANGED`, `LOCK_CHANGED`, `ENDED` or `CHAT` (`message` holds the in-call chat message). `call` is the call as it is now |
 | Subscribe | `/topic/presence` | Online/offline broadcasts for any user |
 
 ## Testing with the browser chat client
@@ -439,7 +467,7 @@ premisave-messenger-service/
 │   ├── config/          # Security, Mongo, Redis, WebSocket, Cache, Async
 │   ├── client/           # Feign client for auth-service integration
 │   ├── controller/       # REST + WebSocket (@MessageMapping) controllers
-│   ├── service/          # Chat, Message, Group, GroupInvite, Presence, Media, User, Attachment services
+│   ├── service/          # Chat, Message, Group, GroupInvite, Presence, Media, User, Attachment, Call and LiveKit services
 │   ├── util/             # QrCodes (QR code PNGs, ZXing)
 │   ├── storage/          # FileStorage (local or mounted network share), StoredFile
 │   ├── realtime/         # Redis pub/sub relay (publisher, subscriber, envelope)
@@ -451,6 +479,8 @@ premisave-messenger-service/
 │   └── PremisaveMessengerServiceApplication.java
 ├── src/main/resources/
 │   └── application.yml
+├── deploy/livekit/       # docker-compose for the LiveKit media server used by calls
+├── docs/CALLS.md         # How calls work and how to set LiveKit up
 ├── test-client/
 │   └── index.html        # Browser chat client for manual testing (light and dark themes)
 └── pom.xml

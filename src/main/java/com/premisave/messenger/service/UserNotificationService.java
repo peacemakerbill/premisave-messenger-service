@@ -190,6 +190,37 @@ public class UserNotificationService {
         return oneLine.length() <= 140 ? oneLine : oneLine.substring(0, 137).trim() + "...";
     }
 
+    /**
+     * Tells people they missed a call. Stored in their list and pushed to their open app, with no email (a missed call
+     * is not worth an inbox message). Runs in the background so a big group does not slow the call.
+     */
+    @Async
+    public void notifyMissedCall(Collection<String> userIds, String chatId, String groupId, String callerId,
+                                 String callerName, boolean video) {
+        if (userIds == null || userIds.isEmpty()) return;
+        String who = callerName == null || callerName.isBlank() ? "Someone" : callerName;
+        LocalDateTime now = LocalDateTime.now();
+        for (String userId : new LinkedHashSet<>(userIds)) {
+            try {
+                if (userId == null || userId.isBlank() || userId.equals(callerId)) continue;
+                UserNotification n = new UserNotification();
+                n.setUserId(userId);
+                n.setType(NotificationType.MISSED_CALL);
+                n.setTitle(video ? "Missed video call" : "Missed voice call");
+                n.setBody(bodyFor(NotificationType.MISSED_CALL, who, ""));
+                n.setGroupId(groupId);
+                n.setChatId(chatId);
+                n.setActorId(callerId);
+                n.setActorName(who);
+                n.setCreatedAt(now);
+                UserNotification saved = repository.save(n);
+                redisMessagePublisher.convertAndSendToUser(userId, "/queue/notifications", toResponse(saved));
+            } catch (Exception e) {
+                log.warn("Could not record a missed call for {}: {}", userId, e.getMessage());
+            }
+        }
+    }
+
     // ------------------------------------------------------------------- read
 
     public List<NotificationResponse> list(String userId, int limit) {
@@ -256,6 +287,7 @@ public class UserNotificationService {
             case REMOVED_FROM_GROUP -> "You were removed from a group";
             case MENTIONED -> "You were mentioned";
             case MENTIONED_ALL -> "Everyone was mentioned";
+            case MISSED_CALL -> "Missed call";
         };
     }
 
@@ -268,6 +300,7 @@ public class UserNotificationService {
             case REMOVED_FROM_GROUP -> actor + " removed you from " + group + ".";
             case MENTIONED -> actor + " mentioned you in " + group + ".";
             case MENTIONED_ALL -> actor + " mentioned everyone in " + group + ".";
+            case MISSED_CALL -> actor + " called you.";
         };
     }
 
@@ -284,6 +317,7 @@ public class UserNotificationService {
             case REMOVED_FROM_GROUP -> "You were removed from " + group;
             case MENTIONED -> actor + " mentioned you in " + group;
             case MENTIONED_ALL -> actor + " mentioned everyone in " + group;
+            case MISSED_CALL -> "Missed call from " + actor;
         };
     }
 

@@ -177,6 +177,7 @@ public class ChatService {
                         lastMsg.setFileName(msg.getFileName());
                         lastMsg.setMimeType(msg.getMimeType());
                         lastMsg.setAttachmentId(msg.getAttachmentId());
+                        lastMsg.setCallId(msg.getCallId());
                         lastMsg.setContent(msg.isDeletedForEveryone() ? "This message was deleted" : msg.getContent());
                         lastMsg.setCreatedAt(msg.getCreatedAt());
                         lastMsg.setSenderId(msg.getSenderId());

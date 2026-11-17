@@ -1,0 +1,44 @@
+# LiveKit media server for Premisave calls.
+#
+# Start it from this folder, reading the key and secret from the messenger's .env:
+#
+#   docker compose --env-file ../../.env up -d
+#
+# LIVEKIT_API_KEY and LIVEKIT_API_SECRET in that .env must be set (the secret at least 32 characters).
+# The messenger and this server then agree on them automatically.
+#
+# It uses the host network so the UDP media ports work without mapping hundreds of ports:
+#   7880/tcp   signalling (the apps connect here; put a TLS proxy in front of it in production)
+#   7881/tcp   media over TCP (fallback when UDP is blocked)
+#   50000-50200/udp   media over UDP
+# This works on Linux. On Docker Desktop for Windows or macOS, host networking is limited: use the
+# "ports" variant described in docs/CALLS.md.
+
+services:
+  livekit:
+    # Pin a release you have tested once calls are in production, for example livekit/livekit-server:v1.9.0.
+    image: livekit/livekit-server:latest
+    container_name: premisave-livekit
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      LIVEKIT_CONFIG: |
+        port: 7880
+        rtc:
+          tcp_port: 7881
+          port_range_start: 50000
+          port_range_end: 50200
+          use_external_ip: ${LIVEKIT_USE_EXTERNAL_IP:-false}
+        keys:
+          ${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}
+        room:
+          auto_create: true
+          empty_timeout: 300
+          departure_timeout: 20
+          max_participants: ${CALLS_MAX_PARTICIPANTS:-50}
+        webhook:
+          api_key: ${LIVEKIT_API_KEY}
+          urls:
+            - ${LIVEKIT_WEBHOOK_URL:-http://localhost:8081/api/calls/livekit-webhook}
+        logging:
+          level: info

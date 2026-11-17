@@ -1,0 +1,60 @@
+package com.premisave.messenger.config;
+
+import lombok.Getter;
+import lombok.Setter;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.stereotype.Component;
+
+import java.nio.charset.StandardCharsets;
+
+/** Binds the "calls" block of application.yml (fed by the CALLS_* and LIVEKIT_* env vars). */
+@Getter
+@Setter
+@Component
+@ConfigurationProperties(prefix = "calls")
+public class CallProperties {
+
+    /** The address the apps connect to for audio and video, for example wss://live.premisave.com. */
+    private String livekitUrl = "ws://localhost:7880";
+
+    /** The address this service uses to reach LiveKit (to remove or mute people). Usually http://localhost:7880. */
+    private String livekitApiUrl = "http://localhost:7880";
+
+    /** Must match a key in the LiveKit server's config. */
+    private String apiKey = "";
+
+    /** At least 32 characters. Must match the LiveKit server's secret for that key. */
+    private String apiSecret = "";
+
+    /** How long phones ring before the call counts as missed. */
+    private int ringTimeoutSeconds = 45;
+
+    /** The most people in one call at the same time. */
+    private int maxParticipants = 50;
+
+    /** The most people a group call rings at once. Others in the group can still join from the chat. */
+    private int ringLimit = 32;
+
+    /** How long a join token works. It is only needed to connect. */
+    private int tokenTtlMinutes = 120;
+
+    /** What a call link starts with. The link is this, a slash and the code. */
+    private String linkBaseUrl = "https://premisave.com/call";
+
+    /** The longest a call link stays valid, in hours. */
+    private int linkTtlHours = 24 * 7;
+
+    /** Most characters in one message in a call's chat. */
+    private int chatMaxLength = 2000;
+
+    public boolean isConfigured() {
+        return apiKey != null && !apiKey.isBlank()
+                && apiSecret != null && apiSecret.getBytes(StandardCharsets.UTF_8).length >= 32;
+    }
+
+    public String linkFor(String code) {
+        String base = linkBaseUrl == null ? "" : linkBaseUrl.trim();
+        while (base.endsWith("/")) base = base.substring(0, base.length() - 1);
+        return base + "/" + code;
+    }
+}

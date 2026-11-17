@@ -25,6 +25,10 @@ public class MessageResponse {
     private String mimeType;
     private String attachmentId;
 
+    // For a call line (messageType CALL): which call, and how it went.
+    private String callId;
+    private CallSummary call;
+
     private MessageStatus status;
     private List<String> readBy;
 

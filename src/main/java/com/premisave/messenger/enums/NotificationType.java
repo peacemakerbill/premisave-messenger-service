@@ -10,5 +10,7 @@ public enum NotificationType {
     /** Someone tagged this person with @ in a chat. */
     MENTIONED,
     /** Someone tagged everyone with @all in a group. */
-    MENTIONED_ALL
+    MENTIONED_ALL,
+    /** A call rang and was not answered. */
+    MISSED_CALL
 }

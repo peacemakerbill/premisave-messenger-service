@@ -177,6 +177,22 @@ group-invite:
   max-expiry-hours: ${GROUP_INVITE_MAX_EXPIRY_HOURS:8760}
   max-uses-limit: ${GROUP_INVITE_MAX_USES_LIMIT:100000}
 
+# Audio and video calls. The media (audio, video, screen sharing) runs on a LiveKit server; this service
+# signs the join tokens and keeps the call records. See docs/CALLS.md for setting LiveKit up.
+# api-secret must be at least 32 characters and match the secret for api-key in the LiveKit server's config.
+calls:
+  livekit-url: ${LIVEKIT_URL:ws://localhost:7880}
+  livekit-api-url: ${LIVEKIT_API_URL:http://localhost:7880}
+  api-key: ${LIVEKIT_API_KEY:}
+  api-secret: ${LIVEKIT_API_SECRET:}
+  ring-timeout-seconds: ${CALLS_RING_TIMEOUT_SECONDS:45}
+  max-participants: ${CALLS_MAX_PARTICIPANTS:50}
+  ring-limit: ${CALLS_RING_LIMIT:32}
+  token-ttl-minutes: ${CALLS_TOKEN_TTL_MINUTES:120}
+  link-base-url: ${CALLS_LINK_BASE_URL:https://premisave.com/call}
+  link-ttl-hours: ${CALLS_LINK_TTL_HOURS:168}
+  chat-max-length: ${CALLS_CHAT_MAX_LENGTH:2000}
+
 rate-limit:
   requests-per-minute: 60
   websocket-messages-per-minute: 100

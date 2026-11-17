@@ -1,11 +1,13 @@
 package com.premisave.messenger.service;
 
 import com.premisave.messenger.config.MessengerMetrics;
+import com.premisave.messenger.dto.response.CallSummary;
 import com.premisave.messenger.dto.response.MessageResponse;
 import com.premisave.messenger.dto.response.ReactionResponse;
 import com.premisave.messenger.dto.response.UserSummaryResponse;
 import com.premisave.messenger.dto.websocket.ChatMessage;
 import com.premisave.messenger.entity.Attachment;
+import com.premisave.messenger.entity.Call;
 import com.premisave.messenger.entity.Chat;
 import com.premisave.messenger.entity.Message;
 import com.premisave.messenger.enums.ChatType;
@@ -16,6 +18,7 @@ import com.premisave.messenger.exception.HttpStatusException;
 import com.premisave.messenger.util.UserNames;
 import com.premisave.messenger.exception.MessageNotFoundException;
 import com.premisave.messenger.realtime.RedisMessagePublisher;
+import com.premisave.messenger.repository.CallRepository;
 import com.premisave.messenger.repository.ChatRepository;
 import com.premisave.messenger.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +51,7 @@ public class MessageService {
     private final MessengerMetrics metrics;
     private final AttachmentService attachmentService;
     private final UserNotificationService userNotifications;
+    private final CallRepository callRepository;
 
     /** Hours a sender may edit a message after sending it. 0 turns editing off. */
     @Value("${message.edit-window-hours:1}")
@@ -98,6 +102,9 @@ public class MessageService {
 
         if (chatId == null || chatId.isBlank()) {
             throw new IllegalArgumentException("chatId is required");
+        }
+        if (chatMessage.getMessageType() == MessageType.CALL) {
+            throw new IllegalArgumentException("Call lines are written by the call service, not sent by people");
         }
         if (senderId == null || !chatService.canAccessChat(chatId, senderId)) {
             throw HttpStatusException.forbidden("You are not a member of this chat");
@@ -431,7 +438,8 @@ public class MessageService {
 
     /** When a message can last be edited, or null if it cannot be edited at all. */
     private LocalDateTime editDeadline(Message message) {
-        if (editWindowHours <= 0 || message.isDeletedForEveryone() || message.getCreatedAt() == null) {
+        if (editWindowHours <= 0 || message.isDeletedForEveryone() || message.getCreatedAt() == null
+                || message.getMessageType() == MessageType.CALL) {
             return null;
         }
         return message.getCreatedAt().plusHours(editWindowHours);
@@ -470,6 +478,9 @@ public class MessageService {
         }
         if (message.isDeletedForEveryone() || !message.isActive()) {
             throw HttpStatusException.badRequest("A deleted message cannot be edited");
+        }
+        if (message.getMessageType() == MessageType.CALL) {
+            throw HttpStatusException.badRequest("A call line cannot be edited");
         }
         if (editWindowHours <= 0) {
             throw new HttpStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "EDITING_DISABLED",
@@ -697,6 +708,53 @@ public class MessageService {
         }
     }
 
+    // ===== CALL LINES =====
+
+    /**
+     * Writes the line a call leaves in its chat ("Video call", "Missed voice call", ...) and delivers it to everyone in
+     * the chat. It never counts as unread: a missed call is announced by a notification instead. Returns the message id.
+     */
+    public String postCallLog(Call call, String authToken) {
+        Chat chat = chatRepository.findById(call.getChatId()).orElse(null);
+        if (chat == null) return null;
+
+        Message message = new Message();
+        message.setIdempotencyKey("call-" + call.getId());
+        message.setChatId(call.getChatId());
+        message.setSenderId(call.getInitiatorId());
+        message.setMessageType(MessageType.CALL);
+        message.setCallId(call.getId());
+        message.setContent(CallSummary.describe(call));
+        message.setStatus(MessageStatus.SENT);
+        message.setReadBy(new ArrayList<>(chat.getParticipantIds()));
+        message.setCreatedAt(LocalDateTime.now());
+        message.setActive(true);
+        message.setDeliveryState(MessageDeliveryState.DELIVERED_TO_DB);
+        Message saved = messageRepository.save(message);
+
+        try {
+            chatService.updateLastMessage(saved.getChatId(), saved.getId());
+        } catch (Exception e) {
+            log.error("Failed to update last message in chat for a call line", e);
+        }
+        broadcastMessage(saved, convertToMessageResponse(saved, authToken));
+        return saved.getId();
+    }
+
+    /** Rewrites the call line after the call changed (answered, ended, missed) and pushes the new version to the chat. */
+    public void refreshCallLog(Call call) {
+        if (call.getLogMessageId() == null) return;
+        try {
+            Message message = messageRepository.findById(call.getLogMessageId()).orElse(null);
+            if (message == null) return;
+            message.setContent(CallSummary.describe(call));
+            Message saved = messageRepository.save(message);
+            broadcastMessage(saved, convertToMessageResponse(saved, null));
+        } catch (Exception e) {
+            log.warn("Could not update the call line for call {}: {}", call.getId(), e.getMessage());
+        }
+    }
+
     // ===== HELPER METHODS =====
 
     private void broadcastMessage(Message message, MessageResponse response) {
@@ -756,6 +814,10 @@ public class MessageService {
         response.setFileSize(message.getFileSize());
         response.setMimeType(message.getMimeType());
         response.setAttachmentId(message.getAttachmentId());
+        if (message.getCallId() != null) {
+            response.setCallId(message.getCallId());
+            callRepository.findById(message.getCallId()).ifPresent(c -> response.setCall(CallSummary.from(c)));
+        }
         response.setStatus(message.getStatus());
         response.setReadBy(message.getReadBy());
         response.setCreatedAt(message.getCreatedAt());
@@ -773,7 +835,8 @@ public class MessageService {
             // outside any HTTP request context and has no JWT to use.
             // Skip the enrichment call entirely rather than making a
             // Feign request that's guaranteed to fail.
-            response.setSenderName("Unknown User");
+            response.setSenderName(response.getCall() != null && response.getCall().getInitiatorName() != null
+                    ? response.getCall().getInitiatorName() : "Unknown User");
         } else {
             try {
                 UserSummaryResponse sender = userService.getUserSummary(message.getSenderId(), authToken);

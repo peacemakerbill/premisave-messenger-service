@@ -81,6 +81,9 @@ public class Message {
     private String failureReason;
     private int retryCount = 0;
 
+    // Set on the call line a call leaves in the chat (messageType CALL). The call itself lives in Call.
+    private String callId;
+
     // Reply support
     private String replyToMessageId;
 

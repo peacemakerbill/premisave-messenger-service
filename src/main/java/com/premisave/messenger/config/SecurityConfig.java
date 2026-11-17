@@ -40,6 +40,10 @@ public class SecurityConfig {
                 // link or a Bearer token, checked in AttachmentController.
                 .requestMatchers(HttpMethod.GET, "/api/attachments/*/content").permitAll()
 
+                // LiveKit reports calls here. It cannot send a user token, so the request carries a signed
+                // header that CallWebhookController checks instead.
+                .requestMatchers(HttpMethod.POST, "/api/calls/livekit-webhook").permitAll()
+
                 // Group photos and other public media returned by /api/media/upload.
                 .requestMatchers(HttpMethod.GET, "/api/media/files/**").permitAll()
 
