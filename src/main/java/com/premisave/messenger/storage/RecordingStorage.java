@@ -1,7 +1,9 @@
 package com.premisave.messenger.storage;
 
 import com.premisave.messenger.config.CallProperties;
+import com.premisave.messenger.dto.response.StorageCheckResponse;
 import com.premisave.messenger.exception.HttpStatusException;
+import com.premisave.messenger.service.StorageSettingsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -10,7 +12,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Set;
+import java.util.UUID;
 
 /**
  * Where call recordings are kept: a folder on this server (LOCAL) or a network share that the operating system has
@@ -19,6 +21,10 @@ import java.util.Set;
  * The service never mounts a share itself. In NETWORK mode with require-mount, recording is refused unless the mount path
  * really is a network file system, so a dropped share cannot quietly send videos to the local disk under an empty mount
  * folder. The answer is remembered for a few seconds, because every call response asks for it.
+ *
+ * The recorder writes into a folder that its Docker mount fixes (CALLS_RECORDINGS_HOST_DIR), so an administrator cannot move
+ * that folder from the dashboard. What they can choose is a folder inside it for new recordings, and the free space below
+ * which recording is refused. The folder is part of each recording's file name, so earlier recordings are still found.
  */
 @Slf4j
 @Component
@@ -27,11 +33,8 @@ public class RecordingStorage {
 
     private static final long CACHE_MILLIS = 10_000;
 
-    private static final Set<String> NETWORK_FS = Set.of(
-            "cifs", "smb3", "smbfs", "nfs", "nfs4", "9p", "ceph", "glusterfs",
-            "fuse.sshfs", "fuse.rclone", "fuse.davfs", "davfs", "fuse.glusterfs");
-
     private final CallProperties props;
+    private final StorageSettingsService settings;
 
     /** What the storage looks like right now. {@code problem} says why it is not ready, and is null when it is. */
     public record Status(CallProperties.StorageMode mode, boolean ready, String problem, Long freeMb) { }
@@ -39,7 +42,7 @@ public class RecordingStorage {
     private volatile Status cached;
     private volatile long cachedAt;
 
-    /** The folder the videos are in, as this service sees it. */
+    /** The folder the recorder writes to, as this service sees it. File names of recordings are relative to it. */
     public Path root() {
         if (props.getRecordingsMode() == CallProperties.StorageMode.NETWORK) {
             String mount = props.getRecordingsNetworkMountPath();
@@ -55,6 +58,69 @@ public class RecordingStorage {
             throw new IllegalStateException("CALLS_RECORDINGS_DIR must not be empty in LOCAL mode");
         }
         return Paths.get(local.trim()).toAbsolutePath().normalize();
+    }
+
+    /** The folder inside {@link #root()} that new recordings go to, from the dashboard. Empty means the folder itself. */
+    public String subfolder() {
+        return settings.recordingsSubfolder();
+    }
+
+    /** The folder new recordings are written to: the root, or the chosen folder inside it. */
+    public Path target() {
+        Path root = root();
+        String sub = subfolder();
+        return sub.isEmpty() ? root : root.resolve(sub).normalize();
+    }
+
+    /** The start of the file name of a new recording: the chosen folder and a slash, or nothing. */
+    public String fileNamePrefix() {
+        String sub = subfolder();
+        return sub.isEmpty() ? "" : sub + "/";
+    }
+
+    /** Forget the remembered state, so the next question looks again. Used after a setting is saved. */
+    public void refresh() {
+        cached = null;
+        cachedAt = 0;
+    }
+
+    /**
+     * Tries a folder inside the recorder's shared folder without saving anything: creates it and writes a small file. The
+     * shared folder must be ready (mounted, enough space) as well.
+     */
+    public StorageCheckResponse tryFolder(String subfolder) {
+        String clean;
+        try {
+            clean = StoragePaths.folderName(subfolder, "The recordings folder");
+        } catch (IllegalArgumentException e) {
+            return new StorageCheckResponse(false, e.getMessage(), null, null);
+        }
+        Path folder;
+        try {
+            Path root = root();
+            folder = clean.isEmpty() ? root : root.resolve(clean).normalize();
+            if (!folder.startsWith(root)) {
+                return new StorageCheckResponse(false, "The folder must stay inside the shared folder", folder.toString(), null);
+            }
+            if (props.getRecordingsMode() == CallProperties.StorageMode.NETWORK && props.isRecordingsNetworkRequireMount()) {
+                Path mount = Paths.get(props.getRecordingsNetworkMountPath().trim()).toAbsolutePath().normalize();
+                if (!MountCheck.isOnNetworkShare(mount)) {
+                    return new StorageCheckResponse(false, "The network share is not mounted at " + mount, folder.toString(), null);
+                }
+            }
+        } catch (IllegalStateException e) {
+            return new StorageCheckResponse(false, e.getMessage(), null, null);
+        }
+        try {
+            Files.createDirectories(folder);
+            Path test = folder.resolve(".write-test-" + UUID.randomUUID());
+            Files.writeString(test, "ok");
+            Files.deleteIfExists(test);
+            return new StorageCheckResponse(true, null, folder.toString(), Files.getFileStore(folder).getUsableSpace() / (1024 * 1024));
+        } catch (IOException | RuntimeException e) {
+            return new StorageCheckResponse(false, "The service cannot write to " + folder + ": " + e.getMessage(),
+                    folder.toString(), null);
+        }
     }
 
     /** The current state, checked at most every few seconds. */
@@ -91,7 +157,7 @@ public class RecordingStorage {
     /** A short description of where the videos go, for the administrators. */
     public String location() {
         try {
-            return root().toString();
+            return target().toString();
         } catch (IllegalStateException e) {
             return "";
         }
@@ -101,14 +167,14 @@ public class RecordingStorage {
         CallProperties.StorageMode mode = props.getRecordingsMode();
         Path root;
         try {
-            root = root();
+            root = target();
         } catch (IllegalStateException e) {
             return new Status(mode, false, e.getMessage(), null);
         }
         try {
             if (mode == CallProperties.StorageMode.NETWORK && props.isRecordingsNetworkRequireMount()) {
                 Path mount = Paths.get(props.getRecordingsNetworkMountPath().trim()).toAbsolutePath().normalize();
-                if (!isOnNetworkShare(mount)) {
+                if (!MountCheck.isOnNetworkShare(mount)) {
                     return new Status(mode, false, "The network share is not mounted at " + mount, null);
                 }
             }
@@ -119,7 +185,7 @@ public class RecordingStorage {
                 return new Status(mode, false, "The recordings folder cannot be read: " + root, null);
             }
             long freeMb = Files.getFileStore(root).getUsableSpace() / (1024 * 1024);
-            int min = props.getRecordingsMinFreeMb();
+            int min = settings.recordingsMinFreeMb();
             if (min > 0 && freeMb < min) {
                 return new Status(mode, false, "Only " + freeMb + " MB free, less than the " + min + " MB required", freeMb);
             }
@@ -128,62 +194,5 @@ public class RecordingStorage {
             log.warn("Recording storage check failed for {}: {}", root, e.getMessage());
             return new Status(mode, false, "The recordings folder is not usable: " + e.getMessage(), null);
         }
-    }
-
-    /**
-     * True when the file system that holds this path is a network file system. Reads /proc/self/mountinfo and finds the most
-     * specific mount containing the path, so a local folder on a separate partition does not pass for a share. Verifies on
-     * Linux only; elsewhere it falls back to "the directory exists" and says so in the log.
-     */
-    private boolean isOnNetworkShare(Path path) {
-        Path info = Paths.get("/proc/self/mountinfo");
-        if (!Files.isReadable(info)) {
-            log.warn("Cannot verify mounts on this OS, only checking that {} exists", path);
-            return Files.isDirectory(path);
-        }
-        try {
-            if (!Files.isDirectory(path)) return false;
-            Path real = path.toRealPath();
-            Path bestMount = null;
-            String bestType = null;
-            for (String line : Files.readAllLines(info)) {
-                // mountinfo: id parent major:minor root mountpoint opts [optional...] - fstype source superopts
-                int dash = line.indexOf(" - ");
-                String[] pre = (dash >= 0 ? line.substring(0, dash) : line).split(" ");
-                String[] post = dash >= 0 ? line.substring(dash + 3).split(" ") : new String[0];
-                if (pre.length < 5 || post.length < 1) continue;
-                Path mountPoint = Paths.get(unescape(pre[4]));
-                if (real.startsWith(mountPoint)
-                        && (bestMount == null || mountPoint.getNameCount() >= bestMount.getNameCount())) {
-                    bestMount = mountPoint;
-                    bestType = post[0];
-                }
-            }
-            if (bestType == null) return false;
-            boolean network = NETWORK_FS.contains(bestType);
-            if (!network) {
-                log.warn("{} is on a '{}' file system, not a network share", real, bestType);
-            }
-            return network;
-        } catch (IOException e) {
-            log.error("Could not read mount table: {}", e.getMessage());
-            return false;
-        }
-    }
-
-    /** mountinfo escapes space, tab, newline and backslash as octal. */
-    private static String unescape(String s) {
-        if (s.indexOf('\\') < 0) return s;
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c == '\\' && i + 3 < s.length() && s.substring(i + 1, i + 4).matches("[0-7]{3}")) {
-                sb.append((char) Integer.parseInt(s.substring(i + 1, i + 4), 8));
-                i += 3;
-            } else {
-                sb.append(c);
-            }
-        }
-        return sb.toString();
     }
 }

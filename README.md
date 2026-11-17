@@ -116,6 +116,7 @@ It was built as a sibling service to `auth-service` (which owns user identity an
 | **Docker and deploy files** | One image for development, staging and production, with ready files for Docker Compose, Coolify, Render, Heroku, Fly.io and Railway. See [Run it with Docker and deploy it](#run-it-with-docker-and-deploy-it). |
 | **Tagging** | Type `@` to tag someone, or `@all` to tag everyone in a group (groups only). Private chats can tag the other person. The picker shows each person's name, username and email. A tagged person gets a stored notification (`MENTIONED`, or `MENTIONED_ALL` for `@all`), a live push, and an email with an `@` badge that opens the chat. Emails are limited to one per person and chat every few minutes, and `@all` in a very large group is in-app only. Editing a message only notifies people who were newly tagged. |
 | **File attachments** | Send images, video, audio, documents and any other file type in a chat. Upload first (`POST /api/attachments`), then send a message carrying the `attachmentId`, over REST or WebSocket. Stored on local disk or a mounted network share, downloaded through expiring signed links with range support. |
+| **Storage from the dashboard** | The `.env` file sets where files go when the service starts. An administrator can also choose the folder or network share for chat files, and the folder and free-space limit for call recordings, from the apps (Messenger settings, Storage). Once saved, the dashboard wins and the `.env` values are the starting point; "Reset to .env" goes back. Folders must be inside the roots in `STORAGE_ALLOWED_ROOTS`, files saved earlier keep opening, and each setting can be tried before it is saved. See [Storage from the dashboard](#storage-from-the-dashboard). |
 | **Public media** | Group photos and `/api/media/upload` files use the same storage and are served without a token from `/api/media/files/...`. |
 | **Statuses** | Post text, photo, video or audio statuses that your followers can watch until they disappear. You choose how long each stays, up to `STATUS_MAX_HOURS` (24 by default). Followers can view, like, react and comment; the owner sees views, likes, reactions and comments, and can delete. Disappeared statuses move to the owner's past statuses and stay, with everything people did on them, until the owner deletes them. |
 | **Structured downstream error handling** | A dependency being unavailable (e.g. `auth-service` down) returns a clean `503` naming which service failed, in a structured `details` field — not a raw stack trace. |
@@ -228,6 +229,41 @@ Before it starts a recording the service checks that the folder is there, that i
 | `PUT` | `/api/call-settings/recording` | Administrators only: `{ "enabled": true \| false }` switches recording for everyone |
 
 In the Flutter app the switch is under Messenger settings, then Calls, for administrators (and in the admin area, Call settings). In the browser client it is under Settings, Calls.
+
+### Storage from the dashboard
+
+Where files are kept can be set in two places that work together.
+
+1. **The `.env` file** is the starting value. It is read when the service starts.
+2. **The admin dashboard** (Flutter app: Messenger settings, Storage, or the Users page, Storage button; browser client: Settings, Storage) saves values in this service's own MongoDB (collection `storage_settings`). Once something is saved there, it wins over the `.env` value. **Reset to .env** deletes the saved value and the `.env` value applies again.
+
+What an administrator can set:
+
+| Setting | Dashboard can change | Stays in `.env` |
+|---|---|---|
+| Chat files, group photos, statuses | Mode (`LOCAL` or `NETWORK`), the folder, the mount path, the folder in the share, "refuse if it is not a real network share" | `STORAGE_ALLOWED_ROOTS`, signing secret, size limits |
+| Call recordings | A folder inside the recorder's folder, and the free-space limit in MB | The recorder's own folder (`CALLS_RECORDINGS_HOST_DIR`, fixed by Docker), mode and mount path |
+
+Safety rules, always on:
+
+- **Only inside allowed roots.** Folders must be full paths inside one of `STORAGE_ALLOWED_ROOTS` (comma separated). When it is blank, the allowed roots are `STORAGE_ROOT` and `STORAGE_NETWORK_MOUNT_PATH` themselves. `..`, links that lead outside the roots and odd characters are refused, and nothing is created outside a root.
+- **Try before saving.** "Try it" creates the folder, writes a small test file, deletes it, and says whether it worked and how much space is free. A save does the same and is refused if the folder does not work.
+- **A network share must be mounted.** In `NETWORK` mode the mount path must really be on a network file system (cifs, nfs and so on) unless the administrator turns that check off. The service never mounts anything itself.
+- **Old files keep working.** Each folder used before is remembered (the last 20) and searched when a file is not in the current one, and so is the `.env` folder. Nothing is copied or moved. Only new files go to the new folder.
+- **A saved folder that is no longer inside the allowed roots is ignored** (with a warning in the log) and the `.env` value is used, so editing `STORAGE_ALLOWED_ROOTS` can never leave the service writing somewhere it should not.
+- **Administrators only.** Everyone else gets `403`.
+
+With Docker, the service only sees folders mounted into the container (`/data/messenger-storage` and `/data/recordings`). To offer another folder, add a volume for it in `docker-compose.yml` and put its container path in `STORAGE_ALLOWED_ROOTS`.
+
+Call recordings: the recorder writes into the folder fixed by its Docker mount, so the dashboard can only choose a subfolder inside it. New videos are saved in `<subfolder>/<callId>/<recordingId>.mp4`, and videos already saved stay where they are.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/api/storage-settings` | Allowed roots, and for chat files and recordings: where the value comes from (`ENV` or `DASHBOARD`), the values, the folder in use, whether it is ready, the problem if not, and free space |
+| `POST` | `/api/storage-settings/attachments/check` | Try chat-file values without saving: `{ mode, root, networkMountPath, networkDirectory, networkRequireMount }`. Returns `{ ok, problem, location, freeMb }` |
+| `PUT` | `/api/storage-settings/attachments` | Save them (same body). `400` with the reason when the folder is refused |
+| `DELETE` | `/api/storage-settings/attachments` | Reset chat files to the `.env` values |
+| `POST` / `PUT` / `DELETE` | `/api/storage-settings/recordings[/check]` | The same for recordings, with `{ subfolder, minFreeMb }` |
 
 ### Set up and run LiveKit
 
@@ -572,6 +608,7 @@ The steps for each one, the limits to know (Heroku has no file storage, Render c
 | `ACTUATOR_USER` / `ACTUATOR_PASSWORD` | No | `actuator` / `actuator123` | Basic Auth for `/actuator/**` (health details, metrics, Prometheus scrape). |
 | `STORAGE_MODE` | No | `LOCAL` | `LOCAL` writes under `STORAGE_ROOT`. `NETWORK` writes to a share already mounted at `STORAGE_NETWORK_MOUNT_PATH`. |
 | `STORAGE_ROOT` | LOCAL mode | `./data/messenger-storage` | Base folder for uploaded files. |
+| `STORAGE_ALLOWED_ROOTS` | No | blank | Folders the admin dashboard may choose from, full paths separated by commas. Blank allows `STORAGE_ROOT` and `STORAGE_NETWORK_MOUNT_PATH` only. See [Storage from the dashboard](#storage-from-the-dashboard). |
 | `STORAGE_PUBLIC_BASE_URL` | No | `http://localhost:8081` | Public address of this service, used in download and photo links. |
 | `STORAGE_MAX_FILE_SIZE` / `STORAGE_MAX_REQUEST_SIZE` | No | `50MB` / `60MB` | Largest single file, and the request limit (keep it a little higher). |
 | `MESSAGE_EDIT_WINDOW_HOURS` | No | `1` | How long after sending a person can edit their own message (`message.edit-window-hours` in `application.yml`). `0` turns editing off. Past the window the edit is refused with `EDIT_WINDOW_EXPIRED`. |
@@ -692,6 +729,7 @@ The steps for each one, the limits to know (Heroku has no file storage, Render c
 | `GET` | `/api/calls/{id}/recordings` | The recordings of a call, newest first, each with `status`, `durationSeconds`, `sizeBytes`, `canDelete` and, when ready, a signed `playUrl`. Anyone who was in the call can read them |
 | `DELETE` | `/api/calls/{id}/recordings/{recordingId}` | Delete a recording and its file (the person who started it, a host or a co-host) |
 | `GET` | `/api/calls/recordings/{recordingId}/file` | The video, from the signed `playUrl` (`exp`, `sig`). Supports HTTP Range |
+| `GET` / `PUT` / `DELETE` | `/api/storage-settings...` | Administrators: see and change where chat files and recordings are saved, try a folder, or reset to `.env`. See [Storage from the dashboard](#storage-from-the-dashboard) |
 | `GET` / `PUT` | `/api/call-settings`, `/api/call-settings/recording` | Read the call switches, or (administrators) turn recording on or off. See [Calls and recordings](#calls-and-recordings) |
 | `POST` | `/api/calls/livekit-webhook` | LiveKit reports people connecting and dropping off. Signed by LiveKit; not for apps |
 | `POST` | `/api/attachments` | Upload a file for a chat (multipart `file`, `chatId`); returns an `attachmentId` |
@@ -749,6 +787,7 @@ Notes:
   - In the call: tiles with a speaking highlight, mute, camera, share screen, a chat that only the people in the call can see, a People panel with host controls (add people, mute one or all, make or remove a co-host, remove, lock or unlock), Leave, and End for everyone for the host.
   - Recording: hosts and co-hosts see a Record button while recording is switched on. Everyone sees the red Recording sign. Starting is refused with the server's message when the storage is not ready.
   - Menu, Calls: your history with missed, declined and running calls, Join and Call again, details with the people, the chat and the recordings (Watch, Download, Delete), New call link, and Join with a link. A link such as `.../call/CODE`, or opening the client as `index.html#call=CODE`, shows who is hosting before you join.
+  - Storage: administrators see Storage under Settings. Chat files and call recordings each show where they are saved now, whether it works and the free space, and can be changed, tried and reset to the `.env` values.
   - Call settings: under Settings, Calls, everyone sees whether recording is on and where the videos are stored. An administrator can switch recording on or off, and also sees the storage folder, free space and any problem (for example a share that is not mounted).
 - Groups: create a group with members, edit its name, description and photo, add and remove members, promote admins, transfer ownership and leave, all from the client. When the owner chooses Leave group, the client asks them to pick the new owner first (admins are listed first) and the button reads "Make <name> owner and leave". Members are added to the group chat on the server, so they see the group and get its messages straight away. Typing indicators and per-member read receipts are not available in groups.
 - Invite links and QR codes: in a group's info the owner and admins see Invite with link or QR code. It makes a link with an optional expiry and join limit, shows the QR code, and offers Copy, Send to chat, Share and Save QR. New link replaces the old one and Revoke stops it. To join, open the side menu and choose Scan QR code, or use Join a group in the New chat dialog. You can scan with the camera, choose a picture of a QR code, or paste a link or code, and you see the group before you join. A link in a message (`.../join/CODE`) opens the same preview when clicked, and opening the client as `index.html#join=CODE` goes straight to it after sign-in. The camera needs `https` or `localhost`; where it is blocked, choose a picture or paste the link instead.
@@ -822,7 +861,7 @@ premisave-messenger-service/
 │   ├── controller/       # REST + WebSocket (@MessageMapping) controllers
 │   ├── service/          # Chat, Message, Group, GroupInvite, Presence, Media, User, Attachment, Call and LiveKit services
 │   ├── util/             # QrCodes (QR code PNGs, ZXing)
-│   ├── storage/          # FileStorage and RecordingStorage (local folder or mounted network share)
+│   ├── storage/          # FileStorage and RecordingStorage (local folder or mounted network share), StoragePaths, MountCheck
 │   ├── realtime/         # Redis pub/sub relay (publisher, subscriber, envelope)
 │   ├── entity/            # MongoDB documents
 │   ├── dto/               # Request/response DTOs

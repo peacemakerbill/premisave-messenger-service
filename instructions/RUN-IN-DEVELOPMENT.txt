@@ -243,6 +243,39 @@ Common causes: the recorder and the messenger use different folders (check the d
 Part 5), the folder is not writable (chmod 777), or recording is switched off.
 
 
+PART 7B. CHOOSE WHERE FILES ARE SAVED FROM THE DASHBOARD (OPTIONAL)
+
+The .env file says where chat files and call recordings go when the messenger starts. An administrator can
+change that without editing .env:
+
+    App:             Messenger settings, then Storage (also the Storage button on the Users page)
+    Browser client:  Settings, then Storage (administrators only)
+
+Each part shows where files are saved now, whether it works, and the free space. You can:
+
+    Try it           creates the folder and writes a small test file, nothing is saved
+    Save             from now on the dashboard value wins over .env
+    Reset to .env    goes back to the .env value
+
+Rules to know:
+
+    - Only folders inside STORAGE_ALLOWED_ROOTS (a list of full paths in .env, separated by commas).
+      Blank means only STORAGE_ROOT and STORAGE_NETWORK_MOUNT_PATH themselves.
+    - Files saved before a change are not moved. They keep opening.
+    - Call recordings: the recorder can only write to the folder in CALLS_RECORDINGS_HOST_DIR, so the
+      dashboard lets you pick a folder inside it, and the free-space limit.
+    - With the messenger in Docker, the container only sees /data/messenger-storage and /data/recordings.
+      To offer another folder, add a volume for it in docker-compose.yml and put its container path in
+      STORAGE_ALLOWED_ROOTS. Running from source, any folder you can write to works.
+
+Example for running from source: allow one folder, then pick a subfolder of it in the dashboard.
+
+    mkdir -p /home/graham218/MyProjects/file-storage/premisave-messenger
+    echo 'STORAGE_ALLOWED_ROOTS=/home/graham218/MyProjects/file-storage' >> .env
+
+Restart the messenger after changing .env.
+
+
 PART 8. START THE FLUTTER APP
 
     cd /home/graham218/MyProjects/premisave/premisave_flutter_frontend

@@ -2,6 +2,7 @@ package com.premisave.messenger.storage;
 
 import com.premisave.messenger.config.StorageProperties;
 import com.premisave.messenger.exception.HttpStatusException;
+import com.premisave.messenger.service.StorageSettingsService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,7 +13,6 @@ import java.io.InputStream;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -35,6 +35,10 @@ import java.util.regex.Pattern;
  * - In NETWORK mode with require-mount, nothing is written unless the
  *   configured path is really a mounted file system. Otherwise a dropped
  *   share would quietly fill the local disk under the empty mount folder.
+ * - Where files go is read for every call from StorageSettingsService: the
+ *   .env values, or what an administrator saved from the dashboard. A file
+ *   that is not in the current folder is looked for in the folders used
+ *   before, so moving the storage never loses a file.
  */
 @Slf4j
 @Component
@@ -48,18 +52,21 @@ public class FileStorage {
     private static final int HEAD_BYTES = 16;
 
     private final StorageProperties props;
+    private final StorageSettingsService settings;
 
-    private Path baseDir;
+    private volatile Path mountCheckedPath;
     private volatile long lastMountCheckAt;
     private volatile boolean lastMountOk;
 
     @PostConstruct
     void init() {
-        baseDir = computeBaseDir();
-        if (props.getMode() == StorageProperties.Mode.NETWORK && props.getNetwork().isRequireMount()) {
-            // Fail fast at startup instead of on the first upload.
-            ensureMounted();
+        // The .env values must work: fail fast at startup instead of on the first upload. What an administrator saved from
+        // the dashboard was tried when it was saved, and is checked again on every use.
+        StorageLocation env = settings.environmentLocation();
+        if (env.mustBeMounted()) {
+            ensureMounted(env);
         }
+        Path baseDir = env.base();
         try {
             Files.createDirectories(baseDir);
             if (!Files.isWritable(baseDir)) {
@@ -68,8 +75,9 @@ public class FileStorage {
         } catch (IOException e) {
             throw new IllegalStateException("Cannot create storage directory " + baseDir, e);
         }
-        log.info("Attachment storage ready: mode={} dir={} maxFileSize={}",
-                props.getMode(), baseDir, props.getMaxFileSize());
+        StorageLocation now = settings.attachmentsLocation();
+        log.info("Attachment storage ready: mode={} dir={} source={} maxFileSize={}",
+                now.mode(), now.base(), now.fromDashboard() ? "dashboard" : ".env", props.getMaxFileSize());
     }
 
     /** Private chat attachment: random name, no extension, kept under chats/{chatId}/{yyyy-MM}/. */
@@ -96,9 +104,10 @@ public class FileStorage {
     }
 
     private StoredFile write(InputStream in, String relativeDir, String fileName, long maxBytes) {
-        ensureAvailable();
+        StorageLocation location = settings.attachmentsLocation();
+        ensureAvailable(location);
 
-        Path dir = resolve(relativeDir);
+        Path dir = resolve(location.base(), relativeDir);
         Path tmp = dir.resolve(".upload-" + UUID.randomUUID() + ".tmp");
         Path target = dir.resolve(fileName);
 
@@ -149,20 +158,37 @@ public class FileStorage {
         }
     }
 
-    /** Resolves a stored path for reading. Throws if the file is missing. */
+    /**
+     * Resolves a stored path for reading. Looks in the current folder first, then in the folders used before. Throws if the
+     * file is nowhere.
+     */
     public Path open(String relativePath) {
-        ensureAvailable();
-        Path p = resolve(relativePath);
-        if (!Files.isRegularFile(p)) {
-            throw HttpStatusException.notFound("FILE_MISSING", "The file is no longer in storage");
+        StorageLocation location = settings.attachmentsLocation();
+        HttpStatusException unavailable = null;
+        try {
+            ensureAvailable(location);
+            Path p = resolve(location.base(), relativePath);
+            if (Files.isRegularFile(p)) return p;
+        } catch (HttpStatusException e) {
+            // The current storage is down. The file may still be in a folder used before.
+            unavailable = e;
         }
-        return p;
+        for (Path old : settings.fallbackBases(location.base())) {
+            Path p = resolve(old, relativePath);
+            if (Files.isRegularFile(p)) return p;
+        }
+        if (unavailable != null) throw unavailable;
+        throw HttpStatusException.notFound("FILE_MISSING", "The file is no longer in storage");
     }
 
     public void deleteQuietly(String relativePath) {
         if (relativePath == null) return;
         try {
-            Files.deleteIfExists(resolve(relativePath));
+            StorageLocation location = settings.attachmentsLocation();
+            if (Files.deleteIfExists(resolve(location.base(), relativePath))) return;
+            for (Path old : settings.fallbackBases(location.base())) {
+                if (Files.deleteIfExists(resolve(old, relativePath))) return;
+            }
         } catch (IOException | RuntimeException e) {
             log.warn("Could not delete stored file {}: {}", relativePath, e.getMessage());
         }
@@ -170,7 +196,7 @@ public class FileStorage {
 
     // ----------------------------------------------------------------
 
-    private Path resolve(String relativePath) {
+    private static Path resolve(Path baseDir, String relativePath) {
         Path p = baseDir.resolve(relativePath).normalize();
         if (!p.startsWith(baseDir)) {
             throw new IllegalArgumentException("Path escapes the storage directory");
@@ -178,27 +204,12 @@ public class FileStorage {
         return p;
     }
 
-    private Path computeBaseDir() {
-        if (props.getMode() == StorageProperties.Mode.NETWORK) {
-            StorageProperties.Network n = props.getNetwork();
-            if (n.getMountPath() == null || n.getMountPath().isBlank()) {
-                throw new IllegalStateException("STORAGE_MODE=NETWORK needs STORAGE_NETWORK_MOUNT_PATH");
-            }
-            Path mount = Paths.get(n.getMountPath()).toAbsolutePath().normalize();
-            String dir = n.getDirectory() == null ? "" : n.getDirectory();
-            return mount.resolve(dir).normalize();
-        }
-        if (props.getRoot() == null || props.getRoot().isBlank()) {
-            throw new IllegalStateException("STORAGE_MODE=LOCAL needs STORAGE_ROOT");
-        }
-        return Paths.get(props.getRoot()).toAbsolutePath().normalize();
-    }
-
-    private void ensureAvailable() {
-        if (props.getMode() == StorageProperties.Mode.NETWORK && props.getNetwork().isRequireMount()) {
+    private void ensureAvailable(StorageLocation location) {
+        if (location.mustBeMounted()) {
             long now = System.currentTimeMillis();
-            if (now - lastMountCheckAt > MOUNT_CHECK_CACHE_MS) {
-                lastMountOk = isMounted(Paths.get(props.getNetwork().getMountPath()).toAbsolutePath().normalize());
+            if (!location.mountPath().equals(mountCheckedPath) || now - lastMountCheckAt > MOUNT_CHECK_CACHE_MS) {
+                lastMountOk = MountCheck.isOnNetworkShare(location.mountPath());
+                mountCheckedPath = location.mountPath();
                 lastMountCheckAt = now;
             }
             if (!lastMountOk) {
@@ -207,77 +218,11 @@ public class FileStorage {
         }
     }
 
-    private void ensureMounted() {
-        Path mount = Paths.get(props.getNetwork().getMountPath()).toAbsolutePath().normalize();
-        if (!isMounted(mount)) {
-            throw new IllegalStateException("STORAGE_NETWORK_REQUIRE_MOUNT=true but " + mount
+    private void ensureMounted(StorageLocation location) {
+        if (!MountCheck.isOnNetworkShare(location.mountPath())) {
+            throw new IllegalStateException("STORAGE_NETWORK_REQUIRE_MOUNT=true but " + location.mountPath()
                     + " is not on a mounted network share. Mount the "
                     + props.getNetwork().getProtocol() + " share first, or set STORAGE_NETWORK_REQUIRE_MOUNT=false.");
         }
-    }
-
-    private static final java.util.Set<String> NETWORK_FS = java.util.Set.of(
-            "cifs", "smb3", "smbfs", "nfs", "nfs4", "9p", "ceph", "glusterfs",
-            "fuse.sshfs", "fuse.rclone", "fuse.davfs", "davfs", "fuse.glusterfs");
-
-    /**
-     * True when the file system that holds this path is a network file
-     * system. Reads /proc/self/mountinfo and finds the most specific mount
-     * containing the path, so a local folder on a separate /home partition
-     * does not pass for a share. Verifies on Linux only; elsewhere it falls
-     * back to "the directory exists" and says so in the log.
-     */
-    private boolean isMounted(Path path) {
-        Path info = Paths.get("/proc/self/mountinfo");
-        if (!Files.isReadable(info)) {
-            log.warn("Cannot verify mounts on this OS, only checking that {} exists", path);
-            return Files.isDirectory(path);
-        }
-        try {
-            if (!Files.isDirectory(path)) {
-                return false;
-            }
-            Path real = path.toRealPath();
-            Path bestMount = null;
-            String bestType = null;
-            for (String line : Files.readAllLines(info)) {
-                // mountinfo: id parent major:minor root mountpoint opts [optional...] - fstype source superopts
-                int dash = line.indexOf(" - ");
-                String[] pre = (dash >= 0 ? line.substring(0, dash) : line).split(" ");
-                String[] post = dash >= 0 ? line.substring(dash + 3).split(" ") : new String[0];
-                if (pre.length < 5 || post.length < 1) continue;
-                Path mountPoint = Paths.get(unescape(pre[4]));
-                if (real.startsWith(mountPoint)
-                        && (bestMount == null || mountPoint.getNameCount() >= bestMount.getNameCount())) {
-                    bestMount = mountPoint;
-                    bestType = post[0];
-                }
-            }
-            if (bestType == null) return false;
-            boolean network = NETWORK_FS.contains(bestType);
-            if (!network) {
-                log.warn("{} is on a '{}' file system, not a network share", real, bestType);
-            }
-            return network;
-        } catch (IOException e) {
-            log.error("Could not read mount table: {}", e.getMessage());
-            return false;
-        }
-    }
-
-    /** mountinfo escapes space, tab, newline and backslash as octal. */
-    private static String unescape(String s) {
-        if (s.indexOf('\\') < 0) return s;
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c == '\\' && i + 3 < s.length() && s.substring(i + 1, i + 4).matches("[0-7]{3}")) {
-                sb.append((char) Integer.parseInt(s.substring(i + 1, i + 4), 8));
-                i += 3;
-            } else {
-                sb.append(c);
-            }
-        }
-        return sb.toString();
     }
 }

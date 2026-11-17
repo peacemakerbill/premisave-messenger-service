@@ -97,7 +97,7 @@ public class CallRecordingService {
         rec.setStartedBy(me.getId());
         rec.setStartedByName(UserNames.full(me));
         rec.setStatus(RecordingStatus.STARTING);
-        rec.setFileName(callId + "/" + rec.getId() + ".mp4");
+        rec.setFileName(storage.fileNamePrefix() + callId + "/" + rec.getId() + ".mp4");
         rec.setCreatedAt(now);
         rec.setUpdatedAt(now);
         recordings.save(rec);

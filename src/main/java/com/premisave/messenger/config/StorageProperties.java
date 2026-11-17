@@ -42,6 +42,12 @@ public class StorageProperties {
     /** HMAC key for signed links. Falls back to the JWT secret when blank. */
     private String signingSecret;
 
+    /**
+     * The folders an administrator may point storage at from the dashboard, as full paths separated by commas. Anything outside
+     * them is refused. Blank means only the folders in these settings themselves (STORAGE_ROOT and STORAGE_NETWORK_MOUNT_PATH).
+     */
+    private String allowedRoots = "";
+
     private Network network = new Network();
 
     @Getter

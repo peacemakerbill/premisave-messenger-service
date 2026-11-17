@@ -228,6 +228,9 @@ storage:
   url-ttl: ${STORAGE_URL_TTL:6h}
   unclaimed-ttl: ${STORAGE_UNCLAIMED_TTL:24h}
   signing-secret: ${STORAGE_SIGNING_SECRET:}
+  # Folders an administrator may point storage at from the dashboard (full paths, separated by commas). Blank allows only
+  # STORAGE_ROOT and STORAGE_NETWORK_MOUNT_PATH themselves.
+  allowed-roots: ${STORAGE_ALLOWED_ROOTS:}
   network:
     protocol: ${STORAGE_NETWORK_PROTOCOL:SMB}
     host: ${STORAGE_NETWORK_HOST:}

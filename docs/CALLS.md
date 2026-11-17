@@ -130,6 +130,13 @@ or NFS: `192.168.1.50:/volume1/premisave  /mnt/premisave-nas  nfs  defaults,_net
 recorder with `CALLS_RECORDINGS_HOST_DIR=/mnt/premisave-nas/premisave-recordings`. The recorder writes there as an unprivileged
 user, so the folder must be writable by everyone (or by the user the share maps to).
 
+**Choosing the folder from the dashboard.** The `.env` values above are the starting point. An administrator can also open
+Messenger settings, Storage (Flutter app) or Settings, Storage (browser client) and choose a subfolder inside the recorder's
+folder and the free-space limit. The recorder itself can only write to its own folder, which Docker fixes with
+`CALLS_RECORDINGS_HOST_DIR`, so the dashboard cannot move it somewhere else. Videos made after the change go to
+`<subfolder>/<callId>/<recordingId>.mp4` inside that folder, and earlier videos stay where they are and keep playing. "Reset to
+.env" goes back to the plain folder and `CALLS_RECORDINGS_MIN_FREE_MB`. See the README, section "Storage from the dashboard".
+
 Safety checks, both on by default:
 
 * **The share must really be mounted.** With `CALLS_RECORDINGS_NETWORK_REQUIRE_MOUNT=true` (recommended), starting a recording is

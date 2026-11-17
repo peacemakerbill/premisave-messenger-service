@@ -35,6 +35,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:-eW91ci12ZXJ5LXNlY3VyZS1qd3Qtc2VjcmV0LWtleS0zMi1ieXRlcyE=}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-api-key}
       STORAGE_PUBLIC_BASE_URL: ${STORAGE_PUBLIC_BASE_URL:-http://localhost:8081}
+      # Folders the admin dashboard may choose for storage (see .env.example). Blank allows only the storage folder itself.
+      STORAGE_ALLOWED_ROOTS: ${STORAGE_ALLOWED_ROOTS:-}
       # LiveKit running on this computer (deploy/livekit). The apps use LIVEKIT_URL from .env directly.
       LIVEKIT_API_URL: http://host.docker.internal:7880
       # Recordings written by the LiveKit egress container (deploy/livekit) land in this folder.

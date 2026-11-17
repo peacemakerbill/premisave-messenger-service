@@ -735,6 +735,19 @@ body.in-call .pop { z-index: 76; }
 .cs .kv { display: grid; grid-template-columns: 120px 1fr; gap: 4px 12px; font-size: 14px; }
 .cs .kv dt { color: var(--text-2); } .cs .kv dd { margin: 0; word-break: break-all; }
 .cs .bad { color: var(--danger); } .cs .good { color: #2f9e44; }
+.ss { display: grid; gap: 14px; }
+.ss h4 { margin: 0; font-size: 15px; font-weight: 600; }
+.ss .grp { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
+.ss .act { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ss .act .btn { height: 36px; padding: 0 14px; font-size: 14px; }
+.ss .chk { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; }
+.ss .chk input { margin-top: 3px; }
+.ss .res { font-size: 13.5px; }
+.ss .res.good { color: #2f9e44; } .ss .res.bad { color: var(--danger); }
+.ss .kv { display: grid; grid-template-columns: 110px 1fr; gap: 4px 12px; font-size: 14px; margin: 0; }
+.ss .kv dt { color: var(--text-2); } .ss .kv dd { margin: 0; word-break: break-all; }
+.ss .bad { color: var(--danger); } .ss .good { color: #2f9e44; }
+.ss .tag { font-size: 12px; padding: 1px 8px; border-radius: 9px; background: var(--panel-2); color: var(--text-2); }
 </style>
 </head>
 <body>
@@ -2149,6 +2162,7 @@ function openSettings() {
       avatar(userName(me), me.profilePictureUrl, me.id, 'lg'),
       h('div', null, h('div', { style: 'font-size:18px;font-weight:600' }, userName(me)), h('div', { class: 'note', style: 'margin:2px 0 0' }, me.email || ''), h('div', { class: 'note', style: 'margin:2px 0 0;word-break:break-all' }, 'User id: ' + (me.id || '')))),
     h('label', { class: 'field-l' }, 'Calls'), callSettingsBlock(),
+    ...(S.callSettings && S.callSettings.canManage ? [h('label', { class: 'field-l' }, 'Storage (administrators)'), storageSettingsBlock()] : []),
     h('label', { class: 'field-l' }, 'Messenger service'), apiIn,
     h('label', { class: 'field-l' }, 'Auth service'), authIn,
     h('p', { class: 'note' }, 'Live updates connect to ' + wsUrl() + '. Changing the messenger address reconnects.')
@@ -4905,6 +4919,92 @@ function callSettingsBlock() {
   loadCallSettings().then(paint);
   return box;
 }
+// ---------- storage settings (administrators): where files and recordings are kept ----------
+function storageSettingsBlock() {
+  const box = h('div', { class: 'ss' }, h('p', { class: 'note' }, 'Loading'));
+  const mb = v => v == null ? '' : (v >= 1024 ? (v / 1024).toFixed(1) + ' GB free' : v + ' MB free');
+  const paint = d => {
+    const a = d.attachments, r = d.recordings;
+    const state = (ok, problem, free) => ok
+      ? h('span', { class: 'good' }, 'Ready' + (free != null ? ', ' + mb(free) : ''))
+      : h('span', { class: 'bad' }, 'Not ready: ' + (problem || 'unknown'));
+    const result = h('div', { class: 'res', role: 'status' });
+    const showResult = (ok, text) => { result.className = 'res' + (ok === null ? '' : ok ? ' good' : ' bad'); result.textContent = text; };
+
+    // ---- files, photos and status media
+    const mode = h('select', { class: 'fld', 'aria-label': 'Where files are kept' },
+      h('option', { value: 'LOCAL' }, 'A folder on this server'), h('option', { value: 'NETWORK' }, 'A network share that is already mounted'));
+    mode.value = a.mode;
+    const root = h('input', { class: 'fld', value: a.root, placeholder: '/data/messenger-storage', 'aria-label': 'Folder' });
+    const mount = h('input', { class: 'fld', value: a.networkMountPath, placeholder: '/mnt/nas', 'aria-label': 'Where the share is mounted' });
+    const dir = h('input', { class: 'fld', value: a.networkDirectory, placeholder: 'premisave-messenger', 'aria-label': 'Folder inside the share' });
+    const must = h('input', { type: 'checkbox' }); must.checked = !!a.networkRequireMount;
+    const localBox = h('div', null, h('label', { class: 'field-l' }, 'Folder (a full path)'), root);
+    const netBox = h('div', null, h('label', { class: 'field-l' }, 'Where the share is mounted (a full path)'), mount,
+      h('label', { class: 'field-l' }, 'Folder inside the share'), dir,
+      h('label', { class: 'chk' }, must, h('span', null, 'Only use it when it really is a network share. Videos and files then never fill this disk when the share drops.')));
+    const syncMode = () => { const net = mode.value === 'NETWORK'; localBox.style.display = net ? 'none' : ''; netBox.style.display = net ? '' : 'none'; };
+    mode.onchange = syncMode; syncMode();
+    const attBody = () => ({ mode: mode.value, root: root.value.trim(), networkMountPath: mount.value.trim(), networkDirectory: dir.value.trim(), networkRequireMount: must.checked });
+    const attCheck = h('button', { class: 'btn outline', type: 'button', onclick: async e => {
+      const btn = e.currentTarget; btn.disabled = true; showResult(null, 'Trying it');
+      try { const c = await api('/api/storage-settings/attachments/check', { method: 'POST', json: attBody() }); showResult(c.ok, c.ok ? 'Works. ' + c.location + (c.freeMb != null ? ', ' + mb(c.freeMb) : '') : c.problem); }
+      catch (er) { showResult(false, er.message); }
+      btn.disabled = false;
+    } }, 'Check');
+    const attSave = h('button', { class: 'btn', type: 'button', onclick: async e => {
+      const btn = e.currentTarget; btn.disabled = true;
+      try { const nd = await api('/api/storage-settings/attachments', { method: 'PUT', json: attBody() }); toast('Storage saved. New files go to the new folder.'); paint(nd); }
+      catch (er) { showResult(false, er.message); btn.disabled = false; }
+    } }, 'Save');
+    const attReset = a.source === 'DASHBOARD' ? h('button', { class: 'btn outline', type: 'button', onclick: async () => {
+      if (!confirm('Go back to the .env values? Files saved so far stay where they are and are still found.')) return;
+      try { paint(await api('/api/storage-settings/attachments', { method: 'DELETE' })); toast('Back to the .env values.'); } catch (er) { toast(er.message, true); }
+    } }, 'Reset to .env') : null;
+    const attKv = [['Using', h('span', null, a.source === 'DASHBOARD' ? 'What an administrator saved here' : 'The .env values', ' ', h('span', { class: 'tag' }, a.source === 'DASHBOARD' ? 'dashboard' : '.env'))],
+      ['Folder now', a.location], ['State', state(a.ready, a.problem, a.freeMb)]];
+    const attGrp = h('div', { class: 'grp' }, h('h4', null, 'Files, photos and status media'),
+      h('dl', { class: 'kv' }, ...attKv.flatMap(([k, v]) => [h('dt', null, k), h('dd', null, v)])),
+      h('label', { class: 'field-l' }, 'Keep them in'), mode, localBox, netBox,
+      h('p', { class: 'note' }, 'Allowed folders: ' + (d.allowedRoots.length ? d.allowedRoots.join(', ') : 'none') + '. The list is set by STORAGE_ALLOWED_ROOTS in .env.'),
+      h('div', { class: 'act' }, attCheck, attSave, attReset), result,
+      h('p', { class: 'note' }, 'Files saved earlier stay where they are and are still found after a change.'));
+
+    // ---- call recordings
+    const sub = h('input', { class: 'fld', value: r.subfolder, placeholder: 'empty means the shared folder itself', 'aria-label': 'Recordings folder' });
+    const min = h('input', { class: 'fld', type: 'number', min: '0', value: String(r.minFreeMb), 'aria-label': 'Smallest free space in MB' });
+    const recBody = () => ({ subfolder: sub.value.trim(), minFreeMb: Number(min.value) });
+    const recResult = h('div', { class: 'res', role: 'status' });
+    const showRec = (ok, text) => { recResult.className = 'res' + (ok === null ? '' : ok ? ' good' : ' bad'); recResult.textContent = text; };
+    const recCheck = h('button', { class: 'btn outline', type: 'button', onclick: async e => {
+      const btn = e.currentTarget; btn.disabled = true; showRec(null, 'Trying it');
+      try { const c = await api('/api/storage-settings/recordings/check', { method: 'POST', json: recBody() }); showRec(c.ok, c.ok ? 'Works. ' + c.location + (c.freeMb != null ? ', ' + mb(c.freeMb) : '') : c.problem); }
+      catch (er) { showRec(false, er.message); }
+      btn.disabled = false;
+    } }, 'Check');
+    const recSave = h('button', { class: 'btn', type: 'button', onclick: async e => {
+      const btn = e.currentTarget; btn.disabled = true;
+      try { const nd = await api('/api/storage-settings/recordings', { method: 'PUT', json: recBody() }); toast('Recording storage saved.'); paint(nd); }
+      catch (er) { showRec(false, er.message); btn.disabled = false; }
+    } }, 'Save');
+    const recReset = r.source === 'DASHBOARD' ? h('button', { class: 'btn outline', type: 'button', onclick: async () => {
+      try { paint(await api('/api/storage-settings/recordings', { method: 'DELETE' })); toast('Back to the .env values.'); } catch (er) { toast(er.message, true); }
+    } }, 'Reset to .env') : null;
+    const recKv = [['Using', h('span', null, r.source === 'DASHBOARD' ? 'What an administrator saved here' : 'The .env values', ' ', h('span', { class: 'tag' }, r.source === 'DASHBOARD' ? 'dashboard' : '.env'))],
+      ['Shared folder', r.sharedFolder || 'Not set'], ['New videos go to', r.location || 'Not set'], ['State', state(r.ready, r.problem, r.freeMb)]];
+    const recGrp = h('div', { class: 'grp' }, h('h4', null, 'Call recordings'),
+      h('dl', { class: 'kv' }, ...recKv.flatMap(([k, v]) => [h('dt', null, k), h('dd', null, v)])),
+      h('p', { class: 'note' }, 'The recorder writes into the shared folder, which its Docker mount fixes (CALLS_RECORDINGS_HOST_DIR in .env). To move that folder, change .env and recreate the recorder. Here you choose a folder inside it for new videos. Earlier videos are still found.'),
+      h('label', { class: 'field-l' }, 'Folder inside the shared folder'), sub,
+      h('label', { class: 'field-l' }, 'Refuse to record below this much free space (MB, 0 turns it off)'), min,
+      h('div', { class: 'act' }, recCheck, recSave, recReset), recResult);
+
+    box.replaceChildren(attGrp, recGrp);
+  };
+  api('/api/storage-settings').then(paint).catch(e => box.replaceChildren(h('p', { class: 'note' }, e.message)));
+  return box;
+}
+
 function openCallSettings() {
   openModal('Call settings', callSettingsBlock(), [h('button', { class: 'btn', type: 'button', onclick: closeModal }, 'Close')]);
 }
