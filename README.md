@@ -105,6 +105,7 @@ It was built as a sibling service to `auth-service` (which owns user identity an
 | **Self-healing chat data** | If a chat's participant data was ever stored inconsistently (e.g. from an earlier bug), it's detected and corrected automatically the next time that chat is accessed. |
 | **Group chats** | Create, add/remove members (single or bulk), promote/demote admins, transfer ownership, group photo, leave group. |
 | **Group invite links and QR codes** | Owners and admins make a link (and a QR code that holds it) that anyone signed in can use to join the group. A link can expire after a set time or after a set number of joins, and can be revoked at any time. One working link per group: making a new one revokes the old one. |
+| **Notifications** | When something happens to you in a group (made an admin, made the owner, demoted, added, removed) you get a stored notification that waits in your list if you were offline, a live push on `/user/queue/notifications`, and an email. Emails go through auth-service, so set `INTERNAL_API_KEY` to the same value as its `API_KEY`. Nothing is sent to the person who did the action. |
 | **File attachments** | Send images, video, audio, documents and any other file type in a chat. Upload first (`POST /api/attachments`), then send a message carrying the `attachmentId`, over REST or WebSocket. Stored on local disk or a mounted network share, downloaded through expiring signed links with range support. |
 | **Public media** | Group photos and `/api/media/upload` files use the same storage and are served without a token from `/api/media/files/...`. |
 | **Statuses** | Post text, photo, video or audio statuses that your followers can watch until they disappear. You choose how long each stays, up to `STATUS_MAX_HOURS` (24 by default). Followers can view, like, react and comment; the owner sees views, likes, reactions and comments, and can delete. Disappeared statuses move to the owner's past statuses and stay, with everything people did on them, until the owner deletes them. |
@@ -258,6 +259,8 @@ Message <id> delivery completed. Success: 1/1, Failures: 0
 | `GROUP_INVITE_BASE_URL` | No | `https://premisave.com/join` | Start of every shared invite link. The link people get is this address, a slash and the code (`https://premisave.com/join/Qx3k...`), and the same text is what the QR code holds. Point it at a page of your web or mobile app that opens the join screen, or leave the default and have the app handle the link. |
 | `GROUP_INVITE_MAX_EXPIRY_HOURS` | No | `8760` | The longest an invite link can last, in hours (`group-invite.max-expiry-hours`). Asking for more is refused with 400. |
 | `GROUP_INVITE_MAX_USES_LIMIT` | No | `100000` | The most joins one invite link can be limited to (`group-invite.max-uses-limit`). |
+| `INTERNAL_API_KEY` | No | empty | The shared service key, the same value as `API_KEY` in auth-service (`auth.service.api-key`). The messenger sends it as `X-API-Key` to ask auth-service to send notification emails. Empty means notifications still appear in the app but no email is sent. |
+| `NOTIFICATION_EMAILS_ENABLED` | No | `true` | Set to `false` to turn notification emails off even when the key is set. |
 | `STORAGE_URL_TTL` / `STORAGE_UNCLAIMED_TTL` | No | `6h` / `24h` | Lifetime of a signed link, and how long an unsent upload is kept. |
 | `STORAGE_SIGNING_SECRET` | No | `JWT_SECRET` | Key used to sign download links. |
 | `STORAGE_NETWORK_*` | NETWORK mode | blank | `PROTOCOL`, `HOST`, `SHARE`, `MOUNT_PATH`, `DIRECTORY`, `REQUIRE_MOUNT`. With `REQUIRE_MOUNT=true` the service refuses to start or write unless the path is on a mounted network share. |
@@ -315,6 +318,12 @@ Message <id> delivery completed. Success: 1/1, Failures: 0
 | `DELETE` | `/api/groups/{groupId}/invite` | Revoke the link and its QR code (owner and admins) |
 | `GET` | `/api/group-invites/{code}` | Preview what a link leads to (`name`, `description`, `groupPhotoUrl`, `memberCount`, `alreadyMember`, `chatId`). Never lists members. Any signed-in user |
 | `POST` | `/api/group-invites/{code}/join` | Join with a link. Counts one use; a person already in the group is not counted again. Returns `groupId`, `chatId`, `name`, `alreadyMember` |
+| `GET` | `/api/notifications` | Your notifications, newest first (`limit` 1 to 100, default 50). Each has `id`, `type`, `title`, `body`, `groupId`, `chatId`, `actorId`, `actorName`, `createdAt`, `read` |
+| `GET` | `/api/notifications/unread-count` | `{ "count": 3 }` |
+| `POST` | `/api/notifications/{id}/read` | Mark one as read |
+| `POST` | `/api/notifications/read-all` | Mark all as read. Returns `{ "updated": n }` |
+| `DELETE` | `/api/notifications/{id}` | Delete one |
+| `DELETE` | `/api/notifications` | Delete all of yours |
 | `POST` | `/api/attachments` | Upload a file for a chat (multipart `file`, `chatId`); returns an `attachmentId` |
 | `GET` | `/api/attachments/{attachmentId}/content` | Download or stream a file (Bearer token or the signed link from a message) |
 | `POST` | `/api/media/upload` | Upload a public file and get its URL back |
@@ -339,6 +348,7 @@ Connect with a STOMP client to `ws://<host>:8081/ws-messenger`, sending `Authori
 | Subscribe | `/user/queue/typing` | Typing indicators from the other participant |
 | Subscribe | `/user/queue/errors` | Send failures for the message you just tried to send (`code`, `message`, `chatId`) |
 | Subscribe | `/user/queue/groups` | Group changes that concern you: `ADDED`, `REMOVED` or `UPDATED`, with `groupId` and `chatId` |
+| Subscribe | `/user/queue/notifications` | A new notification for you: `MADE_ADMIN`, `REMOVED_ADMIN`, `BECAME_OWNER`, `ADDED_TO_GROUP` or `REMOVED_FROM_GROUP`, in the same shape as `GET /api/notifications` |
 | Subscribe | `/user/queue/reactions` | Someone reacted to or removed a reaction from a message in one of your chats. Same payload as the reaction endpoints, with the full `reactions` map |
 | Subscribe | `/user/queue/status` | `NEW_STATUS` and `STATUS_DELETED` for the people who follow the owner, and `ACTIVITY` with the new totals for the owner when someone views, likes, reacts or comments |
 | Subscribe | `/topic/presence` | Online/offline broadcasts for any user |

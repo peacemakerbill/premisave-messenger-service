@@ -1,6 +1,7 @@
 package com.premisave.messenger.client;
 
 import com.premisave.messenger.dto.request.SocialActionRequest;
+import com.premisave.messenger.dto.request.UserEmailRequest;
 import com.premisave.messenger.dto.response.*;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
@@ -127,6 +128,14 @@ public interface AuthServiceClient {
     SocialStatusResponse getMutualFollowStatus(
             @PathVariable String targetId,
             @RequestHeader("Authorization") String token);
+
+    // ── Email (internal, protected by the shared service key) ───────
+
+    /** Asks auth-service to email one user. The address never leaves auth-service. */
+    @PostMapping("/internal/notifications/email")
+    void sendUserEmail(
+            @RequestBody UserEmailRequest request,
+            @RequestHeader("X-API-Key") String apiKey);
 
     // ── Profile Views ────────────────────────────────────────────────
 

@@ -4,6 +4,7 @@ import com.premisave.messenger.entity.Chat;
 import com.premisave.messenger.entity.Group;
 import com.premisave.messenger.entity.GroupMember;
 import com.premisave.messenger.enums.ChatType;
+import com.premisave.messenger.enums.NotificationType;
 import com.premisave.messenger.exception.HttpStatusException;
 import com.premisave.messenger.realtime.RedisMessagePublisher;
 import com.premisave.messenger.repository.ChatRepository;
@@ -38,6 +39,7 @@ public class GroupService {
     private final ChatRepository chatRepository;
     private final MediaService mediaService;
     private final RedisMessagePublisher redisMessagePublisher;
+    private final UserNotificationService userNotifications;
 
     // ---------------------------------------------------------------- create
 
@@ -85,6 +87,7 @@ public class GroupService {
         log.info("Group '{}' created by {} with {} members (id {})", name, adminId, members.size(), saved.getId());
         members.remove(adminId);
         notifyUsers(members, "ADDED", saved.getId(), savedChat.getId());
+        userNotifications.notifyEach(members, NotificationType.ADDED_TO_GROUP, saved.getId(), savedChat.getId(), saved.getName(), adminId);
         return saved;
     }
 
@@ -111,6 +114,7 @@ public class GroupService {
 
         notifyUsers(added, "ADDED", groupId, idOf(chat));
         notifyUsers(without(group.getMemberIds(), added), "UPDATED", groupId, idOf(chat));
+        userNotifications.notifyEach(added, NotificationType.ADDED_TO_GROUP, groupId, idOf(chat), group.getName(), addedBy);
     }
 
     public void addMemberToGroup(String groupId, String userId, String addedBy) {
@@ -155,6 +159,8 @@ public class GroupService {
 
         notifyUsers(removed, "REMOVED", groupId, idOf(chat));
         notifyUsers(without(group.getMemberIds(), removed), "UPDATED", groupId, idOf(chat));
+        // Someone who leaves is not told about it, only someone who was removed by another person.
+        userNotifications.notifyEach(removed, NotificationType.REMOVED_FROM_GROUP, groupId, null, group.getName(), removedBy);
     }
 
     public void removeMemberFromGroup(String groupId, String userId, String removedBy) {
@@ -214,6 +220,7 @@ public class GroupService {
     public void addAdminsToGroup(String groupId, List<String> userIds, String requestedBy) {
         Group group = requireOwner(groupId, requestedBy, "Only the group admin can promote others");
 
+        Set<String> promoted = new LinkedHashSet<>();
         for (String userId : userIds) {
             if (!group.getMemberIds().contains(userId)) {
                 throw HttpStatusException.badRequest("User must be a member first");
@@ -221,10 +228,12 @@ public class GroupService {
             if (!group.getModerators().contains(userId) && !userId.equals(group.getAdminId())) {
                 group.getModerators().add(userId);
                 setRole(groupId, userId, "ADMIN");
+                promoted.add(userId);
             }
         }
         touch(group);
         log.info("Promoted {} users to admin in group {}", userIds.size(), groupId);
+        userNotifications.notifyEach(promoted, NotificationType.MADE_ADMIN, groupId, getChatIdOf(groupId), group.getName(), requestedBy);
     }
 
     public void addAdminToGroup(String groupId, String userId, String requestedBy) {
@@ -234,15 +243,17 @@ public class GroupService {
     public void removeAdminsFromGroup(String groupId, List<String> userIds, String requestedBy) {
         Group group = requireOwner(groupId, requestedBy, "Only the group admin can demote others");
 
+        Set<String> demoted = new LinkedHashSet<>();
         for (String userId : userIds) {
             if (group.getAdminId().equals(userId)) {
                 throw HttpStatusException.badRequest("The group owner cannot be demoted");
             }
-            group.getModerators().remove(userId);
+            if (group.getModerators().remove(userId)) demoted.add(userId);
             setRole(groupId, userId, "MEMBER");
         }
         touch(group);
         log.info("Demoted {} admins in group {}", userIds.size(), groupId);
+        userNotifications.notifyEach(demoted, NotificationType.REMOVED_ADMIN, groupId, getChatIdOf(groupId), group.getName(), requestedBy);
     }
 
     public void removeAdminFromGroup(String groupId, String userId, String requestedBy) {
@@ -261,7 +272,9 @@ public class GroupService {
         group.setAdminId(newAdminId);
         setRole(groupId, newAdminId, "ADMIN");
         setRole(groupId, currentAdminId, "ADMIN");
-        return touch(group);
+        Group saved = touch(group);
+        userNotifications.notifyUser(newAdminId, NotificationType.BECAME_OWNER, groupId, getChatIdOf(groupId), saved.getName(), currentAdminId);
+        return saved;
     }
 
     // ---------------------------------------------------------------- details

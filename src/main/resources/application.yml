@@ -81,6 +81,13 @@ jwt:
 auth:
   service:
     url: ${AUTH_SERVICE_URL:http://localhost:8080}
+    # The shared service key: the same value as API_KEY in auth-service. Without it no notification emails are sent.
+    api-key: ${INTERNAL_API_KEY:}
+
+# Notifications for group changes (made an admin or the owner, added to or removed from a group).
+# They always appear in the app. Emails go through auth-service and need INTERNAL_API_KEY above.
+notifications:
+  email-enabled: ${NOTIFICATION_EMAILS_ENABLED:true}
 
 feign:
   client:
