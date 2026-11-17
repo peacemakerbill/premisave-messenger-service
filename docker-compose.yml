@@ -13,7 +13,7 @@
 # Calls (LiveKit): set LIVEKIT_API_KEY, LIVEKIT_API_SECRET and LIVEKIT_URL in ".env" and start the LiveKit server
 # from deploy/livekit (see docs/CALLS.md). This file points the service at it on this computer.
 #
-# Staging and production use docker-compose.staging.yml and docker-compose.production.yml.
+# Staging and production use deploy/docker-compose.staging.yml and deploy/docker-compose.production.yml.
 
 name: premisave-messenger-dev
 

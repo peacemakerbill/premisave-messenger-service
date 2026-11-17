@@ -297,11 +297,11 @@ docker compose up --build
 
 # staging on a server with Docker: copy the example, fill it in, then
 cp deploy/env/staging.env.example deploy/env/staging.env
-docker compose --env-file deploy/env/staging.env -f docker-compose.staging.yml up -d --build
+docker compose --env-file deploy/env/staging.env -f deploy/docker-compose.staging.yml up -d --build
 
 # production: pull an exact version
 cp deploy/env/production.env.example deploy/env/production.env
-IMAGE_TAG=1.0.0 docker compose --env-file deploy/env/production.env -f docker-compose.production.yml up -d
+IMAGE_TAG=1.0.0 docker compose --env-file deploy/env/production.env -f deploy/docker-compose.production.yml up -d
 ```
 
 Each environment pairs with the auth-service of the **same** environment: `JWT_SECRET` identical, `INTERNAL_API_KEY` equal to the auth-service `API_KEY`, `AUTH_SERVICE_URL` pointing at it, and separate databases. Several copies can run side by side because Redis relays live messages between them. Attachments and recordings are per copy, so with more than one copy use `STORAGE_MODE=NETWORK` and a share every copy mounts.
@@ -575,8 +575,8 @@ premisave-messenger-service/
 ├── src/main/resources/
 │   └── application.yml
 ├── Dockerfile, docker/   # The image and its entrypoint
-├── docker-compose*.yml   # Development, staging, production and Coolify
-├── render.yaml, heroku.yml, app.json, fly.*.toml, railway.json
+├── docker-compose.yml    # Development (staging, production and Coolify are in deploy/)
+├── heroku.yml, app.json  # Heroku only reads these from the root
 ├── deploy/
 │   ├── README.md         # Deploying, platform by platform
 │   ├── env/              # The values each environment needs

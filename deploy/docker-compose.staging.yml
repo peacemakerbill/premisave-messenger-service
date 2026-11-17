@@ -1,7 +1,7 @@
 # Premisave messenger-service, STAGING, on one server with Docker.
 #
 #   cp deploy/env/staging.env.example deploy/env/staging.env     (then fill it in)
-#   docker compose --env-file deploy/env/staging.env -f docker-compose.staging.yml up -d --build
+#   docker compose --env-file deploy/env/staging.env -f deploy/docker-compose.staging.yml up -d --build
 #
 # Staging is a copy of production for testing a release: same image, same profile settings, its own data.
 # It includes its own MongoDB and Redis. Use a separate database from production, always.
@@ -10,8 +10,8 @@
 # must share JWT_SECRET. INTERNAL_API_KEY here must equal API_KEY there.
 #
 # To use a published image instead of building here, log in once (docker login ghcr.io) and run:
-#   IMAGE_TAG=staging docker compose --env-file deploy/env/staging.env -f docker-compose.staging.yml pull
-#   IMAGE_TAG=staging docker compose --env-file deploy/env/staging.env -f docker-compose.staging.yml up -d
+#   IMAGE_TAG=staging docker compose --env-file deploy/env/staging.env -f deploy/docker-compose.staging.yml pull
+#   IMAGE_TAG=staging docker compose --env-file deploy/env/staging.env -f deploy/docker-compose.staging.yml up -d
 #
 # Several copies can run side by side: live messages are relayed through Redis. Each copy keeps attachments in its own
 # volume, though, so with more than one copy use a shared network storage (STORAGE_MODE=NETWORK, see deploy/README.md).
@@ -20,11 +20,13 @@ name: premisave-messenger-staging
 
 services:
   messenger:
-    build: .
+    build:
+      context: ..
+      dockerfile: Dockerfile
     image: ghcr.io/peacemakerbill/premisave-messenger-service:${IMAGE_TAG:-staging}
     container_name: premisave-messenger-staging
     env_file:
-      - deploy/env/staging.env
+      - env/staging.env
     environment:
       SPRING_PROFILES_ACTIVE: staging
       MONGODB_URI: mongodb://mongo:27017/premisave-messenger-staging
@@ -40,13 +42,15 @@ services:
       - "${HTTP_BIND:-127.0.0.1}:${HTTP_PORT:-8081}:8081"
     volumes:
       - messenger-data:/data/messenger-storage
-      - ${CALLS_RECORDINGS_HOST_DIR:-./deploy/livekit/recordings}:/data/recordings
+      - ${CALLS_RECORDINGS_HOST_DIR:-./livekit/recordings}:/data/recordings
     depends_on:
       mongo:
         condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     stop_grace_period: 45s
     deploy:
       resources:

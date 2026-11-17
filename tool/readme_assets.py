@@ -450,12 +450,12 @@ def deploy():
     def has(*names):
         return all(os.path.exists(os.path.join(ROOT, n)) for n in names)
     plats = [
-        ('Docker Compose', ['docker-compose.yml', '+ .staging.yml', '+ .production.yml'], (has('docker-compose.yml'), has('docker-compose.staging.yml'), has('docker-compose.production.yml'))),
-        ('Coolify', ['docker-compose', '.coolify.yml'], (has('docker-compose.coolify.yml'),) * 3),
-        ('Render', ['render.yaml'], (has('render.yaml'),) * 3),
+        ('Docker Compose', ['docker-compose.yml', '+ .staging.yml', '+ .production.yml'], (has('docker-compose.yml'), has('deploy/docker-compose.staging.yml'), has('deploy/docker-compose.production.yml'))),
+        ('Coolify', ['docker-compose', '.coolify.yml'], (has('deploy/docker-compose.coolify.yml'),) * 3),
+        ('Render', ['render.yaml'], (has('deploy/render.yaml'),) * 3),
         ('Heroku', ['heroku.yml', 'app.json'], (has('heroku.yml', 'app.json'),) * 3),
-        ('Fly.io', ['fly.staging.toml', 'fly.production.toml'], (False, has('fly.staging.toml'), has('fly.production.toml'))),
-        ('Railway', ['railway.json'], (has('railway.json'),) * 3),
+        ('Fly.io', ['fly.staging.toml', 'fly.production.toml'], (False, has('deploy/fly.staging.toml'), has('deploy/fly.production.toml'))),
+        ('Railway', ['railway.json'], (has('deploy/railway.json'),) * 3),
     ]
     lx, colw, top, rowh = 32, 160, 176, 58
     x0 = 212

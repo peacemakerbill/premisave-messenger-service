@@ -15,10 +15,10 @@ Files in this repository:
 |---|---|
 | `Dockerfile`, `docker/entrypoint.sh` | The image. Builds with Maven, runs Java 21, listens on `PORT` (or 8081) |
 | `docker-compose.yml` | Development: the service with its own MongoDB and Redis |
-| `docker-compose.staging.yml`, `docker-compose.production.yml` | One server with Docker |
+| `docker-compose.staging.yml`, `docker-compose.production.yml` (in this folder) | One server with Docker |
 | `docker-compose.coolify.yml` | Coolify (any stage) |
 | `render.yaml` | Render: development, staging and production in one Blueprint |
-| `heroku.yml`, `app.json` | Heroku (container stack) |
+| `heroku.yml`, `app.json` (these two stay in the repository root, Heroku only reads them there) | Heroku (container stack) |
 | `fly.staging.toml`, `fly.production.toml` | Fly.io |
 | `railway.json` | Railway |
 | `deploy/env/*.env.example` | The values each environment needs |
@@ -79,7 +79,7 @@ services use the same development secrets, so they work together with no setting
 
 ```bash
 cp deploy/env/staging.env.example deploy/env/staging.env      # fill it in
-docker compose --env-file deploy/env/staging.env -f docker-compose.staging.yml up -d --build
+docker compose --env-file deploy/env/staging.env -f deploy/docker-compose.staging.yml up -d --build
 ```
 
 For production the image is pulled by an exact version and MongoDB is external:
@@ -87,8 +87,8 @@ For production the image is pulled by an exact version and MongoDB is external:
 ```bash
 cp deploy/env/production.env.example deploy/env/production.env
 docker login ghcr.io                          # once, with a GitHub token that can read packages
-IMAGE_TAG=1.0.0 docker compose --env-file deploy/env/production.env -f docker-compose.production.yml pull
-IMAGE_TAG=1.0.0 docker compose --env-file deploy/env/production.env -f docker-compose.production.yml up -d
+IMAGE_TAG=1.0.0 docker compose --env-file deploy/env/production.env -f deploy/docker-compose.production.yml pull
+IMAGE_TAG=1.0.0 docker compose --env-file deploy/env/production.env -f deploy/docker-compose.production.yml up -d
 ```
 
 The service is published on `127.0.0.1:8081`. Put nginx, Caddy or Traefik in front for https. For nginx, websockets
@@ -114,7 +114,7 @@ Calls need a LiveKit server. `deploy/livekit/docker-compose.yml` starts one (and
 
 1. Create the project, then one Coolify **environment** per stage (development, staging, production).
 2. In each: New resource, Git repository, Build Pack **Docker Compose**, branch for that stage,
-   Docker Compose Location `/docker-compose.coolify.yml`.
+   Base Directory `/deploy`, Docker Compose Location `/docker-compose.coolify.yml`.
 3. Open Environment Variables. Fill the required ones and set `SPRING_PROFILES_ACTIVE` to `dev`, `staging` or `prod`.
 4. Give the `messenger` service a domain (websockets pass through Coolify's proxy), then deploy.
 
@@ -128,7 +128,7 @@ server you control. Calls themselves work with LiveKit Cloud or a LiveKit server
 
 ## Render
 
-1. New, **Blueprint**, pick this repository. Render reads `render.yaml` and creates the three environments.
+1. New, **Blueprint**, pick this repository. Open **Blueprint settings** and set the file path to `deploy/render.yaml` (Render looks for the root otherwise). Render then reads it and creates the three environments.
 2. Fill in the values it asks for. `JWT_SECRET` and `INTERNAL_API_KEY` must equal the auth-service's.
 3. `MONGODB_URI` is an Atlas address: Render has no MongoDB. Leave the `LIVEKIT_*` values empty to keep calls off.
 
@@ -166,16 +166,16 @@ Two limits to know before choosing Heroku:
 fly apps create premisave-messenger-staging
 fly volumes create premisave_messenger_staging --region jnb --size 5 -a premisave-messenger-staging
 fly secrets import -a premisave-messenger-staging < deploy/env/staging.env
-fly deploy -c fly.staging.toml
+fly deploy . --config deploy/fly.staging.toml --dockerfile Dockerfile
 ```
 
-Production is the same with `fly.production.toml` and `premisave-messenger`. One machine is the simplest (a volume belongs to one machine). Fly's Redis address goes
+Production is the same with `deploy/fly.production.toml` and `premisave-messenger`. One machine is the simplest (a volume belongs to one machine). Fly's Redis address goes
 in `REDIS_URL`. The volume keeps the attachments.
 
 ## Railway
 
 Create one Railway **environment** per stage in the project. Add MongoDB and Redis from the templates, deploy this
-repository (it reads `railway.json`) and add a volume mounted at `/data`. Variables per environment, for example:
+repository (open the service settings, Config as code, and set the file path to `/deploy/railway.json`) and add a volume mounted at `/data`. Variables per environment, for example:
 
 ```
 SPRING_PROFILES_ACTIVE=staging

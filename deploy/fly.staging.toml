@@ -1,27 +1,26 @@
-# Premisave messenger-service on FLY.IO, PRODUCTION.
+# Premisave messenger-service on FLY.IO, STAGING.
 #
-#   fly apps create premisave-messenger
-#   fly volumes create premisave_messenger --region jnb --size 5 -a premisave-messenger
-#   fly secrets import -a premisave-messenger < deploy/env/production.env
-#   fly deploy -c fly.production.toml
+#   fly apps create premisave-messenger-staging
+#   fly volumes create premisave_messenger_staging --region jnb --size 5 -a premisave-messenger-staging
+#   fly secrets import -a premisave-messenger-staging < deploy/env/staging.env
+#   fly deploy . --config deploy/fly.staging.toml --dockerfile Dockerfile
 #
 # One machine is the simplest. Several work too (live messages are relayed through Redis), but the volume belongs to one
 # machine, so for more than one use a shared network storage (STORAGE_MODE=NETWORK).
 # Fly's Redis (Upstash) gives an address with the password in it: use it for REDIS_URL.
 # MongoDB is not offered by Fly: use MongoDB Atlas for MONGODB_URI.
 
-app = "premisave-messenger"
+app = "premisave-messenger-staging"
 primary_region = "jnb"
 
 [build]
-  dockerfile = "Dockerfile"
 
 [env]
-  SPRING_PROFILES_ACTIVE = "prod"
+  SPRING_PROFILES_ACTIVE = "staging"
   PORT = "8081"
 
 [mounts]
-  source = "premisave_messenger"
+  source = "premisave_messenger_staging"
   destination = "/data"
 
 [http_service]
@@ -40,4 +39,4 @@ primary_region = "jnb"
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "2gb"
+  memory = "1gb"
