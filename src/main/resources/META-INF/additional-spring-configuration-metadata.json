@@ -7,6 +7,11 @@
       "defaultValue": "http://localhost:8080"
     },
     {
+      "name": "auth.service.api-key",
+      "type": "java.lang.String",
+      "description": "Shared service key for calls to auth-service. Must be the same value as API_KEY in auth-service. Without it no notification emails are sent. Set with INTERNAL_API_KEY."
+    },
+    {
       "name": "jwt.secret",
       "type": "java.lang.String",
       "description": "Base64-encoded secret key used to sign and verify JWT tokens. Must match across all microservices."
@@ -396,6 +401,72 @@
       "type": "java.lang.String",
       "description": "Application name tag for metrics.",
       "defaultValue": "premisave-messenger"
+    },
+    {
+      "name": "notifications.email-enabled",
+      "type": "java.lang.Boolean",
+      "description": "Master switch for notification emails, such as group changes (made an admin or the owner, added to or removed from a group) and tags. Notifications always appear in the app. Emails go through auth-service and need auth.service.api-key. Set with NOTIFICATION_EMAILS_ENABLED.",
+      "defaultValue": true
+    },
+    {
+      "name": "notifications.mention-email-cooldown-minutes",
+      "type": "java.lang.Integer",
+      "description": "Tagging someone with @ or everyone with @all always notifies in the app. The email is held back so a burst of tagged messages is one email: at most one per person and chat in this many minutes. Set with MENTION_EMAIL_COOLDOWN_MINUTES.",
+      "defaultValue": 5
+    },
+    {
+      "name": "notifications.mention-all-email-max-members",
+      "type": "java.lang.Integer",
+      "description": "An @all in a group with more people than this notifies in the app only, with no emails. Set with MENTION_ALL_EMAIL_MAX_MEMBERS.",
+      "defaultValue": 100
+    },
+    {
+      "name": "status.max-hours",
+      "type": "java.lang.Integer",
+      "description": "The longest a status can stay, in hours. Nobody can choose more than this. Set with STATUS_MAX_HOURS.",
+      "defaultValue": 24
+    },
+    {
+      "name": "status.default-hours",
+      "type": "java.lang.Integer",
+      "description": "How long a status stays when the person does not choose, in hours. Never above status.max-hours. Set with STATUS_DEFAULT_HOURS.",
+      "defaultValue": 24
+    },
+    {
+      "name": "status.text-max-length",
+      "type": "java.lang.Integer",
+      "description": "Most characters in a text status or a caption. Set with STATUS_TEXT_MAX_LENGTH.",
+      "defaultValue": 700
+    },
+    {
+      "name": "status.comment-max-length",
+      "type": "java.lang.Integer",
+      "description": "Most characters in a comment on a status. Set with STATUS_COMMENT_MAX_LENGTH.",
+      "defaultValue": 300
+    },
+    {
+      "name": "status.past-visible-to-followers",
+      "type": "java.lang.Boolean",
+      "description": "When true, followers can also open a person's past statuses. The owner always can. Set with STATUS_PAST_VISIBLE_TO_FOLLOWERS.",
+      "defaultValue": false
+    },
+    {
+      "name": "group-invite.link-base-url",
+      "type": "java.lang.String",
+      "description": "What a group invite link starts with. The link is this, a slash and a random code. Point it at whatever should open when the link is tapped (the app or a web page). Set with GROUP_INVITE_BASE_URL.",
+      "defaultValue": "https://premisave.com/join"
+    },
+    {
+      "name": "group-invite.max-expiry-hours",
+      "type": "java.lang.Integer",
+      "description": "The longest an admin can make a group invite link last, in hours. A link can also have no expiry at all. Set with GROUP_INVITE_MAX_EXPIRY_HOURS.",
+      "defaultValue": 8760
+    },
+    {
+      "name": "group-invite.max-uses-limit",
+      "type": "java.lang.Integer",
+      "description": "The most joins an admin can limit a group invite link to. Set with GROUP_INVITE_MAX_USES_LIMIT.",
+      "defaultValue": 100000
     },
     {
       "name": "calls.livekit-url",
