@@ -246,6 +246,7 @@ What an administrator can set:
 
 Safety rules, always on:
 
+- **The folder picker shows only the allowed roots.** The app's folder button starts at the list of allowed roots (and the recorder's folder for recordings) and cannot open anything else. If it offers too little, widen `STORAGE_ALLOWED_ROOTS` in `.env`, for example `STORAGE_ALLOWED_ROOTS=/home/you/file-storage,/mnt`, and restart the messenger. Everything inside a listed folder is open to administrators, so list the narrowest folders that do the job and never `/` or a whole home folder.
 - **Only inside allowed roots.** Folders must be full paths inside one of `STORAGE_ALLOWED_ROOTS` (comma separated). When it is blank, the allowed roots are `STORAGE_ROOT` and `STORAGE_NETWORK_MOUNT_PATH` themselves. `..`, links that lead outside the roots and odd characters are refused, and nothing is created outside a root.
 - **Try before saving.** "Try it" creates the folder, writes a small test file, deletes it, and says whether it worked and how much space is free. A save does the same and is refused if the folder does not work.
 - **A network share must be mounted.** In `NETWORK` mode the mount path must really be on a network file system (cifs, nfs and so on) unless the administrator turns that check off. The service never mounts anything itself.
@@ -612,7 +613,7 @@ The steps for each one, the limits to know (Heroku has no file storage, Render c
 | `ACTUATOR_USER` / `ACTUATOR_PASSWORD` | No | `actuator` / `actuator123` | Basic Auth for `/actuator/**` (health details, metrics, Prometheus scrape). |
 | `STORAGE_MODE` | No | `LOCAL` | `LOCAL` writes under `STORAGE_ROOT`. `NETWORK` writes to a share already mounted at `STORAGE_NETWORK_MOUNT_PATH`. |
 | `STORAGE_ROOT` | LOCAL mode | `./data/messenger-storage` | Base folder for uploaded files. |
-| `STORAGE_ALLOWED_ROOTS` | No | blank | Folders the admin dashboard may choose from, full paths separated by commas. Blank allows `STORAGE_ROOT` and `STORAGE_NETWORK_MOUNT_PATH` only. See [Storage from the dashboard](#storage-from-the-dashboard). |
+| `STORAGE_ALLOWED_ROOTS` | No | blank | Folders the admin dashboard and its folder picker may choose from, full paths separated by commas. Blank allows `STORAGE_ROOT` and `STORAGE_NETWORK_MOUNT_PATH` only, so set it to choose other folders, for example `/home/you/file-storage,/mnt`. See [Storage from the dashboard](#storage-from-the-dashboard). |
 | `STORAGE_PUBLIC_BASE_URL` | No | `http://localhost:8081` | Public address of this service, used in download and photo links. |
 | `STORAGE_MAX_FILE_SIZE` / `STORAGE_MAX_REQUEST_SIZE` | No | `50MB` / `60MB` | Largest single file, and the request limit (keep it a little higher). |
 | `MESSAGE_EDIT_WINDOW_HOURS` | No | `1` | How long after sending a person can edit their own message (`message.edit-window-hours` in `application.yml`). `0` turns editing off. Past the window the edit is refused with `EDIT_WINDOW_EXPIRED`. |

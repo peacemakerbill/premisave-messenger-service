@@ -57,7 +57,7 @@ Staging pairs with staging and production with production. Never point staging a
 | `JWT_SECRET` | Has an insecure built-in fallback. **Always set your own** outside development |
 | `AUTH_SERVICE_URL`, `INTERNAL_API_KEY` | See the table above |
 | `ACTUATOR_PASSWORD` | Has a fallback. Set your own. Protects the metrics endpoints |
-| `STORAGE_ALLOWED_ROOTS` | Optional. Folders the admin dashboard may choose from (Messenger settings, Storage). Blank allows only `STORAGE_ROOT` and the network mount path. With Docker or a platform volume, list the container path of any extra volume you add |
+| `STORAGE_ALLOWED_ROOTS` | Optional. Folders the admin dashboard and its folder picker may choose from (Settings, Storage). Blank allows only `STORAGE_ROOT` and the network mount path, so the picker shows nothing else. With Docker or a platform volume, list the container path of any extra volume you add |
 | `STORAGE_PUBLIC_BASE_URL` | This service's own public address. Download links inside messages start with it |
 
 Everything else has a default (see `.env.example`). Make secrets with `openssl rand -base64 32` and

@@ -268,12 +268,18 @@ Rules to know:
       To offer another folder, add a volume for it in docker-compose.yml and put its container path in
       STORAGE_ALLOWED_ROOTS. Running from source, any folder you can write to works.
 
-Example for running from source: allow one folder, then pick a subfolder of it in the dashboard.
+The folder button in the Storage screen shows only the folders listed in STORAGE_ALLOWED_ROOTS. If you
+cannot reach a folder, it is not listed. Everything inside a listed folder is open to administrators, so
+list the narrowest folders that do the job, never / or your whole home folder.
+
+Example for running from source: allow the storage folder and /mnt (for shares), then pick folders in the
+dashboard. The same line goes into the auth service .env, because it has its own list.
 
     mkdir -p /home/graham218/MyProjects/file-storage/premisave-messenger
-    echo 'STORAGE_ALLOWED_ROOTS=/home/graham218/MyProjects/file-storage' >> .env
+    echo 'STORAGE_ALLOWED_ROOTS=/home/graham218/MyProjects/file-storage,/mnt' >> .env
 
-Restart the messenger after changing .env.
+If the line is already in .env, edit it instead of adding a second one. Restart the messenger after
+changing .env.
 
 
 PART 8. START THE FLUTTER APP
