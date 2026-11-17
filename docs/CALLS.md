@@ -59,6 +59,59 @@ treat it as the truth and redraw from it. `INCOMING` is the one that makes a pho
 make it stop. An `INCOMING` for a call you have already answered on another device is followed by `PARTICIPANT_JOINED`
 with your own id as `userId`: stop ringing when you see that.
 
+## Recording and call history
+
+Calls can be recorded and watched later, like Teams. The call chat is also kept, so people can read it after the call.
+
+* **Who can record.** A host or co-host who is in the call. The red "Recording" sign appears for everyone in the call.
+* **Who can watch and read.** Everyone who was in the call (people who were only invited, or were removed, cannot).
+* **Kept for how long.** Until someone deletes it: the person who started the recording, or a host or co-host of that call.
+  The chat messages of a call are kept too (they used to expire after 30 days).
+* **The administrators' switch.** An administrator turns recording on or off for everyone from the dashboard (Admin,
+  Calls). When it is off, the record button, the "Recording" sign and the recordings list disappear for everyone, the
+  recording endpoints refuse, and turning it off finishes any recording that is running. The files stay on disk and come
+  back when it is switched on again. `CALLS_RECORDING_ENABLED` only sets the starting value (false until someone decides).
+
+Endpoints (all under `/api/calls`, signed-in users):
+
+| Method and path | What it does |
+| --- | --- |
+| `POST /{id}/recording/start` | A host or co-host starts recording. |
+| `POST /{id}/recording/stop` | A host or co-host stops it. The video is ready a few seconds later. |
+| `GET /{id}/recordings` | The recordings of the call, newest first. Each ready one has a `playUrl` (a signed link that needs no header, with Range support). |
+| `DELETE /{id}/recordings/{recordingId}` | Deletes a recording and its file. |
+| `GET /{id}/messages?limit=` | The call chat, up to 1000 messages, also after the call ended. |
+| `GET /api/call-settings` | `{ recordingEnabled, canManage }`. |
+| `PUT /api/call-settings/recording` | Administrators only. Body `{ "enabled": true }`. |
+
+New live events: `RECORDING_STARTED`, `RECORDING_STOPPED` and `RECORDING_SETTING`. Every `call` object carries
+`recordingEnabled`, `recording` (a recording is running now) and `recordingCount` (finished recordings).
+
+### Setting up recording
+
+Recording is done by LiveKit Egress, the second service in `deploy/livekit/docker-compose.yml`.
+
+1. **Redis.** Egress and the LiveKit server talk through Redis. The compose file points both at `localhost:6379`, the Redis the
+   messenger already uses. Change `LIVEKIT_REDIS_ADDRESS` (and `LIVEKIT_REDIS_PASSWORD`) if yours is elsewhere. LiveKit will not
+   start when that Redis cannot be reached.
+2. **A folder for the videos**, writable by the recorder (it runs as an unprivileged user):
+   ```bash
+   cd deploy/livekit
+   mkdir -p recordings && chmod 777 recordings
+   ```
+   The messenger reads the same folder through `CALLS_RECORDINGS_DIR` (default `deploy/livekit/recordings`, relative to where
+   the messenger runs). Elsewhere, set `CALLS_RECORDINGS_HOST_DIR` for Docker and `CALLS_RECORDINGS_DIR` for the messenger to the same
+   folder. Inside the container the folder is `/out` (`CALLS_RECORDINGS_EGRESS_DIR`).
+3. **Start it:** `docker compose --env-file ../../.env up -d`, then restart the messenger. Check `docker logs premisave-egress`.
+4. **Switch it on** as an administrator, in the app: Admin, Calls, Call recording.
+
+The recorder runs a headless browser, so each recording uses a good part of a CPU core. Videos are MP4, about 0.5 to 1 GB
+per hour at the default quality. Plan disk space, because recordings are never deleted automatically. If you run the
+messenger on another machine than the recorder, share the folder (NFS or similar) and point both at it.
+
+Webhooks: the LiveKit server also reports `egress_started`, `egress_updated` and `egress_ended` to the same
+`/api/calls/livekit-webhook`. If one is lost, a check every 30 seconds looks at the file and settles the recording.
+
 ## Setting up LiveKit
 
 You need a Linux server (or your own machine for development) with Docker.
@@ -118,7 +171,6 @@ You need a Linux server (or your own machine for development) with Docker.
 * **Ringing when the app is closed.** The phone rings only while the app is running and connected (live events). Ringing a
   closed app needs push notifications (Firebase Cloud Messaging on Android, Apple push and CallKit on iPhone), which need
   accounts and keys of your own. The missed-call notification still arrives when they open the app.
-* **Recording.** LiveKit can record with its Egress service. It is not set up here.
 * **A waiting room.** A host can lock a call, which keeps new people out.
 
 ## Troubleshooting
@@ -131,3 +183,13 @@ You need a Linux server (or your own machine for development) with Docker.
 | Chrome says the camera is blocked | The page is not secure. Use `localhost` or `https`/`wss`. |
 | Hosts cannot mute or remove people | The messenger cannot reach `LIVEKIT_API_URL`. The call record still changes; check the logs for "LiveKit RemoveParticipant failed". |
 | People stay in a call after closing the app | The webhook is not arriving and the 20 second check cannot reach LiveKit either. Check `LIVEKIT_API_URL`. |
+
+### Recording does not work
+
+* **"The recorder is not available".** The Egress container is not running: `docker ps` and `docker logs premisave-egress`.
+  The usual causes are a Redis that is not reachable, or a different Redis than the LiveKit server uses.
+* **The recording ends as "failed" with "video file was not found".** The recorder and the messenger are not looking at the same
+  folder, or the folder is not writable. Run `ls -l deploy/livekit/recordings` after a short recording: the file should be there.
+* **Egress logs a Chrome sandbox error.** Add `cap_add: [SYS_ADMIN]` to the `egress` service.
+* **No record button.** An administrator has to switch recording on first, and the call must have a host or co-host (you are the
+  host of a call you start).

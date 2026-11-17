@@ -31,3 +31,6 @@ build/
 !**/src/test/**/build/
 ### VS Code ###
 .vscode/
+
+# Deployment env files hold real secrets
+deploy/env/*.env

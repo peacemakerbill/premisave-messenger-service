@@ -13,6 +13,7 @@ import com.premisave.messenger.dto.response.CallSummary;
 import com.premisave.messenger.dto.response.UserSummaryResponse;
 import com.premisave.messenger.entity.Call;
 import com.premisave.messenger.entity.CallMessage;
+import com.premisave.messenger.entity.CallRecording;
 import com.premisave.messenger.entity.Chat;
 import com.premisave.messenger.enums.CallEventType;
 import com.premisave.messenger.enums.CallKind;
@@ -21,9 +22,11 @@ import com.premisave.messenger.enums.CallStatus;
 import com.premisave.messenger.enums.CallType;
 import com.premisave.messenger.enums.ChatType;
 import com.premisave.messenger.enums.ParticipantState;
+import com.premisave.messenger.enums.RecordingStatus;
 import com.premisave.messenger.exception.HttpStatusException;
 import com.premisave.messenger.realtime.RedisMessagePublisher;
 import com.premisave.messenger.repository.CallMessageRepository;
+import com.premisave.messenger.repository.CallRecordingRepository;
 import com.premisave.messenger.repository.CallRepository;
 import com.premisave.messenger.repository.ChatRepository;
 import com.premisave.messenger.util.UserNames;
@@ -81,6 +84,8 @@ public class CallService {
 
     private final CallRepository callRepository;
     private final CallMessageRepository callMessageRepository;
+    private final CallRecordingRepository callRecordingRepository;
+    private final CallSettingsService callSettings;
     private final ChatRepository chatRepository;
     private final GroupService groupService;
     private final UserService userService;
@@ -719,10 +724,13 @@ public class CallService {
     public List<CallChatResponse> chat(UserSummaryResponse me, String callId, int limit) {
         Call call = require(callId);
         Call.Participant p = call.participant(me.getId());
-        if (p == null || p.getState() == ParticipantState.REMOVED) {
-            throw HttpStatusException.forbidden("You are not part of this call");
+        // Everyone who was in the call can read its chat afterwards. Someone who was only invited, or was removed, cannot.
+        boolean wasIn = p != null && p.getState() != ParticipantState.REMOVED
+                && (p.getJoinedAt() != null || p.getState() == ParticipantState.JOINED);
+        if (!wasIn) {
+            throw HttpStatusException.forbidden("You were not in this call");
         }
-        int size = Math.max(1, Math.min(limit, 200));
+        int size = Math.max(1, Math.min(limit, 1000));
         List<CallChatResponse> page = new ArrayList<>(callMessageRepository
                 .findByCallIdOrderByCreatedAtDesc(callId, PageRequest.of(0, size)).stream()
                 .map(CallService::toChatResponse).toList());
@@ -765,7 +773,11 @@ public class CallService {
     public List<CallResponse> history(String userId, int limit, LocalDateTime before) {
         int size = Math.max(1, Math.min(limit, 100));
         LocalDateTime cursor = before == null ? LocalDateTime.now().plusMinutes(1) : before;
-        return callRepository.findHistory(userId, cursor, PageRequest.of(0, size)).stream().map(this::toResponse).toList();
+        List<Call> calls = callRepository.findHistory(userId, cursor, PageRequest.of(0, size));
+        List<CallResponse> out = new ArrayList<>();
+        for (Call c : calls) out.add(baseResponse(c));
+        applyRecordings(calls, out);
+        return out;
     }
 
     /** Removes one finished call from this person's history only. */
@@ -1078,7 +1090,35 @@ public class CallService {
         }
     }
 
+    /** A call as the app sees it, with the recording flags filled in. */
     public CallResponse toResponse(Call call) {
+        CallResponse r = baseResponse(call);
+        applyRecordings(List.of(call), List.of(r));
+        return r;
+    }
+
+    /**
+     * Fills in the recording flags of several calls with one query. When recording is switched off, nothing is looked up and
+     * every flag stays false, which is what makes the recording controls disappear in the apps.
+     */
+    private void applyRecordings(List<Call> calls, List<CallResponse> responses) {
+        if (calls.isEmpty() || !callSettings.recordingAvailable()) return;
+        List<String> ids = calls.stream().map(Call::getId).toList();
+        Map<String, List<CallRecording>> byCall = new java.util.HashMap<>();
+        for (CallRecording rec : callRecordingRepository.findByCallIdIn(ids)) {
+            byCall.computeIfAbsent(rec.getCallId(), k -> new ArrayList<>()).add(rec);
+        }
+        for (int i = 0; i < calls.size(); i++) {
+            CallResponse r = responses.get(i);
+            r.setRecordingEnabled(true);
+            for (CallRecording rec : byCall.getOrDefault(calls.get(i).getId(), List.of())) {
+                if (rec.getStatus() != null && rec.getStatus().isCapturing()) r.setRecording(true);
+                if (rec.getStatus() == RecordingStatus.READY) r.setRecordingCount(r.getRecordingCount() + 1);
+            }
+        }
+    }
+
+    private CallResponse baseResponse(Call call) {
         CallResponse r = new CallResponse();
         r.setId(call.getId());
         r.setKind(call.getKind());

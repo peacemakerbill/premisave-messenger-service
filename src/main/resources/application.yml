@@ -192,6 +192,13 @@ calls:
   link-base-url: ${CALLS_LINK_BASE_URL:https://premisave.com/call}
   link-ttl-hours: ${CALLS_LINK_TTL_HOURS:168}
   chat-max-length: ${CALLS_CHAT_MAX_LENGTH:2000}
+  # Recording. The starting value of the switch (administrators change it from the dashboard and their choice then wins),
+  # the folder the recorder writes to as this service sees it, and the same folder as the recorder sees it.
+  recording-enabled: ${CALLS_RECORDING_ENABLED:false}
+  recordings-dir: ${CALLS_RECORDINGS_DIR:deploy/livekit/recordings}
+  recordings-egress-dir: ${CALLS_RECORDINGS_EGRESS_DIR:/out}
+  recording-layout: ${CALLS_RECORDING_LAYOUT:speaker}
+  recording-link-ttl-hours: ${CALLS_RECORDING_LINK_TTL_HOURS:6}
 
 rate-limit:
   requests-per-minute: 60

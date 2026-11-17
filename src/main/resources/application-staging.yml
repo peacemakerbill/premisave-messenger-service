@@ -1,0 +1,10 @@
+# Staging (SPRING_PROFILES_ACTIVE=staging): behaves like production, with a little more detail in the logs
+# so a problem can be found before a release reaches real users.
+logging:
+  level:
+    '[com.premisave.messenger]': DEBUG
+    '[org.springframework]': WARN
+
+server:
+  compression:
+    enabled: true

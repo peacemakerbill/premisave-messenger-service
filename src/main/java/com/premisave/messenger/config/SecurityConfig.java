@@ -44,6 +44,9 @@ public class SecurityConfig {
                 // header that CallWebhookController checks instead.
                 .requestMatchers(HttpMethod.POST, "/api/calls/livekit-webhook").permitAll()
 
+                // A call recording plays from a signed link, checked in CallController.
+                .requestMatchers(HttpMethod.GET, "/api/calls/recordings/*/file").permitAll()
+
                 // Group photos and other public media returned by /api/media/upload.
                 .requestMatchers(HttpMethod.GET, "/api/media/files/**").permitAll()
 

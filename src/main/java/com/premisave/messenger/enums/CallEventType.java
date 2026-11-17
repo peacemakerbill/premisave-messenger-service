@@ -22,5 +22,11 @@ public enum CallEventType {
     ROLE_CHANGED,
     LOCK_CHANGED,
     /** A message in the call's chat. */
-    CHAT
+    CHAT,
+    /** A host started recording the call. */
+    RECORDING_STARTED,
+    /** The recording stopped, or its video file is finished. */
+    RECORDING_STOPPED,
+    /** The administrators switched recording on or off. */
+    RECORDING_SETTING
 }

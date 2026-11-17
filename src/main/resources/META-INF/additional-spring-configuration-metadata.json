@@ -527,6 +527,36 @@
       "defaultValue": 168
     },
     {
+      "name": "calls.recording-enabled",
+      "type": "java.lang.Boolean",
+      "description": "Starting value of the call recording switch. An administrator can change it from the dashboard and their choice then wins. When off, recording is hidden for everyone. Set with CALLS_RECORDING_ENABLED.",
+      "defaultValue": false
+    },
+    {
+      "name": "calls.recordings-dir",
+      "type": "java.lang.String",
+      "description": "Folder the recorder writes call videos to, as this service sees it. Must be the same folder the recorder container writes to. Set with CALLS_RECORDINGS_DIR.",
+      "defaultValue": "deploy/livekit/recordings"
+    },
+    {
+      "name": "calls.recordings-egress-dir",
+      "type": "java.lang.String",
+      "description": "The recordings folder as the recorder container sees it (where the folder is mounted inside the container). Set with CALLS_RECORDINGS_EGRESS_DIR.",
+      "defaultValue": "/out"
+    },
+    {
+      "name": "calls.recording-layout",
+      "type": "java.lang.String",
+      "description": "How a recorded call is laid out: speaker (the speaker is large, shared screens come to the front) or grid. Set with CALLS_RECORDING_LAYOUT.",
+      "defaultValue": "speaker"
+    },
+    {
+      "name": "calls.recording-link-ttl-hours",
+      "type": "java.lang.Integer",
+      "description": "How long a link to watch a recording works, in hours. A new link is made every time the recordings of a call are loaded. Set with CALLS_RECORDING_LINK_TTL_HOURS.",
+      "defaultValue": 6
+    },
+    {
       "name": "calls.chat-max-length",
       "type": "java.lang.Integer",
       "description": "Most characters in one message in a call's chat. Set with CALLS_CHAT_MAX_LENGTH.",

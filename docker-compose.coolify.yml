@@ -1,0 +1,89 @@
+# Premisave messenger-service on COOLIFY (and any platform that deploys a Docker Compose file).
+#
+# In Coolify: Project > Environment (staging or production) > New resource > Public/Private Repository,
+# Build Pack "Docker Compose", Base Directory "/", Docker Compose Location "/docker-compose.coolify.yml".
+#
+# One file serves every environment. Create one Coolify environment per stage and give each its own
+# variables, branch and domain. Coolify shows every ${...} below under Environment Variables:
+#   - ${NAME:?}        required, the deploy waits until it has a value
+#   - ${NAME:-value}   starts with that value, change it per environment
+#   - SERVICE_URL_MESSENGER_8081 gives the service a domain and sends traffic to port 8081
+#     (Coolify's proxy passes websockets through, which live messages need)
+#
+#   development   SPRING_PROFILES_ACTIVE=dev      branch develop
+#   staging       SPRING_PROFILES_ACTIVE=staging  branch staging
+#   production    SPRING_PROFILES_ACTIVE=prod     branch main
+#
+# Set AUTH_SERVICE_URL to the auth-service of the same environment, with the same JWT_SECRET, and
+# INTERNAL_API_KEY equal to its API_KEY. If both are Coolify resources in one environment, use the auth domain.
+#
+# MongoDB: by default the file starts one in the same stack. For production use a managed database
+# (MongoDB Atlas) and set MONGODB_URI to its address.
+#
+# Run ONE copy of the service: live messages go through a broker inside the service.
+
+services:
+  messenger:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - SERVICE_URL_MESSENGER_8081
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-prod}
+      # ---- Required ----
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongo:27017/premisave-messenger}
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:?}
+      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL:?}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:?}
+      - ACTUATOR_USER=${ACTUATOR_USER:-actuator}
+      - ACTUATOR_PASSWORD=${ACTUATOR_PASSWORD:?}
+      # Download links inside messages start with this: the public address of this service.
+      - STORAGE_PUBLIC_BASE_URL=${STORAGE_PUBLIC_BASE_URL:-${SERVICE_URL_MESSENGER}}
+      - STORAGE_MAX_FILE_SIZE=${STORAGE_MAX_FILE_SIZE:-50MB}
+      - STORAGE_MAX_REQUEST_SIZE=${STORAGE_MAX_REQUEST_SIZE:-60MB}
+      - NOTIFICATION_EMAILS_ENABLED=${NOTIFICATION_EMAILS_ENABLED:-true}
+      - GROUP_INVITE_BASE_URL=${GROUP_INVITE_BASE_URL:-https://premisave.com/join}
+      # ---- Calls (leave the key and secret empty to keep calls switched off) ----
+      - LIVEKIT_URL=${LIVEKIT_URL:-}
+      - LIVEKIT_API_URL=${LIVEKIT_API_URL:-}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-}
+      - CALLS_LINK_BASE_URL=${CALLS_LINK_BASE_URL:-https://premisave.com/call}
+    volumes:
+      - messenger-data:/data/messenger-storage
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8081/actuator/health > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  messenger-data:
+  mongo-data:
+  redis-data:

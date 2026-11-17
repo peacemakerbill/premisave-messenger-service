@@ -1,0 +1,41 @@
+{
+  "name": "premisave-messenger-service",
+  "description": "Premisave messenger: chats, groups, statuses, calls.",
+  "repository": "https://github.com/peacemakerbill/premisave-messenger-service",
+  "stack": "container",
+  "formation": {
+    "web": { "quantity": 1, "size": "basic" }
+  },
+  "env": {
+    "SPRING_PROFILES_ACTIVE": {
+      "description": "dev, staging or prod. Use staging on the staging app and prod on the production app.",
+      "value": "staging"
+    },
+    "MONGODB_URI": {
+      "description": "MongoDB Atlas connection string (Heroku has no MongoDB of its own). Use a different database for staging and production."
+    },
+    "REDIS_URL": {
+      "description": "Redis address with its password, for example rediss://default:password@host:6379 (Upstash or Redis Cloud). The Heroku Key-Value Store add-on uses a self-signed certificate and may be refused."
+    },
+    "JWT_SECRET": {
+      "description": "Must equal the auth-service JWT_SECRET of the same environment."
+    },
+    "AUTH_SERVICE_URL": {
+      "description": "Public address of the auth-service of the same environment, for example https://premisave-auth-staging.herokuapp.com"
+    },
+    "INTERNAL_API_KEY": {
+      "description": "Must equal the auth-service API_KEY."
+    },
+    "ACTUATOR_PASSWORD": {
+      "description": "Password for the metrics endpoints.",
+      "generator": "secret"
+    },
+    "STORAGE_PUBLIC_BASE_URL": {
+      "description": "Public address of this app, for example https://premisave-messenger-staging.herokuapp.com. Download links inside messages start with it."
+    },
+    "LIVEKIT_URL": { "description": "wss:// address of LiveKit for calls (LiveKit Cloud works). Leave empty to keep calls off.", "required": false },
+    "LIVEKIT_API_URL": { "description": "https:// address of the same LiveKit server.", "required": false },
+    "LIVEKIT_API_KEY": { "description": "LiveKit API key. Empty keeps calls off.", "required": false },
+    "LIVEKIT_API_SECRET": { "description": "LiveKit API secret, at least 32 characters.", "required": false }
+  }
+}

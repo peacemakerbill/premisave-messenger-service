@@ -37,6 +37,13 @@ public class CallResponse {
     private long durationSeconds;
     private String endReason;
 
+    /** Whether recording is switched on by the administrators. When false the app hides all of it. */
+    private boolean recordingEnabled;
+    /** A recording is starting or running in this call right now. */
+    private boolean recording;
+    /** How many finished recordings the call has. */
+    private int recordingCount;
+
     private List<Participant> participants;
 
     @Data

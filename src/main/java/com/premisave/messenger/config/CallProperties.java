@@ -47,6 +47,24 @@ public class CallProperties {
     /** Most characters in one message in a call's chat. */
     private int chatMaxLength = 2000;
 
+    /**
+     * The starting value of the recording switch. An administrator can change it from the dashboard, and from then on
+     * their choice wins. Off by default, so nothing is recorded until someone decides to.
+     */
+    private boolean recordingEnabled = false;
+
+    /** The folder the recorder writes videos to, as this service sees it. It must be the same folder the recorder writes to. */
+    private String recordingsDir = "deploy/livekit/recordings";
+
+    /** The same folder as the recorder sees it (the path inside the recorder's container). */
+    private String recordingsEgressDir = "/out";
+
+    /** How the video is laid out: speaker (the speaker big, screen shares in front) or grid. */
+    private String recordingLayout = "speaker";
+
+    /** How long a recording link works, in hours. Links are made again every time the list is loaded. */
+    private int recordingLinkTtlHours = 6;
+
     public boolean isConfigured() {
         return apiKey != null && !apiKey.isBlank()
                 && apiSecret != null && apiSecret.getBytes(StandardCharsets.UTF_8).length >= 32;

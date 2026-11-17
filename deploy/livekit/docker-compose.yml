@@ -11,6 +11,14 @@
 #   7880/tcp   signalling (the apps connect here; put a TLS proxy in front of it in production)
 #   7881/tcp   media over TCP (fallback when UDP is blocked)
 #   50000-50200/udp   media over UDP
+# Recording is done by the second service in this file (livekit/egress). It needs Redis to talk to the LiveKit server, the same
+# Redis the messenger already uses (LIVEKIT_REDIS_ADDRESS, default localhost:6379), and a folder to write the videos to:
+#
+#   mkdir -p recordings && chmod 777 recordings     (once, in this folder)
+#
+# The messenger reads the same folder (CALLS_RECORDINGS_DIR, default deploy/livekit/recordings). Recording is switched on or
+# off by an administrator from the dashboard. See docs/CALLS.md, "Recording".
+#
 # This works on Linux. On Docker Desktop for Windows or macOS, host networking is limited: use the
 # "ports" variant described in docs/CALLS.md.
 
@@ -29,6 +37,9 @@ services:
           port_range_start: 50000
           port_range_end: 50200
           use_external_ip: ${LIVEKIT_USE_EXTERNAL_IP:-false}
+        redis:
+          address: ${LIVEKIT_REDIS_ADDRESS:-localhost:6379}
+          password: "${LIVEKIT_REDIS_PASSWORD:-}"
         keys:
           ${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}
         room:
@@ -42,3 +53,26 @@ services:
             - ${LIVEKIT_WEBHOOK_URL:-http://localhost:8081/api/calls/livekit-webhook}
         logging:
           level: info
+
+  # Records calls to MP4 files. A host starts and stops it from the call screen; it only does anything when asked.
+  # It runs a headless browser, so a recording uses a good part of a CPU core while it runs.
+  egress:
+    image: livekit/egress:latest
+    container_name: premisave-egress
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      - livekit
+    environment:
+      EGRESS_CONFIG_BODY: |
+        log_level: info
+        api_key: ${LIVEKIT_API_KEY}
+        api_secret: ${LIVEKIT_API_SECRET}
+        ws_url: ${LIVEKIT_EGRESS_WS_URL:-ws://localhost:7880}
+        insecure: ${LIVEKIT_EGRESS_INSECURE:-true}
+        redis:
+          address: ${LIVEKIT_REDIS_ADDRESS:-localhost:6379}
+          password: "${LIVEKIT_REDIS_PASSWORD:-}"
+    volumes:
+      # The folder the videos are written to. Inside the container it is /out (CALLS_RECORDINGS_EGRESS_DIR).
+      - ${CALLS_RECORDINGS_HOST_DIR:-./recordings}:/out

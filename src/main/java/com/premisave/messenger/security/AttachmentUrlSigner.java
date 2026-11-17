@@ -45,6 +45,17 @@ public class AttachmentUrlSigner {
         return MessageDigest.isEqual(expected, sig.getBytes(StandardCharsets.UTF_8));
     }
 
+    /** A link that plays one call recording. The signature covers a "rec:" prefix, so it cannot open an attachment. */
+    public String signedRecordingUrl(String recordingId, java.time.Duration ttl) {
+        long exp = Instant.now().plus(ttl).getEpochSecond();
+        String base = props.getPublicBaseUrl().replaceAll("/+$", "");
+        return base + "/api/calls/recordings/" + recordingId + "/file?exp=" + exp + "&sig=" + sign("rec:" + recordingId, exp);
+    }
+
+    public boolean isRecordingLinkValid(String recordingId, Long exp, String sig) {
+        return isValid("rec:" + recordingId, exp, sig);
+    }
+
     private String sign(String attachmentId, long exp) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");

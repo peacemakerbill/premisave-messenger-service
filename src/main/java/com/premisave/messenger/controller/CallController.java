@@ -8,19 +8,30 @@ import com.premisave.messenger.dto.request.InviteToCallRequest;
 import com.premisave.messenger.dto.request.StartCallRequest;
 import com.premisave.messenger.dto.response.CallChatResponse;
 import com.premisave.messenger.dto.response.CallInviteResult;
+import com.premisave.messenger.dto.response.CallRecordingResponse;
 import com.premisave.messenger.dto.response.CallJoinResponse;
 import com.premisave.messenger.dto.response.CallLinkPreviewResponse;
 import com.premisave.messenger.dto.response.CallResponse;
 import com.premisave.messenger.dto.response.UserSummaryResponse;
 import com.premisave.messenger.security.CurrentUserResolver;
+import com.premisave.messenger.service.CallRecordingService;
 import com.premisave.messenger.service.CallService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
@@ -34,6 +45,7 @@ import java.util.Map;
 public class CallController {
 
     private final CallService callService;
+    private final CallRecordingService recordingService;
     private final CurrentUserResolver currentUserResolver;
 
     private UserSummaryResponse me(String authHeader) {
@@ -246,5 +258,67 @@ public class CallController {
             @RequestHeader("Authorization") String authHeader) {
 
         return ResponseEntity.ok(callService.sendChat(me(authHeader), id, request.getText()));
+    }
+    // ------------------------------------------------------------- recordings
+
+    /** A host or co-host starts recording the call. */
+    @PostMapping("/{id}/recording/start")
+    public ResponseEntity<CallRecordingResponse> startRecording(
+            @PathVariable String id,
+            @RequestHeader("Authorization") String authHeader) {
+
+        return ResponseEntity.ok(recordingService.start(me(authHeader), id));
+    }
+
+    /** A host or co-host stops the recording. */
+    @PostMapping("/{id}/recording/stop")
+    public ResponseEntity<CallRecordingResponse> stopRecording(
+            @PathVariable String id,
+            @RequestHeader("Authorization") String authHeader) {
+
+        return ResponseEntity.ok(recordingService.stop(me(authHeader), id));
+    }
+
+    /** The recordings of a call, newest first. Anyone who was in the call can read them. Empty when recording is off. */
+    @GetMapping("/{id}/recordings")
+    public ResponseEntity<List<CallRecordingResponse>> recordings(
+            @PathVariable String id,
+            @RequestHeader("Authorization") String authHeader) {
+
+        return ResponseEntity.ok(recordingService.list(me(authHeader), id));
+    }
+
+    @DeleteMapping("/{id}/recordings/{recordingId}")
+    public ResponseEntity<Map<String, Boolean>> deleteRecording(
+            @PathVariable String id,
+            @PathVariable String recordingId,
+            @RequestHeader("Authorization") String authHeader) {
+
+        recordingService.delete(me(authHeader), id, recordingId);
+        return ResponseEntity.ok(Map.of("deleted", true));
+    }
+
+    /**
+     * The video itself, from the signed playUrl of a recording (exp and sig). Supports HTTP Range, so the player can
+     * seek and a download can resume.
+     */
+    @GetMapping("/recordings/{recordingId}/file")
+    public ResponseEntity<Resource> recordingFile(
+            @PathVariable String recordingId,
+            @RequestParam(required = false) Long exp,
+            @RequestParam(required = false) String sig) {
+
+        CallRecordingService.Content content = recordingService.open(recordingId, exp, sig);
+        String name = "Call recording "
+                + (content.recording().getCreatedAt() == null ? recordingId
+                : content.recording().getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH.mm")))
+                + ".mp4";
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("video/mp4"))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.inline().filename(name, StandardCharsets.UTF_8).build().toString())
+                .header("X-Content-Type-Options", "nosniff")
+                .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
+                .body(new FileSystemResource(content.path()));
     }
 }

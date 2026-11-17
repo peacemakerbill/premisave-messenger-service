@@ -1,0 +1,84 @@
+# Premisave messenger-service, DEVELOPMENT.
+#
+# Starts the service together with its own MongoDB and Redis, so nothing else has to be installed:
+#
+#     docker compose up --build
+#
+# The service answers on http://localhost:8081 (health: http://localhost:8081/actuator/health).
+#
+# It talks to the auth-service for sign in. By default that is the auth-service published on this computer's
+# port 8080, for example the one started by its own docker-compose.yml. Set AUTH_SERVICE_URL in ".env" to use another.
+# Values from a ".env" file next to this file are used when present (copy .env.example to .env).
+#
+# Calls (LiveKit): set LIVEKIT_API_KEY, LIVEKIT_API_SECRET and LIVEKIT_URL in ".env" and start the LiveKit server
+# from deploy/livekit (see docs/CALLS.md). This file points the service at it on this computer.
+#
+# Staging and production use docker-compose.staging.yml and docker-compose.production.yml.
+
+name: premisave-messenger-dev
+
+services:
+  messenger:
+    build: .
+    image: premisave-messenger:dev
+    container_name: premisave-messenger-dev
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      # Inside the container, "localhost" is the container itself, so these names point at the services below.
+      MONGODB_URI: mongodb://mongo:27017/premisave-messenger
+      REDIS_URL: redis://redis:6379
+      # The auth-service on this computer. Its development defaults match the ones below.
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://host.docker.internal:8080}
+      JWT_SECRET: ${JWT_SECRET:-eW91ci12ZXJ5LXNlY3VyZS1qd3Qtc2VjcmV0LWtleS0zMi1ieXRlcyE=}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-api-key}
+      STORAGE_PUBLIC_BASE_URL: ${STORAGE_PUBLIC_BASE_URL:-http://localhost:8081}
+      # LiveKit running on this computer (deploy/livekit). The apps use LIVEKIT_URL from .env directly.
+      LIVEKIT_API_URL: http://host.docker.internal:7880
+      # Recordings written by the LiveKit egress container (deploy/livekit) land in this folder.
+      CALLS_RECORDINGS_DIR: /data/recordings
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8081:8081"
+    volumes:
+      - messenger-data:/data/messenger-storage
+      - ${CALLS_RECORDINGS_HOST_DIR:-./deploy/livekit/recordings}:/data/recordings
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    container_name: premisave-messenger-dev-mongo
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: premisave-messenger-dev-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  messenger-data:
+  mongo-data:
+  redis-data:

@@ -42,6 +42,7 @@ import java.util.Set;
 public class LiveKitService {
 
     private static final String TWIRP = "/twirp/livekit.RoomService/";
+    private static final String TWIRP_EGRESS = "/twirp/livekit.Egress/";
 
     private final CallProperties props;
     private final ObjectMapper objectMapper;
@@ -92,6 +93,8 @@ public class LiveKitService {
         video.put("roomList", true);
         // LiveKit asks for roomCreate when a room is deleted, not only roomAdmin.
         video.put("roomCreate", true);
+        // Starting and stopping a recording needs roomRecord.
+        video.put("roomRecord", true);
         if (room != null) video.put("room", room);
         Instant now = Instant.now();
         return Jwts.builder()
@@ -214,17 +217,67 @@ public class LiveKitService {
     private Map<String, Object> post(String method, String room, Map<String, Object> body) {
         if (!props.isConfigured()) return null;
         try {
-            return http.post()
-                    .uri(trim(props.getLivekitApiUrl()) + TWIRP + method)
-                    .header("Authorization", "Bearer " + adminToken(room))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(body)
-                    .retrieve()
-                    .body(new ParameterizedTypeReference<Map<String, Object>>() { });
+            return send(TWIRP, method, room, body);
         } catch (RestClientException e) {
             // A 404 means the room or the person is already gone, which is what was wanted.
             log.warn("LiveKit {} for room {} failed: {}", method, room, e.getMessage());
             return null;
+        }
+    }
+
+    /** One request to LiveKit. Throws when LiveKit could not be reached or said no. */
+    private Map<String, Object> send(String service, String method, String room, Map<String, Object> body) {
+        return http.post()
+                .uri(trim(props.getLivekitApiUrl()) + service + method)
+                .header("Authorization", "Bearer " + adminToken(room))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(new ParameterizedTypeReference<Map<String, Object>>() { });
+    }
+
+    // --------------------------------------------------------------- recording
+
+    /**
+     * Asks the recorder (LiveKit Egress) to record a room into an MP4 file.
+     *
+     * @param filepath where the recorder writes the file, as the recorder sees the path
+     * @return the recorder's id for the job
+     */
+    public String startRoomRecording(String room, String filepath) {
+        requireConfigured();
+        Map<String, Object> output = new LinkedHashMap<>();
+        output.put("fileType", "MP4");
+        output.put("filepath", filepath);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("roomName", room);
+        body.put("layout", props.getRecordingLayout());
+        body.put("audioOnly", false);
+        body.put("fileOutputs", List.of(output));
+        try {
+            Map<String, Object> answer = send(TWIRP_EGRESS, "StartRoomCompositeEgress", room, body);
+            String id = answer == null ? null : str(answer.get("egressId"));
+            if (id == null) {
+                throw new HttpStatusException(HttpStatus.BAD_GATEWAY, "RECORDER_FAILED", "The recorder did not start the recording");
+            }
+            return id;
+        } catch (RestClientException e) {
+            log.warn("Could not start recording room {}: {}", room, e.getMessage());
+            throw new HttpStatusException(HttpStatus.BAD_GATEWAY, "RECORDER_UNAVAILABLE",
+                    "The recorder is not available. Check that the recording service is running.");
+        }
+    }
+
+    /** Tells the recorder to finish a recording. Returns false when it could not be asked. */
+    public boolean stopRecording(String egressId) {
+        if (egressId == null || !props.isConfigured()) return false;
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("egressId", egressId);
+        try {
+            return send(TWIRP_EGRESS, "StopEgress", null, body) != null;
+        } catch (RestClientException e) {
+            log.warn("Could not stop recording {}: {}", egressId, e.getMessage());
+            return false;
         }
     }
 

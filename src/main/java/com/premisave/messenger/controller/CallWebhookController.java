@@ -1,5 +1,6 @@
 package com.premisave.messenger.controller;
 
+import com.premisave.messenger.service.CallRecordingService;
 import com.premisave.messenger.service.CallService;
 import com.premisave.messenger.service.LiveKitService;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ import java.util.Map;
 public class CallWebhookController {
 
     private final CallService callService;
+    private final CallRecordingService recordingService;
     private final LiveKitService liveKit;
     private final ObjectMapper objectMapper;
 
@@ -41,6 +43,11 @@ public class CallWebhookController {
         try {
             Map<?, ?> event = objectMapper.readValue(body, Map.class);
             String name = text(event.get("event"));
+            // Recorder reports have no participant, so they are handled before the check below.
+            if (name != null && name.startsWith("egress_")) {
+                if (event.get("egressInfo") instanceof Map<?, ?> info) recordingService.onEgressEvent(info);
+                return ResponseEntity.ok().build();
+            }
             String room = text(nested(event, "room", "name"));
             String identity = text(nested(event, "participant", "identity"));
             if (name == null || room == null || identity == null) return ResponseEntity.ok().build();
