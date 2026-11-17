@@ -90,6 +90,8 @@ public class LiveKitService {
         Map<String, Object> video = new LinkedHashMap<>();
         video.put("roomAdmin", true);
         video.put("roomList", true);
+        // LiveKit asks for roomCreate when a room is deleted, not only roomAdmin.
+        video.put("roomCreate", true);
         if (room != null) video.put("room", room);
         Instant now = Instant.now();
         return Jwts.builder()
