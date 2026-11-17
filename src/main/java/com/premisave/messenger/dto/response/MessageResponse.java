@@ -39,6 +39,8 @@ public class MessageResponse {
 
     // Users tagged with @ in the text
     private List<String> mentionedUserIds;
+    // True when the text tags everyone with @all
+    private boolean mentionAll;
 
     // Emoji reactions: emoji -> ids of the users who reacted with it
     private Map<String, List<String>> reactions;

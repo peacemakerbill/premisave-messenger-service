@@ -42,5 +42,7 @@ public class UserNotification {
     private LocalDateTime createdAt;
 
     private boolean read;
+    /** When an email for this notification was requested. Used to space out mention emails. Null when none was sent. */
+    private LocalDateTime emailedAt;
     private LocalDateTime readAt;
 }

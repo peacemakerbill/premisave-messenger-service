@@ -39,6 +39,18 @@ public class NotificationService {
     @Async
     public void emailUser(String userId, String subject, String title, String message,
                           Map<String, String> details, String buttonLabel, String buttonPath) {
+        sendEmail(userId, subject, title, message, details, buttonLabel, buttonPath, null);
+    }
+
+    /** Same, with one character for the round badge at the top of the email, for example "@". */
+    @Async
+    public void emailUser(String userId, String subject, String title, String message,
+                          Map<String, String> details, String buttonLabel, String buttonPath, String icon) {
+        sendEmail(userId, subject, title, message, details, buttonLabel, buttonPath, icon);
+    }
+
+    private void sendEmail(String userId, String subject, String title, String message,
+                           Map<String, String> details, String buttonLabel, String buttonPath, String icon) {
         if (!emailEnabled) return;
         if (apiKey == null || apiKey.isBlank()) {
             log.debug("Email to user {} not sent: INTERNAL_API_KEY is not set", userId);
@@ -46,7 +58,7 @@ public class NotificationService {
         }
         try {
             authServiceClient.sendUserEmail(
-                    new UserEmailRequest(userId, subject, title, message, details, buttonLabel, buttonPath), apiKey);
+                    new UserEmailRequest(userId, subject, title, message, details, buttonLabel, buttonPath, icon), apiKey);
         } catch (Exception e) {
             log.warn("Email to user {} could not be requested ({})", userId, e.getClass().getSimpleName());
         }

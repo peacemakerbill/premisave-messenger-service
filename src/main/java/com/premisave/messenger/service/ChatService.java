@@ -171,6 +171,7 @@ public class ChatService {
                         // The client needs these to tell whether the last message is already read.
                         lastMsg.setReadBy(msg.getReadBy());
                         lastMsg.setMentionedUserIds(msg.getMentionedUserIds());
+                        lastMsg.setMentionAll(msg.isMentionAll());
                         lastMsg.setDeleted(msg.isDeletedForEveryone());
                         lastMsg.setEditedAt(msg.getEditedAt());
                         lastMsg.setFileName(msg.getFileName());

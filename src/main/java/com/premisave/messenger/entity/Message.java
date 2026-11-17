@@ -86,6 +86,8 @@ public class Message {
 
     // Users tagged with @ in the text. Always members of the chat, never the sender.
     private List<String> mentionedUserIds = new ArrayList<>();
+    // True when the text tags everyone with @all. Only groups can do this.
+    private boolean mentionAll = false;
 
     // Emoji reactions: emoji -> ids of the users who reacted with it. Each user has at most one reaction.
     private Map<String, List<String>> reactions = new LinkedHashMap<>();

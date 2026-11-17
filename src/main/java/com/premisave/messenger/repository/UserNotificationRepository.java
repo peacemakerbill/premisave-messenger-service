@@ -13,4 +13,8 @@ public interface UserNotificationRepository extends MongoRepository<UserNotifica
     long countByUserIdAndReadFalse(String userId);
 
     long deleteByUserId(String userId);
+
+    /** True when an email for one of these types was already requested for this person and chat after the given time. */
+    boolean existsByUserIdAndChatIdAndTypeInAndEmailedAtAfter(String userId, String chatId,
+            java.util.Collection<com.premisave.messenger.enums.NotificationType> types, java.time.LocalDateTime after);
 }

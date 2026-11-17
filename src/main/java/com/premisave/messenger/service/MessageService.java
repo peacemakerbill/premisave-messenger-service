@@ -28,7 +28,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -45,6 +47,7 @@ public class MessageService {
     private final RedisMessagePublisher redisMessagePublisher;
     private final MessengerMetrics metrics;
     private final AttachmentService attachmentService;
+    private final UserNotificationService userNotifications;
 
     /** Hours a sender may edit a message after sending it. 0 turns editing off. */
     @Value("${message.edit-window-hours:1}")
@@ -117,6 +120,7 @@ public class MessageService {
         }
 
         chatMessage.setMentionedUserIds(validMentions(chat, senderId, chatMessage.getMentionedUserIds()));
+        chatMessage.setMentionAll(chatMessage.isMentionAll() && chat.getChatType() == ChatType.GROUP);
     }
 
     /** Only people who are in the chat can be tagged, never the sender, at most 20. */
@@ -162,6 +166,7 @@ public class MessageService {
         message.setActive(true);
         message.setReplyToMessageId(chatMessage.getReplyToMessageId());
         message.setMentionedUserIds(new ArrayList<>(chatMessage.getMentionedUserIds() == null ? List.of() : chatMessage.getMentionedUserIds()));
+        message.setMentionAll(chatMessage.isMentionAll());
         
         // Mark as pending for delivery
         message.setDeliveryState(MessageDeliveryState.PENDING);
@@ -194,7 +199,28 @@ public class MessageService {
         // STEP 4: Async broadcast with retry (non-blocking)
         broadcastMessageAsync(savedMessage, authToken);
 
-        return convertToMessageResponse(savedMessage, authToken);
+        MessageResponse sent = convertToMessageResponse(savedMessage, authToken);
+        notifyMentions(savedMessage, sent.getSenderName(), List.of(), false);
+        return sent;
+    }
+
+    /**
+     * Tells the people who were tagged: a stored notification they will find even if they were offline, a live
+     * push to their open app, and an email. For an edit, only people who were not tagged before are told, so
+     * fixing a typo never pings anyone twice. Never fails the send.
+     */
+    private void notifyMentions(Message message, String senderName, Collection<String> alreadyTagged, boolean alreadyAll) {
+        try {
+            boolean everyone = message.isMentionAll() && !alreadyAll;
+            List<String> people = message.getMentionedUserIds() == null ? List.of()
+                    : message.getMentionedUserIds().stream().filter(id -> !alreadyTagged.contains(id)).toList();
+            if (!everyone && people.isEmpty()) return;
+            Chat chat = chatRepository.findById(message.getChatId()).orElse(null);
+            if (chat == null) return;
+            userNotifications.notifyMention(chat, message.getSenderId(), senderName, message.getContent(), people, everyone);
+        } catch (Exception e) {
+            log.warn("Could not notify the people tagged in message {}: {}", message.getId(), e.getMessage());
+        }
     }
 
     /**
@@ -417,11 +443,11 @@ public class MessageService {
      * as an update to the same message id, with editedAt set.
      */
     public MessageResponse editMessage(String messageId, String userId, String newContent,
-                                       List<String> mentionedUserIds, String authToken) {
+                                       List<String> mentionedUserIds, Boolean mentionAll, String authToken) {
         int attempt = 0;
         while (true) {
             try {
-                return doEdit(messageId, userId, newContent, mentionedUserIds, authToken);
+                return doEdit(messageId, userId, newContent, mentionedUserIds, mentionAll, authToken);
             } catch (org.springframework.dao.OptimisticLockingFailureException e) {
                 // A read receipt landed at the same moment. Read the message again and retry.
                 if (++attempt >= 3) {
@@ -432,7 +458,7 @@ public class MessageService {
     }
 
     private MessageResponse doEdit(String messageId, String userId, String newContent,
-                                   List<String> mentionedUserIds, String authToken) {
+                                   List<String> mentionedUserIds, Boolean mentionAll, String authToken) {
         Message message = messageRepository.findById(messageId)
             .orElseThrow(() -> new MessageNotFoundException("Message not found: " + messageId));
 
@@ -464,17 +490,26 @@ public class MessageService {
             return convertToMessageResponse(message, authToken);   // nothing changed
         }
 
+        // What was already tagged, so an edit only notifies people who are newly tagged.
+        Collection<String> taggedBefore = message.getMentionedUserIds() == null ? List.of() : new HashSet<>(message.getMentionedUserIds());
+        boolean everyoneBefore = message.isMentionAll();
+
         message.setContent(text);
         message.setEditedAt(LocalDateTime.now());
         if (mentionedUserIds != null) {
             Chat chat = chatRepository.findById(message.getChatId()).orElse(null);
             message.setMentionedUserIds(chat == null ? new ArrayList<>()
                     : new ArrayList<>(validMentions(chat, userId, mentionedUserIds)));
+            boolean wantsAll = mentionAll == null ? message.isMentionAll() : mentionAll;
+            message.setMentionAll(chat != null && chat.getChatType() == ChatType.GROUP && wantsAll);
         }
         Message saved = messageRepository.save(message);
 
         MessageResponse response = convertToMessageResponse(saved, authToken);
         broadcastMessage(saved, response);
+        if (mentionedUserIds != null) {
+            notifyMentions(saved, response.getSenderName(), taggedBefore, everyoneBefore);
+        }
         log.info("Message {} edited by {}", messageId, userId);
         return response;
     }
@@ -729,6 +764,7 @@ public class MessageService {
         response.setDeleted(message.isDeletedForEveryone());
         response.setReplyToMessageId(message.getReplyToMessageId());
         response.setMentionedUserIds(message.getMentionedUserIds());
+        response.setMentionAll(message.isMentionAll());
         response.setReactions(message.getReactions() == null ? new java.util.LinkedHashMap<>() : message.getReactions());
 
         if (authToken == null || authToken.isBlank()) {

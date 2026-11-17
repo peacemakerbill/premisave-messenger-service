@@ -88,6 +88,11 @@ auth:
 # They always appear in the app. Emails go through auth-service and need INTERNAL_API_KEY above.
 notifications:
   email-enabled: ${NOTIFICATION_EMAILS_ENABLED:true}
+  # Tagging someone with @ or everyone with @all always notifies in the app. The email is held back so a burst of
+  # tagged messages is one email: at most one per person and chat in this many minutes.
+  mention-email-cooldown-minutes: ${MENTION_EMAIL_COOLDOWN_MINUTES:5}
+  # An @all in a group with more people than this notifies in the app only, with no emails.
+  mention-all-email-max-members: ${MENTION_ALL_EMAIL_MAX_MEMBERS:100}
 
 feign:
   client:

@@ -99,6 +99,7 @@ public class MessageController {
         chatMessage.setAttachmentId(attachmentId);
         chatMessage.setReplyToMessageId(request.getReplyToMessageId());
         chatMessage.setMentionedUserIds(request.getMentionedUserIds());
+        chatMessage.setMentionAll(request.isMentionAll());
 
         MessageResponse response = messageService.sendMessage(chatMessage, authHeader);
         log.info("Message {} sent in chat {} (attachment: {})", response.getId(), request.getChatId(), attachmentId != null);
@@ -142,7 +143,7 @@ public class MessageController {
             @RequestHeader("Authorization") String authHeader) {
         String userId = currentUserResolver.resolve(authHeader).getId();
         return ResponseEntity.ok(messageService.editMessage(
-                messageId, userId, request.getContent(), request.getMentionedUserIds(), authHeader));
+                messageId, userId, request.getContent(), request.getMentionedUserIds(), request.getMentionAll(), authHeader));
     }
 
     /** React to a message with an emoji. Replaces your earlier reaction on it. */

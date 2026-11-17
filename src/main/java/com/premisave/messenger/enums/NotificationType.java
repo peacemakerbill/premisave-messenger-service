@@ -6,5 +6,9 @@ public enum NotificationType {
     REMOVED_ADMIN,
     BECAME_OWNER,
     ADDED_TO_GROUP,
-    REMOVED_FROM_GROUP
+    REMOVED_FROM_GROUP,
+    /** Someone tagged this person with @ in a chat. */
+    MENTIONED,
+    /** Someone tagged everyone with @all in a group. */
+    MENTIONED_ALL
 }

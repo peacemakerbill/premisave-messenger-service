@@ -12,4 +12,6 @@ public class EditMessageRequest {
 
     // Users tagged with @ in the new text. When null the existing tags are kept.
     private List<String> mentionedUserIds;
+    // Whether the new text tags everyone with @all. When null the existing value is kept.
+    private Boolean mentionAll;
 }

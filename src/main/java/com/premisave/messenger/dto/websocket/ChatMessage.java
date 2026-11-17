@@ -35,4 +35,6 @@ public class ChatMessage {
 
     // Ids of users tagged with @ (the server keeps only members of the chat)
     private java.util.List<String> mentionedUserIds;
+    // True when the text tags everyone with @all (the server only honours it in groups)
+    private boolean mentionAll;
 }

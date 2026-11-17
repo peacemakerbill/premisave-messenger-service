@@ -35,6 +35,9 @@ public class SendMessageRequest {
     // Users tagged with @ in the text
     private java.util.List<String> mentionedUserIds;
 
+    // True when the text tags everyone with @all. Ignored outside groups.
+    private boolean mentionAll;
+
     // Location sharing
     private Double latitude;
     private Double longitude;

@@ -19,4 +19,6 @@ public class UserEmailRequest {
     private Map<String, String> details;
     private String buttonLabel;
     private String buttonPath;
+    /** One character shown in the email's round badge, for example "@". Empty means the default. */
+    private String icon;
 }
