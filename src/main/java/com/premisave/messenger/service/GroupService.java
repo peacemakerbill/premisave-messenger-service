@@ -161,6 +161,54 @@ public class GroupService {
         removeMembersFromGroup(groupId, List.of(userId), removedBy);
     }
 
+    /**
+     * A member leaves. The owner cannot walk away from a group that still has other
+     * people in it: they must name one of those members as the new owner, who then
+     * takes over before the old owner is removed. An owner who is alone just closes
+     * the group.
+     */
+    public void leaveGroup(String groupId, String userId, String newOwnerId) {
+        Group group = group(groupId);
+        boolean owner = group.getAdminId().equals(userId);
+        boolean others = group.getMemberIds().stream().anyMatch(id -> !id.equals(userId));
+
+        if (owner && others) {
+            if (newOwnerId == null || newOwnerId.isBlank()) {
+                throw HttpStatusException.badRequest("Choose a new owner before you leave the group");
+            }
+            if (newOwnerId.equals(userId)) {
+                throw HttpStatusException.badRequest("The new owner must be someone else in the group");
+            }
+            transferAdmin(groupId, newOwnerId, userId);
+        }
+        removeMembersFromGroup(groupId, List.of(userId), userId);
+    }
+
+    /**
+     * Adds a person who joined through an invite link. The link is the permission,
+     * so there is no admin check here. Joining twice changes nothing.
+     */
+    public Group joinGroup(String groupId, String userId) {
+        Group group = group(groupId);
+        if (group.getMemberIds().isEmpty()) {
+            throw HttpStatusException.gone("GROUP_GONE", "This group no longer exists");
+        }
+        if (group.getMemberIds().contains(userId)) return group;
+
+        Chat chat = chatOf(groupId);
+        group.getMemberIds().add(userId);
+        if (chat != null && !chat.getParticipantIds().contains(userId)) chat.getParticipantIds().add(userId);
+        saveMember(groupId, userId, "MEMBER");
+        group.setUpdatedAt(LocalDateTime.now());
+        Group saved = groupRepository.save(group);
+        saveChat(chat);
+        log.info("{} joined group {} through an invite link", userId, groupId);
+
+        notifyUsers(Set.of(userId), "ADDED", groupId, idOf(chat));
+        notifyUsers(without(saved.getMemberIds(), Set.of(userId)), "UPDATED", groupId, idOf(chat));
+        return saved;
+    }
+
     // ---------------------------------------------------------------- admins
 
     public void addAdminsToGroup(String groupId, List<String> userIds, String requestedBy) {
@@ -277,6 +325,20 @@ public class GroupService {
     private Group group(String groupId) {
         return groupRepository.findById(groupId)
                 .orElseThrow(() -> HttpStatusException.notFound("GROUP_NOT_FOUND", "Group not found"));
+    }
+
+    /** The group, only if userId is its owner or one of its admins. */
+    public Group requireManager(String groupId, String userId, String message) {
+        Group group = group(groupId);
+        if (!group.getAdminId().equals(userId) && !group.getModerators().contains(userId)) {
+            throw HttpStatusException.forbidden(message);
+        }
+        return group;
+    }
+
+    /** The group by id, for callers that already hold a valid reason to see it. */
+    public Group findGroup(String groupId) {
+        return group(groupId);
     }
 
     private Group requireOwner(String groupId, String userId, String message) {

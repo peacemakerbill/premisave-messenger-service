@@ -158,6 +158,13 @@ status:
   # true lets followers open a person's past statuses too. The owner always can.
   past-visible-to-followers: ${STATUS_PAST_VISIBLE_TO_FOLLOWERS:false}
 
+# Group invite links. The link people share is link-base-url, a slash and a random code.
+# Point link-base-url at whatever should open when the link is tapped (the app or a web page).
+group-invite:
+  link-base-url: ${GROUP_INVITE_BASE_URL:https://premisave.com/join}
+  max-expiry-hours: ${GROUP_INVITE_MAX_EXPIRY_HOURS:8760}
+  max-uses-limit: ${GROUP_INVITE_MAX_USES_LIMIT:100000}
+
 rate-limit:
   requests-per-minute: 60
   websocket-messages-per-minute: 100

@@ -104,6 +104,7 @@ It was built as a sibling service to `auth-service` (which owns user identity an
 | **New-vs-existing chat signaling** | `POST /api/chats/private` returns `201` with a "created" message for a new chat, `200` with an "already exists" message when reusing one — plus a `newlyCreated` boolean for programmatic checks. |
 | **Self-healing chat data** | If a chat's participant data was ever stored inconsistently (e.g. from an earlier bug), it's detected and corrected automatically the next time that chat is accessed. |
 | **Group chats** | Create, add/remove members (single or bulk), promote/demote admins, transfer ownership, group photo, leave group. |
+| **Group invite links and QR codes** | Owners and admins make a link (and a QR code that holds it) that anyone signed in can use to join the group. A link can expire after a set time or after a set number of joins, and can be revoked at any time. One working link per group: making a new one revokes the old one. |
 | **File attachments** | Send images, video, audio, documents and any other file type in a chat. Upload first (`POST /api/attachments`), then send a message carrying the `attachmentId`, over REST or WebSocket. Stored on local disk or a mounted network share, downloaded through expiring signed links with range support. |
 | **Public media** | Group photos and `/api/media/upload` files use the same storage and are served without a token from `/api/media/files/...`. |
 | **Statuses** | Post text, photo, video or audio statuses that your followers can watch until they disappear. You choose how long each stays, up to `STATUS_MAX_HOURS` (24 by default). Followers can view, like, react and comment; the owner sees views, likes, reactions and comments, and can delete. Disappeared statuses move to the owner's past statuses and stay, with everything people did on them, until the owner deletes them. |
@@ -254,6 +255,9 @@ Message <id> delivery completed. Success: 1/1, Failures: 0
 | `STATUS_TEXT_MAX_LENGTH` | No | `700` | Most characters in a text status or a caption. |
 | `STATUS_COMMENT_MAX_LENGTH` | No | `300` | Most characters in a comment on a status. |
 | `STATUS_PAST_VISIBLE_TO_FOLLOWERS` | No | `false` | When `true`, followers can also open a person's past statuses. The owner always can. |
+| `GROUP_INVITE_BASE_URL` | No | `https://premisave.com/join` | Start of every shared invite link. The link people get is this address, a slash and the code (`https://premisave.com/join/Qx3k...`), and the same text is what the QR code holds. Point it at a page of your web or mobile app that opens the join screen, or leave the default and have the app handle the link. |
+| `GROUP_INVITE_MAX_EXPIRY_HOURS` | No | `8760` | The longest an invite link can last, in hours (`group-invite.max-expiry-hours`). Asking for more is refused with 400. |
+| `GROUP_INVITE_MAX_USES_LIMIT` | No | `100000` | The most joins one invite link can be limited to (`group-invite.max-uses-limit`). |
 | `STORAGE_URL_TTL` / `STORAGE_UNCLAIMED_TTL` | No | `6h` / `24h` | Lifetime of a signed link, and how long an unsent upload is kept. |
 | `STORAGE_SIGNING_SECRET` | No | `JWT_SECRET` | Key used to sign download links. |
 | `STORAGE_NETWORK_*` | NETWORK mode | blank | `PROTOCOL`, `HOST`, `SHARE`, `MOUNT_PATH`, `DIRECTORY`, `REQUIRE_MOUNT`. With `REQUIRE_MOUNT=true` the service refuses to start or write unless the path is on a mounted network share. |
@@ -303,14 +307,22 @@ Message <id> delivery completed. Success: 1/1, Failures: 0
 | `POST` / `DELETE` | `/api/groups/{groupId}/admins` | Promote / demote a single admin |
 | `POST` / `DELETE` | `/api/groups/{groupId}/admins/bulk` | Promote / demote admins in bulk |
 | `POST` | `/api/groups/{groupId}/transfer-admin` | Transfer group ownership |
-| `POST` | `/api/groups/{groupId}/leave` | Leave a group (the owner must transfer ownership first, unless alone) |
+| `POST` | `/api/groups/{groupId}/leave` | Leave a group. An owner with other members still in the group must send `newOwnerId`: that member becomes the owner and the old owner is removed in the same call. Without it the answer is `400`. An owner who is alone can leave, which closes the group |
 | `GET` | `/api/groups/my-groups` | List the caller's groups |
+| `POST` | `/api/groups/{groupId}/invite` | Make an invite link (owner and admins). Optional `expiresInHours` and `maxUses`; leave them out for a link that never expires and has no limit. Revokes the previous link. Returns `link`, `code`, `expiresAt`, `maxUses`, `uses` |
+| `GET` | `/api/groups/{groupId}/invite` | The working link and how many people used it (owner and admins). `404 INVITE_NOT_FOUND` when there is none |
+| `GET` | `/api/groups/{groupId}/invite/qr` | The working link as a QR code PNG (`size` 128 to 1024, default 320; owner and admins) |
+| `DELETE` | `/api/groups/{groupId}/invite` | Revoke the link and its QR code (owner and admins) |
+| `GET` | `/api/group-invites/{code}` | Preview what a link leads to (`name`, `description`, `groupPhotoUrl`, `memberCount`, `alreadyMember`, `chatId`). Never lists members. Any signed-in user |
+| `POST` | `/api/group-invites/{code}/join` | Join with a link. Counts one use; a person already in the group is not counted again. Returns `groupId`, `chatId`, `name`, `alreadyMember` |
 | `POST` | `/api/attachments` | Upload a file for a chat (multipart `file`, `chatId`); returns an `attachmentId` |
 | `GET` | `/api/attachments/{attachmentId}/content` | Download or stream a file (Bearer token or the signed link from a message) |
 | `POST` | `/api/media/upload` | Upload a public file and get its URL back |
 | `GET` | `/api/media/files/{folder}/{month}/{name}` | Public read for group photos and other uploaded media |
 | `GET` | `/health`, `/health/ready`, `/health/live`, `/health/startup` | Kubernetes-style health probes (unauthenticated) |
 | `GET` | `/actuator/health`, `/actuator/metrics`, `/actuator/prometheus` | Actuator endpoints (Basic Auth) |
+
+Invite errors use the same structured body as the rest of the API: `404 INVITE_NOT_FOUND` (no such code), `410 INVITE_REVOKED`, `410 INVITE_EXPIRED`, `410 INVITE_FULL` (the use limit was reached) and `410 GROUP_GONE` (the group has no members left), and `403` when someone who is not an owner or admin tries to make, read or revoke a link. A person who joins gets a live `ADDED` on `/user/queue/groups` and the existing members get `UPDATED`. Codes are 24 random URL-safe characters and are stored in the `group_invites` collection, so the link is the only secret: treat it like a password and revoke it if it leaks.
 
 ## WebSocket destinations reference
 
@@ -333,7 +345,7 @@ Connect with a STOMP client to `ws://<host>:8081/ws-messenger`, sending `Authori
 
 ## Testing with the browser chat client
 
-`test-client/index.html` is a single-file chat client styled like WhatsApp Web, with light and dark themes. It talks to the real service over REST and raw STOMP, so it exercises everything described above.
+`test-client/index.html` is a single-file chat client styled like Telegram Web, with light and dark themes. The menu button (top left) opens the side menu with your profile, new chat, status, settings, night mode and sign out; Chats and Status are the two tabs under the search box. It talks to the real service over REST and raw STOMP, so it exercises everything described above.
 
 1. Start auth-service (`8080`) and this service (`8081`).
 2. Serve the client (recommended). Localhost is a secure origin, so microphone access for voice notes works and CORS behaves like a real front end:
@@ -350,14 +362,15 @@ Connect with a STOMP client to `ws://<host>:8081/ws-messenger`, sending `Authori
 What it covers: private chats, group chats, replies, emoji, photos, videos, audio, documents and voice notes (upload progress, captions, drag and drop, paste), live delivery and read ticks, typing and online status, unread counters, mark as read and unread, editing your own messages, in-chat search, delete for me and for everyone, automatic reconnect with a polling fallback, and a mobile layout.
 
 Notes:
-- Groups: create a group with members, edit its name, description and photo, add and remove members, promote admins, transfer ownership and leave, all from the client. Members are added to the group chat on the server, so they see the group and get its messages straight away. Typing indicators and per-member read receipts are not available in groups.
+- Groups: create a group with members, edit its name, description and photo, add and remove members, promote admins, transfer ownership and leave, all from the client. When the owner chooses Leave group, the client asks them to pick the new owner first (admins are listed first) and the button reads "Make <name> owner and leave". Members are added to the group chat on the server, so they see the group and get its messages straight away. Typing indicators and per-member read receipts are not available in groups.
+- Invite links and QR codes: in a group's info the owner and admins see Invite with link or QR code. It makes a link with an optional expiry and join limit, shows the QR code, and offers Copy, Send to chat, Share and Save QR. New link replaces the old one and Revoke stops it. To join, open the side menu and choose Scan QR code, or use Join a group in the New chat dialog. You can scan with the camera, choose a picture of a QR code, or paste a link or code, and you see the group before you join. A link in a message (`.../join/CODE`) opens the same preview when clicked, and opening the client as `index.html#join=CODE` goes straight to it after sign-in. The camera needs `https` or `localhost`; where it is blocked, choose a picture or paste the link instead.
 - Read state: opening a chat marks its unread messages as read automatically (also when the tab becomes visible again and after a reconnect). Use the chat menu or a right click on a chat row for "Mark as unread" and "Mark as read". Your own messages never count as unread.
 - Editing: open the message menu on one of your own messages and choose Edit, change the text in the message box and press Enter (Escape cancels). The menu only offers Edit while the edit window is open, and the edited message shows "edited" for everyone. The window comes from `MESSAGE_EDIT_WINDOW_HOURS` (default 1 hour).
 - Reactions: hover a message and click the smiley beside it, or open the message menu, then pick one of the six quick emojis or the plus for the full list. Picking the emoji you already used removes it. Reactions show as chips under the message, tapping a chip reacts with that emoji too, and the count button lists who reacted. Messages in the history carry a `reactions` map, and changes arrive live on `/user/queue/reactions`. An emoji must be a single emoji of up to 16 characters, and a message holds at most 50 different ones. Deleted messages cannot be reacted to.
-- Status: the Status button on the left rail has three tabs. New lists what the people you follow have posted, with a ring around people you have not watched yet. My status lists yours with their views, likes, reactions and comments, and the Add status button posts a text, photo, video or audio status and lets you choose how long it stays (up to the server maximum). Past keeps the ones that disappeared, still with their numbers, and you can open or delete them. Opening a status plays it full screen: it advances on its own after 6 seconds, or when a video or audio ends, and you tap the sides or use the arrow keys to move. Followers can like, react with an emoji and comment; on your own statuses the bar at the bottom opens the list of who viewed, liked, reacted and commented. A profile also has a Statuses tab (Status record on your own).
+- Status: the Status tab under the search box has three tabs of its own. New lists what the people you follow have posted, with a ring around people you have not watched yet. My status lists yours with their views, likes, reactions and comments, and the Add status button posts a text, photo, video or audio status and lets you choose how long it stays (up to the server maximum). Past keeps the ones that disappeared, still with their numbers, and you can open or delete them. Opening a status plays it full screen: it advances on its own after 6 seconds, or when a video or audio ends, and you tap the sides or use the arrow keys to move. Followers can like, react with an emoji and comment; on your own statuses the bar at the bottom opens the list of who viewed, liked, reacted and commented. A profile also has a Statuses tab (Status record on your own).
 - Tagging: type `@` in the message box to pick someone from the chat (the other person in a private chat, the members in a group). The tag is stored as `mentionedUserIds`, shown highlighted in the message, and a chat row shows `@` when you were tagged in an unread message. The server keeps only people who are in the chat.
 - Search: the box above the chat list matches chat names and emails, and lists matching people below your chats with their email and a profile button. You never appear in people lists.
-- Profiles: click a contact's name or avatar (or a group member) to see their profile, followers, following, likes and reviews, then follow, like, or review them, or start a chat. Your own profile, with who follows you and who viewed it, is under the person icon on the left rail. Reviews show the reviewer's picture, name and email, and clicking one opens their profile. The auth-service returns `reviewerName`, `reviewerEmail` and `reviewerProfilePicture` with every review (`GET /api/social/reviews/{id}`, `my-reviews`, `my-written-reviews`), and the messenger passes them through and adds a `reviewer` object built from them. It looks the profile up by `userId` only when a review arrives without those fields. When the reviewer's account was deleted all three are null, `reviewer` is null and the client shows "Unknown user". `updatedAt` differs from `createdAt` when a review was edited, and the client marks those reviews as edited. Names are shown as first and last name wherever the profile has them, falling back to the display name and then the username. Profile editing is not part of the client.
+- Profiles: click a contact's name or avatar (or a group member) to see their profile, followers, following, likes and reviews, then follow, like, or review them, or start a chat. Your own profile, with who follows you and who viewed it, is under My profile in the side menu. Reviews show the reviewer's picture, name and email, and clicking one opens their profile. The auth-service returns `reviewerName`, `reviewerEmail` and `reviewerProfilePicture` with every review (`GET /api/social/reviews/{id}`, `my-reviews`, `my-written-reviews`), and the messenger passes them through and adds a `reviewer` object built from them. It looks the profile up by `userId` only when a review arrives without those fields. When the reviewer's account was deleted all three are null, `reviewer` is null and the client shows "Unknown user". `updatedAt` differs from `createdAt` when a review was edited, and the client marks those reviews as edited. Names are shown as first and last name wherever the profile has them, falling back to the display name and then the username. Profile editing is not part of the client.
 - The client needs `GET /api/users/me`. If it is missing it falls back to the chat list to find your id.
 - Voice notes need microphone permission, which browsers only grant on `localhost` or HTTPS pages.
 
@@ -368,6 +381,7 @@ Notes:
 | `Chat` | `chats` | `chatType` (PRIVATE/GROUP), `participantIds`, `participantEmails`, `lastMessageId` |
 | `Message` | `messages` | `chatId`, `senderId`, `content`, `deliveryState`, `receipts`, `readBy`, `@Version` for optimistic locking |
 | `Group` | `groups` | `name`, `adminId`, `memberIds`, `groupPhotoUrl` |
+| `GroupInvite` | `group_invites` | `code` (unique), `groupId`, `createdBy`, `expiresAt`, `maxUses`, `uses`, `revoked` |
 | `UserPresence` | `user_presence` | `userId`, `isOnline`, `lastSeen` |
 | `Status` | `statuses` | `ownerId`, `type`, `text`, `attachmentId`, `durationHours`, `expiresAt`, view, like, reaction and comment totals. Never removed when it expires, only when the owner deletes it |
 | `StatusActivity` | `status_activity` | `statusId`, `userId`, `kind` (VIEW, LIKE, REACTION), `emoji`. Unique per person and kind |
@@ -398,6 +412,7 @@ Notes:
 - **JWT authentication** on both REST (via filter) and WebSocket (via `STOMP CONNECT` interceptor, resolving the real user ID — never trusting the JWT's email subject as an identifier).
 - **Chat access validation** before any message operation — a user can only read or send within chats they're actually a participant of.
 - **Privacy of private chats**: every send, read, reply, delete-for-me and typing event is checked against the chat's participants on the server. Typing events are relayed only to the other participant of the chat, never to a receiver id supplied by the client, and a reply must target a message in the same chat.
+- **Invite links**: made and revoked only by a group's owner and admins. The code is 18 random bytes from `SecureRandom`, joins are counted atomically so a limit cannot be overshot, and the preview shows only the group's name, picture and member count.
 - **Self-messaging blocked**: you cannot create a private chat with yourself, and a send into a chat with no other participant is refused with `You cannot send messages to yourself`.
 - **Input validation** on chat creation.
 - **CORS** configured centrally; tighten `setAllowedOriginPatterns` before production deployment.
@@ -411,7 +426,8 @@ premisave-messenger-service/
 │   ├── config/          # Security, Mongo, Redis, WebSocket, Cache, Async
 │   ├── client/           # Feign client for auth-service integration
 │   ├── controller/       # REST + WebSocket (@MessageMapping) controllers
-│   ├── service/          # Chat, Message, Group, Presence, Media, User, Attachment services
+│   ├── service/          # Chat, Message, Group, GroupInvite, Presence, Media, User, Attachment services
+│   ├── util/             # QrCodes (QR code PNGs, ZXing)
 │   ├── storage/          # FileStorage (local or mounted network share), StoredFile
 │   ├── realtime/         # Redis pub/sub relay (publisher, subscriber, envelope)
 │   ├── entity/            # MongoDB documents

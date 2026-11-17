@@ -113,10 +113,10 @@ public class GroupController {
     @PostMapping("/{groupId}/leave")
     public ResponseEntity<String> leaveGroup(
             @PathVariable String groupId,
+            @RequestParam(required = false) String newOwnerId,
             @RequestHeader("Authorization") String authHeader) {
 
-        String userId = me(authHeader);
-        groupService.removeMemberFromGroup(groupId, userId, userId);
+        groupService.leaveGroup(groupId, me(authHeader), newOwnerId);
         return ResponseEntity.ok("You have left the group");
     }
 

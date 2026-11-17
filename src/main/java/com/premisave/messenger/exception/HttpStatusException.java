@@ -41,6 +41,11 @@ public class HttpStatusException extends RuntimeException {
         return new HttpStatusException(HttpStatus.NOT_FOUND, code, message);
     }
 
+    /** The thing existed but is no longer usable, such as an expired or revoked invite link. */
+    public static HttpStatusException gone(String code, String message) {
+        return new HttpStatusException(HttpStatus.GONE, code, message);
+    }
+
     public static HttpStatusException tooLarge(String message) {
         return new HttpStatusException(HttpStatus.CONTENT_TOO_LARGE, "FILE_TOO_LARGE", message);
     }
