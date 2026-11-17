@@ -12,6 +12,7 @@ import base64
 import math
 import os
 import re
+import sys
 import textwrap
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -438,68 +439,6 @@ def presence():
                              ('cond7', 'sans4', 'sans6', 'mono4', 'mono6')))
 
 
-# ---------------------------------------------------------------------------------------- deploy
-
-def deploy():
-    w, h = 1200, 520
-    cycle = 12.0
-    envs = [('development', 'profile dev', 'branch develop, tag development'),
-            ('staging', 'profile staging', 'branch staging, tag staging'),
-            ('production', 'profile prod', 'branch main, tag production or 1.0.0')]
-    # which platforms ship a file for which environment (read from the files that really exist)
-    def has(*names):
-        return all(os.path.exists(os.path.join(ROOT, n)) for n in names)
-    plats = [
-        ('Docker Compose', ['docker-compose.yml', '+ .staging.yml', '+ .production.yml'], (has('docker-compose.yml'), has('deploy/docker-compose.staging.yml'), has('deploy/docker-compose.production.yml'))),
-        ('Coolify', ['docker-compose', '.coolify.yml'], (has('deploy/docker-compose.coolify.yml'),) * 3),
-        ('Render', ['render.yaml'], (has('deploy/render.yaml'),) * 3),
-        ('Heroku', ['heroku.yml', 'app.json'], (has('heroku.yml', 'app.json'),) * 3),
-        ('Fly.io', ['fly.staging.toml', 'fly.production.toml'], (False, has('deploy/fly.staging.toml'), has('deploy/fly.production.toml'))),
-        ('Railway', ['railway.json'], (has('deploy/railway.json'),) * 3),
-    ]
-    lx, colw, top, rowh = 32, 160, 176, 58
-    x0 = 212
-    out = [f'<text class="cond" x="{lx}" y="108" font-size="20">Environment</text>']
-    for j, (name, files, _) in enumerate(plats):
-        x = x0 + j * colw
-        out.append(f'<text class="cond" x="{x + 6}" y="108" font-size="20">{name}</text>')
-        for k, f in enumerate(files):
-            out.append(f'<text class="mono soft" x="{x + 6}" y="{126 + k * 14}" font-size="10.5">{esc(f)}</text>')
-    out.append(f'<line x1="{lx}" y1="{top - 14}" x2="{w - 32}" y2="{top - 14}" stroke="{INK}" stroke-width="1.5"/>')
-    for i, (name, prof, note) in enumerate(envs):
-        y = top + i * rowh
-        out.append(f'<text class="cond" x="{lx}" y="{y + 20}" font-size="22">{name}</text>'
-                   f'<text class="mono" x="{lx}" y="{y + 38}" font-size="11.5" style="fill:{DATA}">{prof}</text>'
-                   f'<line x1="{lx}" y1="{y + rowh - 6}" x2="{w - 32}" y2="{y + rowh - 6}" stroke="{RULE}"/>')
-        for j, (_, _, flags) in enumerate(plats):
-            x = x0 + j * colw + 6
-            if flags[i]:
-                out.append(f'<rect x="{x}" y="{y + 8}" width="22" height="22" fill="{DATA}"/>'
-                           f'<path d="M{x + 5} {y + 19}l5 5l8 -10" fill="none" stroke="{PAPER}" stroke-width="2.4"/>')
-            else:
-                out.append(f'<rect x="{x}" y="{y + 8}" width="22" height="22" fill="none" stroke="{RULE}" stroke-width="1.5"/>'
-                           f'<path d="M{x + 6} {y + 19}h10" stroke="{RULE}" stroke-width="1.6"/>')
-    css = ('.rise { animation: rise .7s cubic-bezier(.2,.8,.2,1) both; } @keyframes rise { from { opacity:0; transform: translateY(14px); } }\n'
-           f'.band {{ opacity: 0; animation: band {cycle}s infinite; }}\n' + band_kf('band', cycle, 3, 3.6, rowh, 'Y'))
-    out.append(f'<rect class="band" x="{lx - 6}" y="{top - 8}" width="{w - 52}" height="{rowh - 8}" fill="none" stroke="{AMBER}" stroke-width="4"/>')
-    # the one image and the pair
-    by = top + 3 * rowh + 26
-    out.append(f'<line x1="32" y1="{by - 12}" x2="{w - 32}" y2="{by - 12}" stroke="{INK}" stroke-width="1.5"/>')
-    boxw = 540
-    for k, (a, b, c) in enumerate([
-        ('One image', 'Dockerfile and docker/entrypoint.sh', 'Listens on PORT, runs as an unprivileged user, and reads SPRING_PROFILES_ACTIVE.'),
-        ('A pair per environment', 'messenger and auth-service', 'JWT_SECRET identical. INTERNAL_API_KEY equals auth API_KEY. Own databases.')]):
-        x = 32 + k * (boxw + 56)
-        out.append(f'<g class="rise" style="animation-delay:{.2 + k * .12:.2f}s"><rect x="{x}" y="{by + 6}" width="{boxw}" height="104" fill="{PAPER if k else INK}" stroke="{INK}" stroke-width="2"/>'
-                   f'<text class="cond" x="{x + 20}" y="{by + 40}" font-size="22" style="fill:{INK if k else PAPER}">{a}</text>'
-                   f'<text class="mono" x="{x + 20}" y="{by + 62}" font-size="12" style="fill:{DATA if k else AMBER}">{b}</text>'
-                   f'<text x="{x + 20}" y="{by + 88}" font-size="12.5" style="fill:{INK2 if k else SHEET_LINE}">{esc(c)}</text></g>')
-    body = sheet(w, h, 'One image, every environment', 'what each platform ships') + ''.join(out)
-    save('deploy.svg', svg(w, h, body, css, '', 'Deploying the messenger',
-                           'One Docker image runs in development, staging and production on Docker Compose, Coolify, Render, Heroku, Fly.io or Railway.',
-                           ('cond7', 'sans4', 'sans6', 'mono4', 'mono6')))
-
-
 # ---------------------------------------------------------------------------------------- stats
 
 PKG_NAME = {'service': 'Services', 'controller': 'Controllers', 'dto': 'Request and response objects', 'entity': 'MongoDB documents',
@@ -566,5 +505,6 @@ if __name__ == '__main__':
     realtime()
     presence()
     calls()
-    deploy()
     stats()
+    import deploy_pictures
+    deploy_pictures.run(sys.modules[__name__])

@@ -34,3 +34,4 @@ build/
 
 # Deployment env files hold real secrets
 deploy/env/*.env
+__pycache__/

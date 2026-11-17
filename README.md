@@ -252,6 +252,8 @@ docker run -d --name messenger-redis -p 6379:6379 redis:7
 mvn spring-boot:run
 ```
 
+> **Prefer Docker for everything?** `docker compose up --build` starts the service with its own MongoDB and Redis, no Java needed. See [Run it with Docker and deploy it](#run-it-with-docker-and-deploy-it).
+
 Create a `.env` file next to `pom.xml`:
 
 ```properties
@@ -286,27 +288,191 @@ Message <id> delivery completed. Success: 1/1, Failures: 0
 ## Run it with Docker and deploy it
 
 <p align="center">
-  <img src="docs/assets/deploy.svg" alt="One Docker image runs in development, staging and production on Docker Compose, Coolify, Render, Heroku, Fly.io or Railway" width="100%" />
+  <img src="docs/assets/environments.svg" alt="Development, staging and production side by side: profile, branch and image tag, the command, MongoDB, Redis and the port" width="100%" />
 </p>
 
-One image runs everywhere. What makes an environment development, staging or production is only the variables, above all `SPRING_PROFILES_ACTIVE` (`dev`, `staging` or `prod`). The image listens on `PORT` (or 8081), starts as an unprivileged user and answers `GET /actuator/health`.
+Everything here uses **one Docker image**. What makes an environment development, staging or production is only the variables, above all `SPRING_PROFILES_ACTIVE` (`dev`, `staging` or `prod`). The image listens on `PORT` (or 8081), runs as an unprivileged user and reports its health at `GET /health`.
+
+You do not need Java, Maven, MongoDB or Redis for this. You need **Docker with the Compose plugin**: `docker compose version` should print a version. The messenger also needs the **auth-service** of the same environment, because it has no sign-in of its own.
+
+| I want to | Use | Go to |
+| --- | --- | --- |
+| Try it or work on it on my computer | `docker compose up --build` | [Development](#development-on-your-computer) |
+| Run the auth-service, the messenger and the app together | three folders, in order | [The whole system](#the-whole-system-on-one-computer) |
+| A test server for the team | `deploy/docker-compose.staging.yml` | [Staging](#staging-on-a-server) |
+| The real thing | `deploy/docker-compose.production.yml` with a version tag | [Production](#production-on-a-server) |
+| Render, Coolify, Fly.io, Railway or Heroku | the file in `deploy/` | [Hosting platforms](#hosting-platforms) |
+
+### Development on your computer
+
+<p align="center">
+  <img src="docs/assets/docker-dev.svg" alt="docker compose up --build starts the service with its own MongoDB and Redis and answers on port 8081" width="100%" />
+</p>
+
+**1.** Start the auth-service first, on port 8080 (`docker compose up --build` in its folder). The messenger reaches it through `host.docker.internal`, and both use the same development secrets, so they work together with no settings.
+
+**2.** Start the messenger:
 
 ```bash
-# development: the service with its own MongoDB and Redis (start auth-service first, on port 8080)
+cd premisave-messenger-service
 docker compose up --build
+```
 
-# staging on a server with Docker: copy the example, fill it in, then
-cp deploy/env/staging.env.example deploy/env/staging.env
+**3.** Check it. `curl http://localhost:8081/health` answers with the status of MongoDB and Redis. Then open [`test-client/index.html`](test-client/index.html) in a browser (see [Testing with the browser chat client](#testing-with-the-browser-chat-client)), or sign in from the Flutter app.
+
+A `.env` next to `docker-compose.yml` is used when it exists, for example `AUTH_SERVICE_URL` when the auth-service is somewhere else, or the `LIVEKIT_*` values to try calls. The development file already points the service at LiveKit on `host.docker.internal:7880`.
+
+Useful commands, all run in the project folder:
+
+| Command | What it does |
+| --- | --- |
+| `docker compose up --build` | Build the image and start everything. Add `-d` to run in the background |
+| `docker compose logs -f` | Follow the log (add the service name `messenger` to see only that one) |
+| `docker compose ps` | Show what is running and whether it is healthy |
+| `docker compose down` | Stop and remove the containers. **Your data stays** in its volumes |
+| `docker compose down -v` | Same, and also delete the data. Use it for a clean start |
+| `docker compose up --build -d messenger` | Rebuild and restart only the service after a code change |
+
+The first build takes a few minutes because Maven downloads the dependencies once. The next ones reuse them.
+
+### The whole system on one computer
+
+<p align="center">
+  <img src="docs/assets/whole-stack.svg" alt="Start the auth-service, then the messenger, then LiveKit if you want calls, then the Flutter app" width="100%" />
+</p>
+
+Start them in this order, each in its own folder (the folders sit side by side):
+
+```bash
+(cd premisave_auth_service && docker compose up --build -d)                          # 1. sign in, on :8080
+(cd premisave-messenger-service && docker compose up --build -d)                     # 2. messages, on :8081
+(cd premisave-messenger-service/deploy/livekit && docker compose --env-file ../../.env up -d)   # 3. only for calls
+(cd premisave_flutter_frontend && ./run.sh)                                          # 4. the app
+```
+
+To stop: `docker compose down` in each backend folder, and the same in `deploy/livekit` if you started it.
+
+### Staging on a server
+
+Staging is a copy of production that you can break. It gets its **own database and its own secrets**, and it pairs with the staging auth-service, never the production one. The compose file starts MongoDB and Redis beside the service.
+
+**1. Get the code and make the settings file.** The file is git-ignored, so secrets never reach GitHub.
+
+```bash
+git clone https://github.com/peacemakerbill/premisave-messenger-service.git && cd premisave-messenger-service
+
+deploy/env/from-dotenv.sh staging        # builds deploy/env/staging.env from the example and your .env
+```
+
+The script copies every value your development `.env` already has and generates the secrets nobody could supply. It prints key names only, never values, and lists what you still have to check. Prefer to do it by hand? `cp deploy/env/staging.env.example deploy/env/staging.env` and open it in any editor.
+
+These are the values that matter. Everything else has a default (see [`.env.example`](.env.example)).
+
+| Value | What to put |
+| --- | --- |
+| `AUTH_SERVICE_URL` | The address of the staging auth-service, reachable **from inside the container**. Not `localhost` |
+| `JWT_SECRET` | Identical to the auth-service's |
+| `INTERNAL_API_KEY` | Equal to the auth-service's `API_KEY` |
+| `ACTUATOR_PASSWORD` | A long random password for the metrics endpoints |
+| `STORAGE_PUBLIC_BASE_URL` | This service's own public address. Download links inside messages start with it |
+| `LIVEKIT_URL`, `LIVEKIT_API_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` | Leave empty to keep calls off. See [Calls and recordings](#calls-and-recordings) |
+
+**2. Start it.**
+
+```bash
 docker compose --env-file deploy/env/staging.env -f deploy/docker-compose.staging.yml up -d --build
+```
 
-# production: pull an exact version
-cp deploy/env/production.env.example deploy/env/production.env
+**3. Check it.**
+
+```bash
+docker compose -f deploy/docker-compose.staging.yml ps
+curl http://127.0.0.1:8081/health
+docker compose -f deploy/docker-compose.staging.yml logs -f messenger
+```
+
+**4. Update it later.** Pull the code and run step 2 again. **Stop it** with the same command ending in `down` instead of `up -d --build`.
+
+The service is published on `127.0.0.1:8081` only, so nothing outside the server can reach it until you put a reverse proxy (nginx, Caddy or Traefik) in front for https. Set `HTTP_PORT` or `HTTP_BIND` in the env file to publish it elsewhere. If the auth-service runs on the same server, use `http://host.docker.internal:8080` as `AUTH_SERVICE_URL`: the staging file maps that name to the server. The proxy must pass websocket upgrades on `/ws`, see [deploy/README.md](deploy/README.md#a-server-with-docker-staging-and-production). Attachments live in the `messenger-data` volume: back it up.
+
+### Production on a server
+
+Production differs from staging in four ways, all on purpose:
+
+- **MongoDB is not started here.** Use a managed database (MongoDB Atlas, with backups) and put its address in `MONGODB_URI`. Allow the server's address in Atlas.
+- **The image is pulled by an exact version**, so production runs the very build you tested on staging. `IMAGE_TAG` is required.
+- **Secrets have no fallback.** The file refuses to start without them.
+- **Redis keeps its data on disk** and is reachable only from the service.
+
+```bash
+git clone https://github.com/peacemakerbill/premisave-messenger-service.git && cd premisave-messenger-service
+deploy/env/from-dotenv.sh production                  # or copy deploy/env/production.env.example by hand and fill it in
+
+docker login ghcr.io                                  # once. User: your GitHub name, password: a token with read:packages
+IMAGE_TAG=1.0.0 docker compose --env-file deploy/env/production.env -f deploy/docker-compose.production.yml pull
 IMAGE_TAG=1.0.0 docker compose --env-file deploy/env/production.env -f deploy/docker-compose.production.yml up -d
 ```
 
-Each environment pairs with the auth-service of the **same** environment: `JWT_SECRET` identical, `INTERNAL_API_KEY` equal to the auth-service `API_KEY`, `AUTH_SERVICE_URL` pointing at it, and separate databases. Several copies can run side by side because Redis relays live messages between them. Attachments and recordings are per copy, so with more than one copy use `STORAGE_MODE=NETWORK` and a share every copy mounts.
+| Task | Command |
+| --- | --- |
+| Release a new version | `IMAGE_TAG=1.1.0 docker compose --env-file deploy/env/production.env -f deploy/docker-compose.production.yml pull`, then the same with `up -d` |
+| Roll back | Run the two commands again with the previous `IMAGE_TAG` |
+| See the log | `IMAGE_TAG=1.0.0 docker compose --env-file deploy/env/production.env -f deploy/docker-compose.production.yml logs -f --tail 200 messenger` |
+| Stop | `IMAGE_TAG=1.0.0 docker compose --env-file deploy/env/production.env -f deploy/docker-compose.production.yml down` (the data stays) |
 
-[deploy/README.md](deploy/README.md) walks through each platform, and `.github/workflows/docker-image.yml` builds the image and publishes it to ghcr.io on the `develop`, `staging` and `main` branches.
+### Publishing the image
+
+<p align="center">
+  <img src="docs/assets/pipeline.svg" alt="A push to develop, staging or main, or a version tag, makes GitHub Actions build the image and publish it to ghcr.io. A server pulls it, or a platform builds from the Dockerfile" width="100%" />
+</p>
+
+`.github/workflows/docker-image.yml` does it on GitHub, with nothing to set up:
+
+| You push | Image tag published |
+| --- | --- |
+| branch `develop` | `development` |
+| branch `staging` | `staging` |
+| branch `main` | `production` and `latest` |
+| tag `v1.2.3` | `1.2.3` |
+| any of the above | also `sha-<commit>` |
+
+A pull request only checks that the image builds. To cut a release: `git tag v1.0.0 && git push origin v1.0.0`, wait for the **Docker image** run to turn green in the Actions tab, then use `IMAGE_TAG=1.0.0` on the server. The first time, open the package on GitHub (your profile, Packages) and either make it public or let the repository read it.
+
+### Hosting platforms
+
+<p align="center">
+  <img src="docs/assets/hosting.svg" alt="Docker Compose, Coolify, Render, Heroku, Fly.io and Railway each have a ready file in the repository" width="100%" />
+</p>
+
+Every platform runs the same Dockerfile. The files are in `deploy/`, except the two Heroku reads from the repository root.
+
+| Platform | File | The one thing to set |
+| --- | --- | --- |
+| Docker Compose (a server) | `deploy/docker-compose.staging.yml`, `deploy/docker-compose.production.yml` | Run the commands above |
+| Coolify | `deploy/docker-compose.coolify.yml` | Build pack **Docker Compose**, Base Directory `/deploy`, Compose Location `/docker-compose.coolify.yml` |
+| Render | `deploy/render.yaml` | New, **Blueprint**, then set the file path to `deploy/render.yaml` in the Blueprint settings |
+| Fly.io | `deploy/fly.staging.toml`, `deploy/fly.production.toml` | `fly deploy . --config deploy/fly.staging.toml --dockerfile Dockerfile` |
+| Railway | `deploy/railway.json` | Service settings, **Config as code**, file path `/deploy/railway.json` |
+| Heroku | `heroku.yml`, `app.json` (root) | `heroku create --stack container`, then push |
+
+The steps for each one, the limits to know (Heroku has no file storage, Render cannot run LiveKit) and a troubleshooting table are in **[deploy/README.md](deploy/README.md)**.
+
+### When Docker misbehaves
+
+| You see | Why, and what to do |
+| --- | --- |
+| `open .../deploy/docker-compose.staging.yml: no such file` | You are not in the project folder, or you have not pulled the latest code. `cd` into it and `git pull` |
+| `couldn't find env file .../deploy/env/staging.env` | The settings file does not exist yet. Run `deploy/env/from-dotenv.sh staging` |
+| `required variable ... is missing a value` | Production insists on `IMAGE_TAG` and its secrets. Set them, or pass `IMAGE_TAG=1.0.0` in front of the command |
+| `port is already allocated` or `address already in use` | Another stack uses 8081. `docker ps` shows which. Stop it, or set `HTTP_PORT` for staging and production |
+| `pull access denied` or `unauthorized` from ghcr.io | Run `docker login ghcr.io`, make sure the package is readable, and check the tag exists (the Docker image run must have finished) |
+| `Connection refused` to `localhost:27017` or `6379` | A value still points at `localhost`. Inside a container that is the container itself. Use the compose service names, or the real address |
+| The container shows `unhealthy` for the first minute | Java is still starting. Allow about 90 seconds, then read `docker compose logs messenger` |
+| The build stops while downloading dependencies | A network hiccup. Run the same command again, the finished layers are cached |
+| It starts, but every request answers 401 | `JWT_SECRET` differs from the auth-service's. They must be identical |
+| Sign in fails and the log says the auth-service cannot be reached | `AUTH_SERVICE_URL` is wrong or points at `localhost` |
+| Messages only show up after a refresh | The reverse proxy does not pass websocket upgrades on `/ws` |
+| Download links inside messages open the wrong address | `STORAGE_PUBLIC_BASE_URL` is not this service's public address |
 
 ## Configuration reference
 
@@ -579,12 +745,14 @@ premisave-messenger-service/
 ├── heroku.yml, app.json  # Heroku only reads these from the root
 ├── deploy/
 │   ├── README.md         # Deploying, platform by platform
-│   ├── env/              # The values each environment needs
+│   ├── docker-compose.staging.yml, docker-compose.production.yml, docker-compose.coolify.yml
+│   ├── render.yaml, railway.json, fly.staging.toml, fly.production.toml
+│   ├── env/              # The values each environment needs, and from-dotenv.sh to fill them in
 │   └── livekit/          # LiveKit and the recorder, for calls
 ├── docs/
 │   ├── CALLS.md          # How calls work and how to set LiveKit up
 │   └── assets/           # The pictures in this README
-├── tool/readme_assets.py # Redraws those pictures (python3 tool/readme_assets.py)
+├── tool/                 # readme_assets.py and deploy_pictures.py redraw the pictures (python3 tool/readme_assets.py)
 ├── test-client/
 │   └── index.html        # Browser chat client, with calls (light and dark themes)
 └── pom.xml
