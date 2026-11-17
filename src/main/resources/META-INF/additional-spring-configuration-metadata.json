@@ -634,6 +634,12 @@
       "description": "Key used to sign download links. Leave blank to sign with jwt.secret. Set with STORAGE_SIGNING_SECRET."
     },
     {
+      "name": "storage.allowed-roots",
+      "type": "java.lang.String",
+      "description": "Folders an administrator may point storage at from the dashboard (Settings, Storage), as full paths separated by commas (env STORAGE_ALLOWED_ROOTS). Blank allows only storage.root and storage.network.mount-path themselves.",
+      "defaultValue": ""
+    },
+    {
       "name": "storage.network.protocol",
       "type": "java.lang.String",
       "description": "Protocol of the network share (informational). Set with STORAGE_NETWORK_PROTOCOL.",
