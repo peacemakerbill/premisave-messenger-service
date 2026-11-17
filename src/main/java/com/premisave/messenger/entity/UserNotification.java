@@ -38,7 +38,7 @@ public class UserNotification {
     private String actorId;
     private String actorName;
 
-    @Indexed(name = "notifications_ttl_idx", expireAfterSeconds = 15552000)
+    @Indexed(name = "notifications_ttl_idx", expireAfter = "180d")
     private LocalDateTime createdAt;
 
     private boolean read;
