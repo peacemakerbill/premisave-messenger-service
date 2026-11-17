@@ -235,7 +235,7 @@ In the Flutter app the switch is under Messenger settings, then Calls, for admin
 Where files are kept can be set in two places that work together.
 
 1. **The `.env` file** is the starting value. It is read when the service starts.
-2. **The admin dashboard** (Flutter app: Messenger settings, Storage, or the Users page, Storage button; browser client: Settings, Storage) saves values in this service's own MongoDB (collection `storage_settings`). Once something is saved there, it wins over the `.env` value. **Reset to .env** deletes the saved value and the `.env` value applies again.
+2. **The admin dashboard** (Flutter app: Settings, then Storage; browser client: Settings, Storage) saves values in this service's own MongoDB (collection `storage_settings`). Once something is saved there, it wins over the `.env` value. **Reset to .env** deletes the saved value and the `.env` value applies again.
 
 What an administrator can set:
 
@@ -255,7 +255,9 @@ Safety rules, always on:
 
 With Docker, the service only sees folders mounted into the container (`/data/messenger-storage` and `/data/recordings`). To offer another folder, add a volume for it in `docker-compose.yml` and put its container path in `STORAGE_ALLOWED_ROOTS`.
 
-Call recordings: the recorder writes into the folder fixed by its Docker mount, so the dashboard can only choose a subfolder inside it. New videos are saved in `<subfolder>/<callId>/<recordingId>.mp4`, and videos already saved stay where they are.
+**Folder picker.** Next to every folder field the app has a folder button that opens a picker with the server's own folders (not the folders of the phone or computer running the app, because the files are kept on the server). It shows only folders inside the allowed roots, plus the recorder's folder for recordings, leaves out hidden folders and links that lead outside, and has a **New folder** button. The path can still be typed. It uses `GET /api/storage-settings/browse` and `POST /api/storage-settings/folders`.
+
+Call recordings: the recorder writes into the folder fixed by its Docker mount, so the dashboard can only choose a subfolder inside it. To record onto another disk or share, point `CALLS_RECORDINGS_HOST_DIR` at it (or at a parent folder that holds the places you want) and restart the recorder. New videos are saved in `<subfolder>/<callId>/<recordingId>.mp4`, and videos already saved stay where they are.
 
 | Method | Endpoint | Purpose |
 |---|---|---|
@@ -263,6 +265,8 @@ Call recordings: the recorder writes into the folder fixed by its Docker mount, 
 | `POST` | `/api/storage-settings/attachments/check` | Try chat-file values without saving: `{ mode, root, networkMountPath, networkDirectory, networkRequireMount }`. Returns `{ ok, problem, location, freeMb }` |
 | `PUT` | `/api/storage-settings/attachments` | Save them (same body). `400` with the reason when the folder is refused |
 | `DELETE` | `/api/storage-settings/attachments` | Reset chat files to the `.env` values |
+| `GET` | `/api/storage-settings/browse?path=` | The folder picker: the folders inside `path`, or the folders that may be chosen when `path` is left out. Returns `{ path, parent, top, exists, canCreate, writable, freeMb, truncated, folders: [{ name, path }] }` |
+| `POST` | `/api/storage-settings/folders` | Make a folder from the picker: `{ parent, name }`. Returns the new folder in the same shape |
 | `POST` / `PUT` / `DELETE` | `/api/storage-settings/recordings[/check]` | The same for recordings, with `{ subfolder, minFreeMb }` |
 
 ### Set up and run LiveKit

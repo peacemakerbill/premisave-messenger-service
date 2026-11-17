@@ -1,6 +1,7 @@
 package com.premisave.messenger.controller;
 
 import com.premisave.messenger.dto.request.StorageAttachmentsRequest;
+import com.premisave.messenger.dto.request.StorageFolderRequest;
 import com.premisave.messenger.dto.request.StorageRecordingsRequest;
 import com.premisave.messenger.dto.response.StorageCheckResponse;
 import com.premisave.messenger.dto.response.StorageSettingsResponse;
@@ -9,6 +10,7 @@ import com.premisave.messenger.exception.HttpStatusException;
 import com.premisave.messenger.security.CurrentUserResolver;
 import com.premisave.messenger.service.StorageAdminService;
 import com.premisave.messenger.service.StorageSettingsService;
+import com.premisave.messenger.storage.FolderBrowser;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,6 +40,26 @@ public class StorageSettingsController {
     public ResponseEntity<StorageSettingsResponse> get(@RequestHeader("Authorization") String authHeader) {
         requireAdmin(authHeader);
         return ResponseEntity.ok(admin.view());
+    }
+
+    // ---------------------------------------------------------------- folder picker
+
+    /** The folders inside {@code path}. Without a path, the folders an administrator may choose from. */
+    @GetMapping("/browse")
+    public ResponseEntity<FolderBrowser.Listing> browse(
+            @RequestParam(required = false) String path,
+            @RequestHeader("Authorization") String authHeader) {
+        requireAdmin(authHeader);
+        return ResponseEntity.ok(admin.browse(path));
+    }
+
+    /** Makes a folder from the picker and returns it, ready to open. */
+    @PostMapping("/folders")
+    public ResponseEntity<FolderBrowser.Listing> createFolder(
+            @RequestBody StorageFolderRequest request,
+            @RequestHeader("Authorization") String authHeader) {
+        requireAdmin(authHeader);
+        return ResponseEntity.ok(admin.createFolder(request == null ? null : request.parent(), request == null ? null : request.name()));
     }
 
     // ---------------------------------------------------------------- attachments, group photos, status media

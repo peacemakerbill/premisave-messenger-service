@@ -7,12 +7,15 @@ import com.premisave.messenger.dto.response.StorageCheckResponse;
 import com.premisave.messenger.dto.response.StorageSettingsResponse;
 import com.premisave.messenger.entity.StorageSettings;
 import com.premisave.messenger.exception.HttpStatusException;
+import com.premisave.messenger.storage.FolderBrowser;
 import com.premisave.messenger.storage.RecordingStorage;
 import com.premisave.messenger.storage.StorageLocation;
 import com.premisave.messenger.storage.StorageMode;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * The administrators' storage screen: what is in use now, where it comes from (.env or the dashboard), whether it works, and
@@ -86,6 +89,40 @@ public class StorageAdminService {
                 status.ready(),
                 status.problem(),
                 status.freeMb());
+    }
+
+    // ============================================================ folder picker
+
+    /**
+     * The folders the picker may show: the allowed roots, and the folder the recorder writes to, because that is where the
+     * recordings folder is chosen.
+     */
+    private List<Path> browsableRoots() {
+        List<Path> roots = new ArrayList<>(settings.allowedRoots());
+        try {
+            Path recorder = recordingStorage.root();
+            if (!roots.contains(recorder)) roots.add(recorder);
+        } catch (IllegalStateException ignored) {
+            // the recorder folder is not set in .env, so there is nothing to add
+        }
+        return roots;
+    }
+
+    /** The folders inside {@code path}, or the folders an administrator may choose from when it is blank. */
+    public FolderBrowser.Listing browse(String path) {
+        try {
+            return FolderBrowser.list(path, browsableRoots());
+        } catch (IllegalArgumentException e) {
+            throw HttpStatusException.badRequest(e.getMessage());
+        }
+    }
+
+    public FolderBrowser.Listing createFolder(String parent, String name) {
+        try {
+            return FolderBrowser.create(parent, name, browsableRoots());
+        } catch (IllegalArgumentException e) {
+            throw HttpStatusException.badRequest(e.getMessage());
+        }
     }
 
     // ============================================================ recordings
