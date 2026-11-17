@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -73,6 +74,9 @@ public class GroupInviteService {
             invite.setMaxUses(maxUses);
             try {
                 GroupInvite saved = inviteRepository.save(invite);
+                // Two admins making a link at the same moment could each leave the other's link open.
+                // Whatever happened, the link just saved is the only working one.
+                revokeOthers(groupId, saved.getId(), now);
                 log.info("Invite link created for group {} by {} (expires {}, max uses {})", groupId, userId, invite.getExpiresAt(), maxUses);
                 return saved;
             } catch (DuplicateKeyException e) {
@@ -87,7 +91,7 @@ public class GroupInviteService {
         groupService.requireManager(groupId, userId, "Only a group admin can see the invite link");
         return inviteRepository.findByGroupIdAndRevokedFalse(groupId).stream()
                 .filter(GroupInviteService::isUsable)
-                .findFirst()
+                .max(Comparator.comparing(GroupInvite::getCreatedAt))
                 .orElseThrow(() -> HttpStatusException.notFound("INVITE_NOT_FOUND", "This group has no invite link yet"));
     }
 
@@ -209,6 +213,14 @@ public class GroupInviteService {
             i.setRevokedAt(now);
         });
         inviteRepository.saveAll(open);
+    }
+
+    /** Revokes every open link of the group except the one named. */
+    private void revokeOthers(String groupId, String keepId, LocalDateTime when) {
+        mongoTemplate.updateMulti(
+                Query.query(Criteria.where("groupId").is(groupId).and("revoked").is(false).and("id").ne(keepId)),
+                new Update().set("revoked", true).set("revokedAt", when),
+                GroupInvite.class);
     }
 
     private static boolean isUsable(GroupInvite invite) {
