@@ -507,11 +507,16 @@ The steps for each one, the limits to know (Heroku has no file storage, Render c
 | `CALLS_MAX_PARTICIPANTS` / `CALLS_RING_LIMIT` | No | `50` / `32` | The most people in one call, and the most people a group call rings at once. Other group members can still join from the chat. |
 | `CALLS_LINK_BASE_URL` / `CALLS_LINK_TTL_HOURS` | No | `https://premisave.com/call` / `168` | Start of every call link, and the longest a call link stays valid. |
 | `CALLS_RECORDINGS_MODE` | No | `LOCAL` | Where call recordings are kept: `LOCAL` (a folder on the server) or `NETWORK` (a share mounted by the operating system). |
-| `CALLS_RECORDINGS_DIR` | LOCAL mode | `deploy/livekit/recordings` | The folder for recordings in `LOCAL` mode. The LiveKit recorder writes here too. |
+| `CALLS_RECORDING_ENABLED` | No | `false` | The starting value of the recording switch. Administrators change it from the dashboard and their choice then wins. |
+| `CALLS_RECORDINGS_DIR` | LOCAL mode | `deploy/livekit/recordings` | The folder for recordings in `LOCAL` mode. Use an absolute path to keep videos with your other files. The LiveKit recorder must write to the same folder. |
+| `CALLS_RECORDINGS_HOST_DIR` | Recorder | `deploy/livekit/recordings` | The same folder as the LiveKit recorder container sees it, read by `deploy/livekit` and the compose files. Empty uses the default. |
 | `CALLS_RECORDINGS_NETWORK_MOUNT_PATH` | NETWORK mode | blank | Where the share is mounted, for example `/mnt/premisave-nas`. |
 | `CALLS_RECORDINGS_NETWORK_DIRECTORY` | No | `premisave-recordings` | A folder inside the share. Blank uses the mount path itself. |
 | `CALLS_RECORDINGS_NETWORK_REQUIRE_MOUNT` | No | `true` | Refuse to record unless the mount path is really a network filesystem (cifs, nfs and so on). |
 | `CALLS_RECORDINGS_MIN_FREE_MB` | No | `500` | Recording will not start when less than this is free. |
+| `CALLS_RECORDINGS_EGRESS_DIR` | No | `/out` | The folder inside the recorder container. Leave it as it is. |
+| `CALLS_RECORDING_LAYOUT` | No | `speaker` | How the recorded video is laid out (a LiveKit layout name, for example `speaker` or `grid`). |
+| `CALLS_RECORDING_LINK_TTL_HOURS` | No | `6` | How long a recording's play link stays valid. |
 | `SPRING_PROFILES_ACTIVE` | No | `prod` in the Docker image | `dev`, `staging` or `prod`. Sets log levels and is how one image becomes each environment. |
 | `PORT` | No | `8081` | The port the container listens on. Hosting platforms set it for you. |
 | `STORAGE_SIGNING_SECRET` | No | `JWT_SECRET` | Key used to sign download links. |
