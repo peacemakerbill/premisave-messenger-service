@@ -1,85 +1,60 @@
-<p align="center">
-  <img src="docs/assets/banner.svg" alt="Premisave Messenger: chat, presence and calls for the Premisave platform" width="100%" />
-</p>
+<div align="center">
 
-<h1 align="center">Premisave Messenger Service: Real-Time Chat &amp; Presence API</h1>
+<img src="docs/assets/banner.svg" alt="Premisave Messenger: chat, presence and calls for the Premisave platform" width="100%"/>
 
-<p align="center">
-  <b>A production-minded Spring Boot 4 &amp; MongoDB microservice powering real-time 1:1 and group messaging for the Premisave platform — WebSocket/STOMP delivery, Redis-relayed for correct behavior across multiple instances, with live presence, typing, delivery, and read-receipt tracking.</b>
-</p>
+<br/>
 
-<p align="center">
-  <a href="https://github.com/peacemakerbill">
-    <img src="https://avatars.githubusercontent.com/u/262163756?v=4&s=200" width="110" height="110" alt="Bill Graham Peacemaker (peacemakerbill) GitHub profile picture" />
-  </a>
-  <br/>
-  <sub>Built by <a href="https://github.com/peacemakerbill"><b>Bill Graham Peacemaker</b></a> (<code>@peacemakerbill</code>) · Backend Developer &amp; API Support Engineer · Nairobi, Kenya</sub>
-</p>
+[![Java 21](https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
+[![Spring Boot 4.1](https://img.shields.io/badge/Spring_Boot-4.1-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![MongoDB Spring Data](https://img.shields.io/badge/MongoDB-Spring_Data-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com)
+[![Redis Pub%2FSub](https://img.shields.io/badge/Redis-Pub%2FSub-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io)
+[![STOMP WebSocket](https://img.shields.io/badge/STOMP-WebSocket-0E9AA7?style=for-the-badge&logo=websocket&logoColor=white)](https://stomp.github.io)
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java 21" />
-  <img src="https://img.shields.io/badge/Spring_Boot-4.1.2-6DB33F?style=for-the-badge&logo=springboot&logoColor=white" alt="Spring Boot 4.1.2" />
-  <img src="https://img.shields.io/badge/Spring_Framework-7.0.9-6DB33F?style=for-the-badge&logo=spring&logoColor=white" alt="Spring Framework 7" />
-  <img src="https://img.shields.io/badge/Spring_Cloud-2025.1.2-6DB33F?style=for-the-badge&logo=spring&logoColor=white" alt="Spring Cloud 2025.1.2 Oakwood" />
-  <img src="https://img.shields.io/badge/MongoDB-Spring_Data-47A248?style=for-the-badge&logo=mongodb&logoColor=white" alt="MongoDB with Spring Data" />
-  <img src="https://img.shields.io/badge/Redis-Pub%2FSub_%26_Cache-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis pub/sub and cache" />
-  <img src="https://img.shields.io/badge/STOMP-WebSocket-0E9AA7?style=for-the-badge&logo=websocket&logoColor=white" alt="STOMP over WebSocket" />
-  <img src="https://img.shields.io/badge/Maven-Build-C71A36?style=for-the-badge&logo=apachemaven&logoColor=white" alt="Apache Maven" />
-</p>
+![LiveKit Calls](https://img.shields.io/badge/LiveKit-Calls-0E3B2F?style=flat-square)
+![Maven Wrapper](https://img.shields.io/badge/Maven-Wrapper-C71A36?style=flat-square&logo=apachemaven&logoColor=white)
+![License Proprietary](https://img.shields.io/badge/License-Proprietary-C0392B?style=flat-square)
 
-<p align="center">
-  <a href="https://github.com/peacemakerbill/premisave-messenger-service/stargazers"><img src="https://img.shields.io/github/stars/peacemakerbill/premisave-messenger-service?style=for-the-badge&logo=github" alt="GitHub stars" /></a>
-  <a href="https://github.com/peacemakerbill/premisave-messenger-service/network/members"><img src="https://img.shields.io/github/forks/peacemakerbill/premisave-messenger-service?style=for-the-badge&logo=github" alt="GitHub forks" /></a>
-  <a href="https://github.com/peacemakerbill/premisave-messenger-service/issues"><img src="https://img.shields.io/github/issues/peacemakerbill/premisave-messenger-service?style=for-the-badge" alt="Open issues" /></a>
-  <a href="https://github.com/peacemakerbill/premisave-messenger-service/commits"><img src="https://img.shields.io/github/last-commit/peacemakerbill/premisave-messenger-service?style=for-the-badge" alt="Last commit" /></a>
-  <img src="https://img.shields.io/github/repo-size/peacemakerbill/premisave-messenger-service?style=for-the-badge" alt="Repository size" />
-  <img src="https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge" alt="Proprietary license" />
-  <img src="https://img.shields.io/badge/Made_in-Nairobi,_Kenya-000000?style=for-the-badge" alt="Made in Nairobi, Kenya" />
-</p>
+[![Last commit](https://img.shields.io/github/last-commit/peacemakerbill/premisave-messenger-service?style=flat-square&color=14493B)](https://github.com/peacemakerbill/premisave-messenger-service/commits/main)
+[![Stars](https://img.shields.io/github/stars/peacemakerbill/premisave-messenger-service?style=flat-square&color=14493B)](https://github.com/peacemakerbill/premisave-messenger-service/stargazers)
+[![Issues](https://img.shields.io/github/issues/peacemakerbill/premisave-messenger-service?style=flat-square&color=14493B)](https://github.com/peacemakerbill/premisave-messenger-service/issues)
+[![Frontend](https://img.shields.io/badge/frontend-premisave__flutter__frontend-0E3B2F?style=flat-square&logo=flutter&logoColor=E3A72F)](https://github.com/peacemakerbill/premisave_flutter_frontend)
 
-<p align="center">
-  <a href="#quick-start">Quick start</a> ·
-  <a href="#architecture">Architecture</a> ·
-  <a href="#how-real-time-delivery-works">Real-time delivery</a> ·
-  <a href="#how-presence-tracking-works">Presence</a> ·
-  <a href="#calls-and-recordings">Calls</a> ·
-  <a href="#run-it-with-docker-and-deploy-it">Docker</a> ·
-  <a href="#api-reference">API reference</a> ·
-  <a href="#configuration-reference">Configuration</a> ·
-  <a href="#troubleshooting">Troubleshooting</a>
-</p>
+**[Quick start](#quick-start)** &nbsp;|&nbsp; **[Where it sits](#where-it-sits)** &nbsp;|&nbsp; **[Flutter app](#connected-to-the-flutter-app)** &nbsp;|&nbsp; **[Architecture](#architecture)** &nbsp;|&nbsp; **[Real-time delivery](#how-real-time-delivery-works)** &nbsp;|&nbsp; **[Calls](#calls-and-recordings)** &nbsp;|&nbsp; **[API reference](#api-reference)** &nbsp;|&nbsp; **[Troubleshooting](#troubleshooting)**
+
+</div>
+
+<img src="docs/assets/divider.svg" alt="" width="100%"/>
 
 > **If this saves you time building real-time chat with Spring and STOMP, please star the repo.** It helps other developers find a working, horizontally-scalable reference implementation.
 
 > **Disclaimer.** This is an independent, community-built project shared as a portfolio and reference implementation. It is not affiliated with or endorsed by any third party mentioned here. Always follow your own provider's current documentation for production credentials and go-live requirements.
 
-<p align="center"><img src="docs/assets/divider.svg" alt="" width="100%" /></p>
+## Contents
 
-## Table of contents
+- [What is this?](#what-is-this)
+- [Features](#features)
+- [Architecture](#architecture)
+- [How real-time delivery works](#how-real-time-delivery-works)
+- [How presence tracking works](#how-presence-tracking-works)
+- [Calls and recordings](#calls-and-recordings)
+- [Quick start](#quick-start)
+- [Run it with Docker and deploy it](#run-it-with-docker-and-deploy-it)
+- [Where it sits](#where-it-sits)
+- [Connected to the Flutter app](#connected-to-the-flutter-app)
+- [Configuration reference](#configuration-reference)
+- [API reference](#api-reference)
+- [WebSocket destinations reference](#websocket-destinations-reference)
+- [Testing with the browser chat client](#testing-with-the-browser-chat-client)
+- [Data model](#data-model)
+- [Scaling and production readiness](#scaling-and-production-readiness)
+- [Security notes](#security-notes)
+- [Project structure](#project-structure)
+- [Troubleshooting](#troubleshooting)
+- [Roadmap ideas](#roadmap-ideas)
+- [Contributing](#contributing)
+- [Author](#author)
 
-1. [What is this?](#what-is-this)
-2. [Features](#features)
-3. [Architecture](#architecture)
-4. [How real-time delivery works](#how-real-time-delivery-works)
-5. [How presence tracking works](#how-presence-tracking-works)
-6. [Calls and recordings](#calls-and-recordings)
-   - [Set up and run LiveKit](#set-up-and-run-livekit)
-7. [Quick start](#quick-start)
-8. [Run it with Docker and deploy it](#run-it-with-docker-and-deploy-it)
-9. [Configuration reference](#configuration-reference)
-10. [API reference](#api-reference)
-11. [WebSocket destinations reference](#websocket-destinations-reference)
-12. [Testing with the browser chat client](#testing-with-the-browser-chat-client)
-13. [Data model](#data-model)
-14. [Scaling and production readiness](#scaling-and-production-readiness)
-15. [Security notes](#security-notes)
-16. [Project structure](#project-structure)
-17. [Troubleshooting](#troubleshooting)
-18. [Roadmap ideas](#roadmap-ideas)
-19. [Contributing](#contributing)
-20. [Author](#author)
-
----
+<img src="docs/assets/divider.svg" alt="" width="100%"/>
 
 ## What is this?
 
@@ -602,6 +577,108 @@ The steps for each one, the limits to know (Heroku has no file storage, Render c
 | Messages only show up after a refresh | The reverse proxy does not pass websocket upgrades on `/ws` |
 | Download links inside messages open the wrong address | `STORAGE_PUBLIC_BASE_URL` is not this service's public address |
 
+<img src="docs/assets/divider.svg" alt="" width="100%"/>
+
+## Where it sits
+
+<img src="docs/assets/services.svg" alt="The Flutter app on the left and the seven Premisave services on the right with their ports and the setting that holds each address. This service is picked out." width="100%"/>
+
+The messenger carries chats, presence and calls. The Flutter app talks to it over REST and a STOMP WebSocket, it checks the auth-service token, and it asks the auth-service for profiles and notification emails.
+
+| Caller | What for | Proves who it is with |
+| --- | --- | --- |
+| Flutter app | Messages: chats, groups, statuses, calls | the person's bearer token |
+| auth-service | called by this service for profiles and emails | `X-API-Key` internal key |
+| LiveKit | the audio and video of a call | a token this service signs |
+
+It listens on port **8081**. The Flutter app finds it with the setting `MESSENGER_URL`.
+
+<img src="docs/assets/divider.svg" alt="" width="100%"/>
+
+## Connected to the Flutter app
+
+<img src="docs/assets/connect.svg" alt="A screen asks a provider, which asks the repository, which uses the API client to call this service." width="100%"/>
+
+The Flutter app's **Messages** tab uses this service. The [app's messenger guide](https://github.com/peacemakerbill/premisave_flutter_frontend/blob/main/docs/MESSENGER.md) covers the screens, calls and recording from the app side.
+
+The code is in [`premisave_flutter_frontend`](https://github.com/peacemakerbill/premisave_flutter_frontend): the repository class is `lib/src/data/repositories/messenger_repository.dart`, the providers are in `lib/src/state`, and every call below goes through one client built for this service.
+
+### What the app does with it
+
+| Screen | What it does | Calls |
+| --- | --- | --- |
+| Chats and groups | Private chats, groups, members, invite links and QR codes | `/api/chats`, `/api/chats/private`, `/api/groups` |
+| Messages and files | Send, reply, react, attach, and the delivery settings | `/api/messages`, `/api/messages/settings`, `/api/attachments` |
+| People | Who I can message, and my own details | `/api/users`, `/api/users/me`, `/api/users/search` |
+| Statuses | Post, view and expire statuses | `/api/status`, `/api/status/feed`, `/api/status/mine`, `/api/status/mine/past`, `/api/status/settings` |
+| Notifications | Counts and read marks | `/api/notifications`, `/api/notifications/read-all`, `/api/notifications/unread-count` |
+| Calls | Start, join, link and record | `/api/calls`, `/api/calls/active`, `/api/calls/links`, `/api/call-settings`, `/api/call-settings/recording` |
+| Storage | Where chat files and recordings are kept | `/api/storage-settings`, `/admin/storage-settings` |
+| Live delivery | Typing, presence, new messages and call events | WebSocket `/ws-messenger` |
+
+- The app sends the same bearer token as for the auth-service, and the WebSocket connects with it.
+- The app's messenger client shares the saved sign in, and a refresh goes through the auth-service.
+- Answers are plain bodies, not an envelope.
+
+### Settings
+
+In the Flutter app, in `config/env/*.json` or passed with `--dart-define`:
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `MESSENGER_URL` | `http://localhost:8081`, or `http://10.0.2.2:8081` on the Android emulator | Where this service lives, with no trailing slash |
+
+On a real phone `localhost` is the phone itself, so use the computer's address on the network. Flutter reads these values only at launch: stop the app and run it again after a change.
+
+In this service's `.env`:
+
+| Variable | Why the app cares |
+| --- | --- |
+| `JWT_SECRET` | Must equal the auth-service value |
+| `AUTH_SERVICE_URL` | Where profiles are fetched |
+| `INTERNAL_API_KEY` | The same value as `API_KEY` in the auth-service. Without it no notification emails are sent |
+
+### Signing and tokens
+
+The app sends `Authorization: Bearer <access token>`. It leaves out the device headers (`X-Client-Platform`, `X-Device-Token`) that only the auth-service reads. The service checks the signature with the same `JWT_SECRET` as the auth-service and reads the user from the claims, so **the two values must be identical**. When the access token has expired the app asks the auth-service for a new one and sends the request again, so this service never sees a refresh.
+
+### Browser rules (CORS)
+
+A phone or desktop build is not stopped by CORS. A browser is, so for the web build this service must allow the address the app is served from, which is `http://localhost:3000` in development.
+
+| Setting | Default | What to do |
+| --- | --- | --- |
+| none | any origin | REST and the WebSocket both allow every origin pattern, so nothing needs setting for the web build. Narrow it before production. |
+
+### Run it together
+
+Each command is run in its own terminal. Start the services this one needs first.
+
+```bash
+# 1. premisave_auth_service
+cd ~/MyProjects/premisave/premisave_auth_service && ./mvnw spring-boot:run
+
+# 2. this service
+cd ~/MyProjects/premisave/premisave-messenger-service && ./mvnw spring-boot:run
+
+# 3. the app, on the port the backends allow for browsers
+cd ~/MyProjects/premisave/premisave_flutter_frontend
+flutter run -d chrome --web-port=3000 --dart-define-from-file=config/env/dev.local.json
+```
+
+Leave `MESSENGER_URL` empty in the app's file and it finds this service on `localhost:8081`. The same walk through for every service is in [the app's docs](https://github.com/peacemakerbill/premisave_flutter_frontend/blob/main/docs/SERVICES.md).
+
+### If it does not connect
+
+| You see | Likely cause | Do this |
+| --- | --- | --- |
+| Messages says it cannot connect | The messenger is not running, or `MESSENGER_URL` points elsewhere | Start it, or set `MESSENGER_URL` and restart the app |
+| Chats load but nothing arrives live | The WebSocket cannot connect | Check `/ws-messenger` is reachable, and that a proxy in front allows WebSocket upgrades |
+| 401 straight after signing in | `JWT_SECRET` differs from the auth-service | Copy the auth-service value into this service's `.env` |
+| Calls ring but have no audio | LiveKit is not running | Follow the LiveKit steps in [Calls and recordings](#calls-and-recordings) |
+
+<img src="docs/assets/divider.svg" alt="" width="100%"/>
+
 ## Configuration reference
 
 | Variable | Required | Default | Purpose |
@@ -993,7 +1070,7 @@ Found a bug or have a real-time messaging question? [Open an issue](https://gith
   <img src="https://api.star-history.com/svg?repos=peacemakerbill/premisave-messenger-service&type=Date" alt="Star history chart for premisave-messenger-service" width="600" />
 </a>
 
----
+<img src="docs/assets/divider.svg" alt="" width="100%"/>
 
 <details>
 <summary>Search keywords</summary>
